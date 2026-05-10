@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Monitoring</p>
+        <h1>Latency</h1>
+    </div>
+    <div class="refresh-state" id="monitoring-refresh-state">Loading</div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Latency Targets</h2>
+        <div class="panel-actions">
+            <span id="latency-target-count">targets={{ latency_targets|length }}</span>
+            <button class="text-button compact primary" type="button" data-latency-add>Add</button>
+        </div>
+    </div>
+    <div class="table-wrap latency-targets-table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Interface</th>
+                    <th>Target</th>
+                    <th>Count</th>
+                    <th>Timeout</th>
+                    <th>Status</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="latency-targets-body">
+                {% for target in latency_targets %}
+                <tr>
+                    <td><span class="iface-tooltip" title="{{ target.interface_tooltip }}">{{ target.iface }}</span></td>
+                    <td>{{ target.target }}</td>
+                    <td>{{ target.count }}</td>
+                    <td>{{ target.timeout }}s</td>
+                    <td>{% if target.enabled %}enabled{% else %}disabled{% endif %}</td>
+                    <td>{{ target.updated_at }}</td>
+                    <td>
+                        <button class="text-button compact" type="button" data-latency-edit="{{ target.id }}">Edit</button>
+                        <button class="text-button compact" type="button" data-latency-toggle="{{ target.id }}" data-enabled="{{ target.enabled }}">{% if target.enabled %}Disable{% else %}Enable{% endif %}</button>
+                        <button class="text-button compact" type="button" data-latency-delete="{{ target.id }}">Delete</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="empty-state">No latency targets configured</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="monitoring-periods" aria-label="Graph period">
+    {% for period in periods %}
+    <button
+        class="period-button {% if period.id == 'daily' %}active{% endif %}"
+        type="button"
+        data-period-button="{{ period.id }}"
+    >{{ period.label }}</button>
+    {% endfor %}
+</section>
+
+<section class="monitoring-controls" aria-label="Latency target selection">
+    <label class="monitoring-select-label" for="latency-target-select">Target</label>
+    <select id="latency-target-select" class="monitoring-select">
+        {% for target in targets %}
+        <option value="{{ target.safe_name }}">{{ target.label }}</option>
+        {% endfor %}
+    </select>
+</section>
+
+<section class="monitoring-grid" id="latency-graphs" aria-label="Latency monitoring graphs">
+    {% for graph in graphs %}
+    <article
+        class="panel monitoring-graph"
+        data-graph-card
+        data-graph-id="{{ graph.id }}"
+        data-latency-target="{{ graph.latency_target_name }}"
+    >
+        <div class="panel-head">
+            <h2>{{ graph.title }}</h2>
+            <span data-graph-period-label>Daily / {{ graph.rrd }}</span>
+        </div>
+        <div class="monitoring-graph-body">
+            {% set daily = graph.periods.daily %}
+            {% if daily.exists %}
+            <button class="monitoring-graph-zoom" type="button" data-graph-zoom aria-label="Open {{ graph.title }} graph">
+                <img
+                    src="{{ daily.image_url }}?v={{ daily.updated_at }}"
+                    alt="{{ graph.title }} graph"
+                    data-graph-image
+                    data-graph-src="{{ daily.image_url }}"
+                >
+            </button>
+            {% else %}
+            <div class="empty-state">Graph not generated yet</div>
+            {% endif %}
+        </div>
+        <div class="monitoring-graph-foot">
+            <span>{{ graph.description }}</span>
+            <span data-graph-updated>{% if daily.exists %}ready{% else %}missing{% endif %}</span>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+
+<div class="graph-modal" id="graph-modal" hidden>
+    <button class="graph-modal-backdrop" type="button" data-graph-modal-close aria-label="Close graph preview"></button>
+    <section class="graph-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="graph-modal-title">
+        <div class="graph-modal-head">
+            <div>
+                <p class="eyebrow">Graph Preview</p>
+                <h2 id="graph-modal-title">Graph</h2>
+            </div>
+            <button class="icon-button" type="button" data-graph-modal-close aria-label="Close">X</button>
+        </div>
+        <div class="graph-modal-body">
+            <img id="graph-modal-image" alt="Expanded monitoring graph">
+        </div>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="latency-edit-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="latency-edit-title">
+        <div class="panel-head">
+            <h2 id="latency-edit-title">Edit latency target</h2>
+            <button class="icon-button" type="button" data-latency-modal-close aria-label="Close popup">x</button>
+        </div>
+        <form class="edit-form" id="latency-edit-form">
+            <input id="latency-edit-id" name="id" type="hidden">
+            <div class="form-grid">
+                <label class="field">
+                    <span>Interface</span>
+                    <input id="latency-edit-iface" name="iface" type="text" required>
+                </label>
+                <label class="field">
+                    <span>Target</span>
+                    <input id="latency-edit-target" name="target" type="text" required>
+                </label>
+                <label class="field">
+                    <span>Count</span>
+                    <input id="latency-edit-count" name="count" type="number" min="1" required>
+                </label>
+                <label class="field">
+                    <span>Timeout</span>
+                    <input id="latency-edit-timeout" name="timeout" type="number" min="1" required>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="text-button" type="button" data-latency-modal-close>Cancel</button>
+                <button class="text-button primary" type="submit">Save</button>
+            </div>
+            <div class="form-status" id="latency-edit-status"></div>
+        </form>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="latency-delete-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="latency-delete-title">
+        <div class="panel-head">
+            <h2 id="latency-delete-title">Delete latency target</h2>
+            <button class="icon-button" type="button" data-latency-delete-close aria-label="Close popup">x</button>
+        </div>
+        <div class="terminal-empty">
+            <span class="prompt">$</span>
+            <span id="latency-delete-message">confirm delete</span>
+        </div>
+        <div class="form-actions">
+            <button class="text-button" type="button" data-latency-delete-close>Cancel</button>
+            <button class="text-button primary" type="button" id="latency-delete-confirm">Delete</button>
+        </div>
+        <div class="form-status" id="latency-delete-status"></div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/monitoring_latency.js') }}" defer></script>
+{% endblock %}

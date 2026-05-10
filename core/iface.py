@@ -1,0 +1,181 @@
+from __future__ import annotations
+
+from typing import Any
+from fastapi import HTTPException
+
+from core import db
+
+
+def db_rows(query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    """Run a database query and translate storage errors to HTTP errors."""
+    try:
+        return db.fetch_all(query, params)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="Interface database is not ready.") from exc
+    except db.DatabaseError as exc:
+        raise HTTPException(status_code=500, detail="Interface database query failed.") from exc
+
+
+def byte_label(value: int | None) -> str:
+    """Format a byte count as a compact binary unit label."""
+    number = float(value or 0)
+    units = ("B", "KiB", "MiB", "GiB", "TiB")
+    unit = 0
+    while number >= 1024 and unit < len(units) - 1:
+        number /= 1024
+        unit += 1
+    if unit == 0:
+        return f"{int(number)} {units[unit]}"
+    return f"{number:.1f} {units[unit]}"
+
+
+def get_interfaces() -> dict[str, Any]:
+    """Return interface inventory enriched with addresses and labels."""
+    interfaces = db_rows(
+        """
+        SELECT
+            i.id,
+            i.name,
+            i.is_actived,
+            i.description,
+            i.mtu,
+            i.mac_address,
+            i.role,
+            i.type,
+            i.speed_mbps,
+            i.duplex,
+            i.protected,
+            i.collected_at,
+            s.rx_bytes,
+            s.rx_packets,
+            s.rx_errors,
+            s.rx_dropped,
+            s.tx_bytes,
+            s.tx_packets,
+            s.tx_errors,
+            s.tx_dropped,
+            s.collected_at AS stats_collected_at
+        FROM ifaces i
+        LEFT JOIN stats s ON s.iface_id = i.id
+        ORDER BY
+            CASE i.role WHEN 'LAN' THEN 0 WHEN 'WAN' THEN 1 ELSE 2 END,
+            i.name
+        """
+    )
+    addresses = db_rows(
+        """
+        SELECT
+            iface_id,
+            addr_family,
+            addr,
+            prefixlen,
+            broadcast,
+            scopeid
+        FROM addresses
+        ORDER BY addr_family, addr
+        """
+    )
+
+    by_iface: dict[int, list[dict[str, Any]]] = {}
+    for address in addresses:
+        by_iface.setdefault(int(address["iface_id"]), []).append(address)
+
+    for iface in interfaces:
+        iface["addresses"] = by_iface.get(int(iface["id"]), [])
+        iface["rx_label"] = byte_label(iface.get("rx_bytes"))
+        iface["tx_label"] = byte_label(iface.get("tx_bytes"))
+
+    return {"interfaces": interfaces}
+
+
+def get_traffic_counters() -> dict[str, Any]:
+    """Return summary and raw counters for all interfaces."""
+    interfaces = get_interfaces()["interfaces"]
+    active_count = sum(1 for item in interfaces if item.get("is_actived") == 1)
+    newest = max((item.get("stats_collected_at") or "" for item in interfaces), default="")
+    return {
+        "summary": {
+            "interfaces": len(interfaces),
+            "active": active_count,
+            "updated_at": newest,
+        },
+        "interfaces": interfaces,
+    }
+
+
+def get_proc_values() -> dict[str, Any]:
+    """Return collected proc values joined with interface metadata."""
+    rows = db_rows(
+        """
+        SELECT
+            p.id,
+            p.iface_id,
+            i.name AS iface_name,
+            i.role AS iface_role,
+            p.addr_family,
+            p.proc_path,
+            p.description,
+            p.default_value,
+            p.desired_value,
+            p.collected_at,
+            p.updated_at
+        FROM proc p
+        JOIN ifaces i ON i.id = p.iface_id
+        ORDER BY i.name, p.addr_family, p.proc_path
+        """
+    )
+    return {"proc": rows}
+
+
+def update_proc_desired_value(iface_name: str, proc_path: str, desired_value: str) -> dict[str, Any]:
+    """Update the desired proc value for a specific interface."""
+    try:
+        with db.transaction() as conn:
+            cursor = db.execute_on(
+                conn,
+                """
+                UPDATE proc
+                SET desired_value = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE proc_path = ?
+                  AND iface_id = (
+                      SELECT id
+                      FROM ifaces
+                      WHERE name = ?
+                  )
+                """,
+                (desired_value, proc_path, iface_name),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Proc value not found.")
+
+            row = db.fetch_one_on(
+                conn,
+                """
+                SELECT
+                    p.id,
+                    p.iface_id,
+                    i.name AS iface_name,
+                    i.role AS iface_role,
+                    p.addr_family,
+                    p.proc_path,
+                    p.description,
+                    p.default_value,
+                    p.desired_value,
+                    p.collected_at,
+                    p.updated_at
+                FROM proc p
+                JOIN ifaces i ON i.id = p.iface_id
+                WHERE i.name = ?
+                  AND p.proc_path = ?
+                """,
+                (iface_name, proc_path),
+            )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="Interface database is not ready.") from exc
+    except db.DatabaseError as exc:
+        raise HTTPException(status_code=500, detail="Interface database update failed.") from exc
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Proc value not found.")
+
+    return {"proc": dict(row)}

@@ -1,0 +1,73 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Python virtual environments and local package state
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+
+# Local environment and secrets
+.env
+.env.*
+*.key
+*.pem
+*.crt
+*.csr
+*.p12
+*.pfx
+
+# ArmFirewall runtime configuration generated on target hosts
+conf/armfw.conf
+conf/supervisord.conf
+conf/*.local
+
+# SQLite runtime databases and journaling files
+db/*.db
+db/*.db-*
+db/*.sqlite
+db/*.sqlite-*
+db/*.sqlite3
+db/*.sqlite3-*
+!db/ddl/
+!db/ddl/*.ddl
+
+# Runtime logs, supervisor state, and process ids
+logs/
+*.log
+*.pid
+
+# Monitoring runtime data and generated graph images
+rrd/
+
+# Temporary, backup, and editor files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build and packaging output
+build/
+dist/
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# Local IDE/editor metadata
+.idea/
+.vscode/

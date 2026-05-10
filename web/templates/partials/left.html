@@ -1,0 +1,47 @@
+<aside class="sidebar" id="main-menu" aria-label="Main navigation">
+    <div class="sidebar-title">Main Menu</div>
+    <nav class="menu">
+        <a class="menu-link {% if current_path == '/' %}active{% endif %}" href="/">Dashboard</a>
+
+        <div class="menu-group">Settings</div>
+        <a class="menu-link child {% if current_path == '/settings/users' %}active{% endif %}" href="/settings/users">Users</a>
+        <a class="menu-link child {% if current_path == '/settings/system' %}active{% endif %}" href="/settings/system">Settings</a>
+
+        <div class="menu-group">Network</div>
+        <a class="menu-link child {% if current_path == '/network/interfaces' %}active{% endif %}" href="/network/interfaces">Interfaces</a>
+        <a class="menu-link child {% if current_path == '/network/policy-routing' %}active{% endif %}" href="/network/policy-routing">Policy Routing</a>
+        <a class="menu-link child {% if current_path == '/network/packet-capture' %}active{% endif %}" href="/network/packet-capture">Packet Capture</a>
+        <a class="menu-link child {% if current_path == '/network/qos' %}active{% endif %}" href="/network/qos">QoS</a>
+
+        <div class="menu-group">Firewall</div>
+        <a class="menu-link child {% if current_path == '/firewall/filter-rules' %}active{% endif %}" href="/firewall/filter-rules">Filter Rules</a>
+        <a class="menu-link child {% if current_path == '/firewall/nat-rules' %}active{% endif %}" href="/firewall/nat-rules">NAT Rules</a>
+        <a class="menu-link child {% if current_path == '/firewall/mangle-rules' %}active{% endif %}" href="/firewall/mangle-rules">Mangle Rules</a>
+
+        <div class="menu-group">Routing Protocols</div>
+        <a class="menu-link child {% if current_path == '/routing/rip' %}active{% endif %}" href="/routing/rip">RIP</a>
+        <a class="menu-link child {% if current_path == '/routing/ospf' %}active{% endif %}" href="/routing/ospf">OSPF</a>
+        <a class="menu-link child {% if current_path == '/routing/bgp' %}active{% endif %}" href="/routing/bgp">BGP</a>
+
+        <div class="menu-group">Monitoring</div>
+        <a class="menu-link child {% if current_path == '/monitoring/cpu-mem' %}active{% endif %}" href="/monitoring/cpu-mem">CPU &amp; Mem</a>
+        <a class="menu-link child {% if current_path == '/monitoring/network' %}active{% endif %}" href="/monitoring/network">Network</a>
+        <a class="menu-link child {% if current_path == '/monitoring/system' %}active{% endif %}" href="/monitoring/system">System</a>
+        <a class="menu-link child {% if current_path == '/monitoring/socket-states' %}active{% endif %}" href="/monitoring/socket-states">Socket States</a>
+        <a class="menu-link child {% if current_path in ['/monitoring/filesystem', '/monitoring/disk'] %}active{% endif %}" href="/monitoring/filesystem">Filesystem</a>
+        <a class="menu-link child {% if current_path == '/monitoring/latency' %}active{% endif %}" href="/monitoring/latency">Latency</a>
+
+        <div class="menu-group">Tools</div>
+        <a class="menu-link child {% if current_path == '/tools/ping' %}active{% endif %}" href="/tools/ping">Ping</a>
+        <a class="menu-link child {% if current_path == '/tools/mtr' %}active{% endif %}" href="/tools/mtr">MTR</a>
+        <a class="menu-link child {% if current_path == '/tools/traceroute' %}active{% endif %}" href="/tools/traceroute">Traceroute</a>
+
+        <div class="menu-group">Services</div>
+        <a class="menu-link child {% if current_path == '/services/status' %}active{% endif %}" href="/services/status">Status</a>
+        <a class="menu-link child {% if current_path == '/services/dhcp' %}active{% endif %}" href="/services/dhcp">DHCP</a>
+        <a class="menu-link child {% if current_path == '/services/dns' %}active{% endif %}" href="/services/dns">DNS</a>
+        <a class="menu-link child {% if current_path == '/services/proxy' %}active{% endif %}" href="/services/proxy">Proxy</a>
+        <a class="menu-link child {% if current_path == '/services/link-failover' %}active{% endif %}" href="/services/link-failover">Link Failover</a>
+        <a class="menu-link child {% if current_path == '/services/link-load-balance' %}active{% endif %}" href="/services/link-load-balance">Link Load Balance</a>
+    </nav>
+</aside>

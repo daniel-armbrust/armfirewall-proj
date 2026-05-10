@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Monitoring</p>
+        <h1>Network</h1>
+    </div>
+    <div class="refresh-state" id="monitoring-refresh-state">Loading</div>
+</section>
+
+<section class="monitoring-periods" aria-label="Graph period">
+    {% for period in periods %}
+    <button
+        class="period-button {% if period.id == 'daily' %}active{% endif %}"
+        type="button"
+        data-period-button="{{ period.id }}"
+    >{{ period.label }}</button>
+    {% endfor %}
+</section>
+
+<section class="monitoring-controls" aria-label="Network interface selection">
+    <label class="monitoring-select-label" for="network-interface-select">Interface</label>
+    <select id="network-interface-select" class="monitoring-select">
+        {% for iface in interfaces %}
+        <option value="{{ iface.safe_name }}">{{ iface.label }}</option>
+        {% endfor %}
+    </select>
+</section>
+
+<section class="monitoring-grid" id="network-graphs" aria-label="Network monitoring graphs">
+    {% for graph in graphs %}
+    <article
+        class="panel monitoring-graph"
+        data-graph-card
+        data-graph-id="{{ graph.id }}"
+        data-iface-name="{{ graph.iface_safe_name }}"
+    >
+        <div class="panel-head">
+            <h2 title="{{ graph.iface_description }}">{{ graph.title }}</h2>
+            <span data-graph-period-label>Daily / {{ graph.rrd }}</span>
+        </div>
+        <div class="monitoring-graph-body">
+            {% set daily = graph.periods.daily %}
+            {% if daily.exists %}
+            <button class="monitoring-graph-zoom" type="button" data-graph-zoom aria-label="Open {{ graph.title }} graph">
+                <img
+                    src="{{ daily.image_url }}?v={{ daily.updated_at }}"
+                    alt="{{ graph.title }} graph"
+                    data-graph-image
+                    data-graph-src="{{ daily.image_url }}"
+                >
+            </button>
+            {% else %}
+            <div class="empty-state">Graph not generated yet</div>
+            {% endif %}
+        </div>
+        <div class="monitoring-graph-foot">
+            <span title="{{ graph.iface_description }}">{{ graph.description }}</span>
+            <span data-graph-updated>{% if daily.exists %}ready{% else %}missing{% endif %}</span>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+
+<div class="graph-modal" id="graph-modal" hidden>
+    <button class="graph-modal-backdrop" type="button" data-graph-modal-close aria-label="Close graph preview"></button>
+    <section class="graph-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="graph-modal-title">
+        <div class="graph-modal-head">
+            <div>
+                <p class="eyebrow">Graph Preview</p>
+                <h2 id="graph-modal-title">Graph</h2>
+            </div>
+            <button class="icon-button" type="button" data-graph-modal-close aria-label="Close">X</button>
+        </div>
+        <div class="graph-modal-body">
+            <img id="graph-modal-image" alt="Expanded monitoring graph">
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/monitoring_network.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Dashboard</p>
+        <h1>Firewall status</h1>
+    </div>
+    <div class="refresh-state" id="refresh-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="System summary">
+    <div class="metric">
+        <span class="metric-label">Interfaces</span>
+        <strong id="summary-interfaces">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Active</span>
+        <strong id="summary-active">-</strong>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Firewall status</h2>
+        <span id="system-updated">system=live</span>
+    </div>
+    <div class="summary-grid compact dashboard-system-grid" aria-label="Firewall system status">
+        <div class="metric">
+            <span class="metric-label">Processor</span>
+            <strong id="system-cpu-model">-</strong>
+            <small id="system-cpu-count">cores=-</small>
+        </div>
+        <div class="metric">
+            <span class="metric-label">CPU used</span>
+            <strong id="system-cpu-used">-</strong>
+            <small>since last poll</small>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Memory used</span>
+            <strong id="system-memory-used">-</strong>
+            <small id="system-memory-total">total=-</small>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Architecture</span>
+            <strong id="system-architecture">-</strong>
+            <small id="system-os">os=-</small>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Processes</span>
+            <strong id="system-processes">-</strong>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Root disk</span>
+            <strong id="system-root-disk">-</strong>
+            <small id="system-root-disk-free">free=-</small>
+        </div>
+    </div>
+</section>
+
+<section class="panel" data-dashboard-counters>
+    <div class="panel-head">
+        <h2>Traffic counters</h2>
+        <span>Raw counters from iface.db</span>
+    </div>
+    <div class="counter-list" id="counter-list"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/dashboard.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">network/interfaces</p>
+        <h1>Edit {{ iface_name }}</h1>
+    </div>
+    <div class="refresh-state" id="refresh-state">Loading</div>
+</section>
+
+<section class="panel" data-interface-edit="{{ iface_name }}">
+    <div class="panel-head">
+        <h2>Properties</h2>
+        <span id="interface-edit-updated">updated=-</span>
+    </div>
+    <form class="edit-form" id="interface-edit-form">
+        <div class="form-grid">
+            <label class="field">
+                <span>Name</span>
+                <input id="iface-edit-name" name="name" type="text" readonly>
+            </label>
+            <label class="field">
+                <span>Role</span>
+                <select id="iface-edit-role" name="role">
+                    <option value="LAN">LAN</option>
+                    <option value="WAN">WAN</option>
+                    <option value="UNKNOWN">UNKNOWN</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Status</span>
+                <input id="iface-edit-status" name="status" type="text" readonly>
+            </label>
+            <label class="field">
+                <span>Protected</span>
+                <select id="iface-edit-protected" name="protected" {% if protected_readonly %}disabled aria-readonly="true" title="First LAN interface from armfw.conf is always protected"{% endif %}>
+                    <option value="1">yes</option>
+                    <option value="0">no</option>
+                </select>
+                {% if protected_readonly %}
+                <small class="field-note">first LAN from armfw.conf</small>
+                {% endif %}
+            </label>
+            <label class="field">
+                <span>MAC</span>
+                <input id="iface-edit-mac" name="mac_address" type="text" readonly>
+            </label>
+            <label class="field">
+                <span>MTU</span>
+                <input id="iface-edit-mtu" name="mtu" type="number">
+            </label>
+            <label class="field">
+                <span>Speed</span>
+                <input id="iface-edit-speed" name="speed_mbps" type="text" readonly>
+            </label>
+            <label class="field">
+                <span>Duplex</span>
+                <input id="iface-edit-duplex" name="duplex" type="text" readonly>
+            </label>
+            <label class="field wide">
+                <span>Description</span>
+                <input id="iface-edit-description" name="description" type="text">
+            </label>
+        </div>
+        <div class="form-actions">
+            <a class="text-button" href="/network/interfaces">Back</a>
+            <button class="text-button primary" type="button" disabled title="Save API not implemented yet">Save</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Addresses</h2>
+        <span id="interface-edit-address-count">items=-</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Family</th>
+                    <th>Address</th>
+                    <th>Prefix</th>
+                    <th>Broadcast</th>
+                    <th>Scope</th>
+                </tr>
+            </thead>
+            <tbody id="interface-edit-addresses">
+                <tr>
+                    <td colspan="5">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>loading addresses</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Kernel /proc</h2>
+        <span id="interface-edit-proc-count">items=-</span>
+    </div>
+    <div class="proc-groups" id="interface-edit-proc">
+        <div class="terminal-empty"><span class="prompt">$</span><span>loading proc values</span></div>
+    </div>
+</section>
+
+<div class="modal-backdrop" id="proc-value-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="proc-value-title">
+        <div class="panel-head">
+            <h2 id="proc-value-title">Edit /proc value</h2>
+            <button class="icon-button" type="button" id="proc-value-close" aria-label="Close popup">x</button>
+        </div>
+        <form class="edit-form" id="proc-value-form">
+            <label class="field">
+                <span>PATH</span>
+                <input id="proc-value-path" name="proc_path" type="text" readonly>
+            </label>
+            <label class="field">
+                <span>Current value</span>
+                <input id="proc-value-current" name="desired_value" type="text">
+            </label>
+            <div class="form-actions">
+                <button class="text-button" type="button" id="proc-value-cancel">Cancel</button>
+                <button class="text-button primary" type="submit">Save</button>
+            </div>
+            <div class="form-status" id="proc-value-status"></div>
+        </form>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/interface_edit.js') }}" defer></script>
+{% endblock %}

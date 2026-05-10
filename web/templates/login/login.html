@@ -1,0 +1,28 @@
+{% extends "login/base.html" %}
+
+{% block content %}
+<section class="login-screen" aria-label="Login">
+    <div class="login-shell">
+        <div class="login-brand">
+            <span class="brand-mark">AF</span>
+            <div>
+                <p class="eyebrow">secure access</p>
+                <h1>ArmFirewall</h1>
+            </div>
+        </div>
+
+        <form class="login-form" method="post" action="/login">
+            <label class="field">
+                <span>User</span>
+                <input name="username" type="text" autocomplete="username" autofocus>
+            </label>
+            <label class="field">
+                <span>Password</span>
+                <input name="password" type="password" autocomplete="current-password">
+            </label>
+            <button class="text-button primary" type="submit">Login</button>
+            <div class="form-status">authentication backend pending</div>
+        </form>
+    </div>
+</section>
+{% endblock %}

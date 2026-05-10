@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">services/dns</p>
+        <h1>DNS</h1>
+    </div>
+    <div class="refresh-state">Ready</div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>DNS service</h2>
+        <span>module=services-dns</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Zone</th>
+                    <th>Record</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>TTL</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="6">
+                        <div class="terminal-empty">
+                            <span class="prompt">$</span>
+                            <span>dns service editor pending</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

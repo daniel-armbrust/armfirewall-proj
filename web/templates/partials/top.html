@@ -1,0 +1,28 @@
+<header class="topbar">
+    <div class="topbar-left">
+        <button class="menu-toggle" type="button" aria-label="Open menu" aria-controls="main-menu" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a class="brand" href="/" aria-label="ArmFirewall dashboard">
+            <span class="brand-mark">AF</span>
+            <span class="brand-name">ArmFirewall</span>
+        </a>
+    </div>
+    <div class="topbar-actions">
+        <label class="theme-control" for="theme-select">
+            <span>theme</span>
+            <select id="theme-select" aria-label="Select interface theme">
+                <option value="default">default</option>
+                <option value="blue">blue</option>
+                <option value="light">white</option>
+                <option value="red">red</option>
+            </select>
+        </label>
+        <div class="topbar-user">
+            <span>{{ user_name }}</span>
+            <a href="#" aria-label="Logout">logout</a>
+        </div>
+    </div>
+</header>

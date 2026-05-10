@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">network</p>
+        <h1>Interfaces</h1>
+    </div>
+    <div class="refresh-state">Ready</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Interface summary">
+    <div class="metric">
+        <span class="metric-label">Interfaces</span>
+        <strong id="summary-interfaces">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Active</span>
+        <strong id="summary-active">-</strong>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Interface inventory</h2>
+        <span id="interface-inventory-updated">updated=-</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Addresses</th>
+                    <th>MAC</th>
+                    <th>MTU</th>
+                    <th>Link</th>
+                    <th>RX/TX</th>
+                </tr>
+            </thead>
+            <tbody id="interface-inventory-body">
+                <tr>
+                    <td colspan="8">
+                        <div class="terminal-empty">
+                            <span class="prompt">$</span>
+                            <span>loading interfaces</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Traffic counters</h2>
+        <span id="counters-updated">Raw counters from iface.db</span>
+    </div>
+    <div class="counter-list" id="counter-list"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/interfaces.js') }}" defer></script>
+{% endblock %}

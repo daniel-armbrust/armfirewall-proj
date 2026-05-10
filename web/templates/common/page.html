@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">{{ section }}</p>
+        <h1>{{ title }}</h1>
+    </div>
+    <div class="refresh-state">Ready</div>
+</section>
+
+<section class="panel module-panel">
+    <div class="panel-head">
+        <h2>{{ title }}</h2>
+        <span>module={{ title | lower | replace(' ', '-') }}</span>
+    </div>
+    <div class="terminal-empty">
+        <span class="prompt">$</span>
+        <span>standby</span>
+    </div>
+</section>
+{% endblock %}

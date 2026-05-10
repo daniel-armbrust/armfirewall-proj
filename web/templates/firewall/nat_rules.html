@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">firewall/nat</p>
+        <h1>NAT Rules</h1>
+    </div>
+    <div class="refresh-state" id="nat-rules-state">Ready</div>
+</section>
+
+<nav class="local-tabs" aria-label="NAT rules menu">
+    <button class="local-tab active" type="button" data-nat-tab="rules">Rules</button>
+    <button class="local-tab" type="button" data-nat-tab="new-rule">New Rule</button>
+    <button class="local-tab" type="button" data-nat-tab="work-requests">Work Requests</button>
+</nav>
+
+<section class="summary-grid compact" aria-label="NAT rules summary">
+    <div class="metric">
+        <span class="metric-label">Rules</span>
+        <strong id="nat-summary-total">0</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Enabled</span>
+        <strong id="nat-summary-enabled">0</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Disabled</span>
+        <strong id="nat-summary-disabled">0</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Protected</span>
+        <strong id="nat-summary-protected">0</strong>
+    </div>
+</section>
+
+<section data-nat-view="rules">
+    {% for chain in ["PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"] %}
+    <section class="panel">
+        <div class="panel-head">
+            <h2>{{ chain }}</h2>
+            <div class="panel-actions">
+                <span id="nat-{{ chain | lower }}-count">rules=-</span>
+                <button class="text-button compact" type="button" data-chain-apply="{{ chain }}">Apply</button>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table firewall-rules-table">
+                <thead>
+                    <tr>
+                        <th>Family</th>
+                        <th>Order</th>
+                        <th>Action</th>
+                        <th>Interface</th>
+                        <th>Protocol</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Translation</th>
+                        <th>Status</th>
+                        <th>Ops</th>
+                    </tr>
+                </thead>
+                <tbody id="nat-{{ chain | lower }}-body">
+                    <tr>
+                        <td colspan="10">
+                            <div class="terminal-empty">
+                                <span class="prompt">$</span>
+                                <span>loading {{ chain }} NAT rules</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endfor %}
+</section>
+
+<section class="panel" data-nat-view="new-rule" hidden>
+    <div class="panel-head">
+        <h2>New NAT rule</h2>
+        <span id="nat-form-status">queue=idle</span>
+    </div>
+    <form class="edit-form" id="nat-rule-form">
+        <div class="form-grid firewall-form-grid">
+            <label class="field">
+                <span>Family</span>
+                <select name="family" id="nat-family">
+                    <option value="IPV4">IPv4</option>
+                    <option value="IPV6">IPv6</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Chain</span>
+                <select name="chain" id="nat-chain">
+                    <option value="PREROUTING">PREROUTING</option>
+                    <option value="INPUT">INPUT</option>
+                    <option value="OUTPUT">OUTPUT</option>
+                    <option value="POSTROUTING">POSTROUTING</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Action</span>
+                <select name="nat_action" id="nat-action"></select>
+            </label>
+            <label class="field">
+                <span>Protocol</span>
+                <select name="protocol_name" id="nat-protocol">
+                    <option value="all">any</option>
+                    <option value="tcp">tcp</option>
+                    <option value="udp">udp</option>
+                    <option value="icmp">icmp / icmpv6</option>
+                </select>
+            </label>
+            <label class="field" data-iface-in-field>
+                <span>Interface IN</span>
+                <select name="iface_in" id="nat-iface-in">
+                    <option value="">loading interfaces</option>
+                </select>
+            </label>
+            <label class="field" data-iface-out-field>
+                <span>Interface OUT</span>
+                <select name="iface_out" id="nat-iface-out">
+                    <option value="">loading interfaces</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Source</span>
+                <input name="src_addr" id="nat-src-addr" type="text" value="0.0.0.0/0">
+            </label>
+            <label class="field">
+                <span>Destination</span>
+                <input name="dst_addr" id="nat-dst-addr" type="text" value="0.0.0.0/0">
+            </label>
+            <label class="field" data-port-field>
+                <span>Source port</span>
+                <input name="src_port" type="number" min="0" max="65535" value="0">
+            </label>
+            <label class="field" data-port-field>
+                <span>Destination port</span>
+                <input name="dst_port" type="number" min="0" max="65535" value="0">
+            </label>
+            <label class="field">
+                <span>To address</span>
+                <input name="to_addr" type="text" placeholder="optional">
+            </label>
+            <label class="field">
+                <span>To port</span>
+                <input name="to_port" type="number" min="0" max="65535" placeholder="optional">
+            </label>
+            <label class="field">
+                <span>Status</span>
+                <select name="enabled">
+                    <option value="1">enabled</option>
+                    <option value="0">disabled</option>
+                </select>
+            </label>
+        </div>
+        <div class="form-actions">
+            <button class="text-button compact" type="reset">Reset</button>
+            <button class="text-button compact" type="submit" id="nat-submit-button">Queue rule</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel" data-nat-view="work-requests" hidden>
+    <div class="panel-head">
+        <h2>Work Requests</h2>
+        <span id="nat-work-requests-count">requests=0</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table firewall-work-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Category</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Updated</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="nat-work-requests-body">
+                <tr>
+                    <td colspan="7">
+                        <div class="terminal-empty">
+                            <span class="prompt">$</span>
+                            <span>loading NAT work requests</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal-backdrop" id="nat-apply-modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="nat-apply-title">
+        <div class="panel-head">
+            <h2 id="nat-apply-title">Apply NAT Rules</h2>
+            <span id="nat-apply-chain">chain=-</span>
+        </div>
+        <div class="terminal-empty">
+            <span class="prompt">$</span>
+            <span id="nat-apply-message">Confirm rule application.</span>
+        </div>
+        <div class="form-actions">
+            <button class="text-button" type="button" data-apply-cancel>Cancel</button>
+            <button class="text-button primary" type="button" data-apply-confirm>Apply</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="nat-delete-modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="nat-delete-title">
+        <div class="panel-head">
+            <h2 id="nat-delete-title">Delete NAT Rule</h2>
+            <span id="nat-delete-rule">rule=-</span>
+        </div>
+        <div class="terminal-empty">
+            <span class="prompt">$</span>
+            <span id="nat-delete-message">Confirm rule deletion.</span>
+        </div>
+        <div class="form-actions">
+            <button class="text-button" type="button" data-delete-cancel>Cancel</button>
+            <button class="text-button primary" type="button" data-delete-confirm>Delete</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/nat_rules.js') }}" defer></script>
+{% endblock %}

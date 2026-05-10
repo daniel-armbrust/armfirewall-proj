@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">firewall/mangle</p>
+        <h1>Mangle Rules</h1>
+    </div>
+    <div class="refresh-state" id="mangle-rules-state">Ready</div>
+</section>
+
+<nav class="local-tabs" aria-label="Mangle rules menu">
+    <button class="local-tab active" type="button" data-mangle-tab="rules">Rules</button>
+    <button class="local-tab" type="button" data-mangle-tab="new-rule">New Rule</button>
+    <button class="local-tab" type="button" data-mangle-tab="work-requests">Work Requests</button>
+</nav>
+
+<section class="summary-grid compact" aria-label="Mangle rules summary">
+    <div class="metric">
+        <span class="metric-label">Rules</span>
+        <strong id="mangle-summary-total">0</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Enabled</span>
+        <strong id="mangle-summary-enabled">0</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Disabled</span>
+        <strong id="mangle-summary-disabled">0</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Protected</span>
+        <strong id="mangle-summary-protected">0</strong>
+    </div>
+</section>
+
+<section data-mangle-view="rules">
+    {% for chain in ["PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"] %}
+    <section class="panel">
+        <div class="panel-head">
+            <h2>{{ chain }}</h2>
+            <div class="panel-actions">
+                <span id="mangle-{{ chain | lower }}-count">rules=-</span>
+                <button class="text-button compact" type="button" data-chain-apply="{{ chain }}">Apply</button>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table firewall-rules-table">
+                <thead>
+                    <tr>
+                        <th>Family</th>
+                        <th>Order</th>
+                        <th>Action</th>
+                        <th>Interfaces</th>
+                        <th>Protocol</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Conntrack</th>
+                        <th>Values</th>
+                        <th>Status</th>
+                        <th>Ops</th>
+                    </tr>
+                </thead>
+                <tbody id="mangle-{{ chain | lower }}-body">
+                    <tr>
+                        <td colspan="11">
+                            <div class="terminal-empty">
+                                <span class="prompt">$</span>
+                                <span>loading {{ chain }} mangle rules</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endfor %}
+</section>
+
+<section class="panel" data-mangle-view="new-rule" hidden>
+    <div class="panel-head">
+        <h2>New mangle rule</h2>
+        <span id="mangle-form-status">queue=idle</span>
+    </div>
+    <form class="edit-form" id="mangle-rule-form">
+        <div class="form-grid firewall-form-grid">
+            <label class="field">
+                <span>Family</span>
+                <select name="family" id="mangle-family">
+                    <option value="IPV4">IPv4</option>
+                    <option value="IPV6">IPv6</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Chain</span>
+                <select name="chain" id="mangle-chain">
+                    <option value="PREROUTING">PREROUTING</option>
+                    <option value="INPUT">INPUT</option>
+                    <option value="FORWARD">FORWARD</option>
+                    <option value="OUTPUT">OUTPUT</option>
+                    <option value="POSTROUTING">POSTROUTING</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Action</span>
+                <select name="mangle_action">
+                    <option value="MARK">MARK</option>
+                    <option value="CONNMARK">CONNMARK</option>
+                    <option value="DSCP">DSCP</option>
+                    <option value="TOS">TOS</option>
+                    <option value="TTL">TTL</option>
+                    <option value="ACCEPT">ACCEPT</option>
+                    <option value="DROP">DROP</option>
+                    <option value="RETURN">RETURN</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Protocol</span>
+                <select name="protocol_name" id="mangle-protocol">
+                    <option value="all">any</option>
+                    <option value="tcp">tcp</option>
+                    <option value="udp">udp</option>
+                    <option value="icmp">icmp / icmpv6</option>
+                </select>
+            </label>
+            <label class="field" data-iface-in-field>
+                <span>Interface IN</span>
+                <select name="iface_in" id="mangle-iface-in">
+                    <option value="">loading interfaces</option>
+                </select>
+            </label>
+            <label class="field" data-iface-out-field>
+                <span>Interface OUT</span>
+                <select name="iface_out" id="mangle-iface-out">
+                    <option value="">loading interfaces</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Source</span>
+                <input name="src_addr" id="mangle-src-addr" type="text" value="0.0.0.0/0">
+            </label>
+            <label class="field">
+                <span>Destination</span>
+                <input name="dst_addr" id="mangle-dst-addr" type="text" value="0.0.0.0/0">
+            </label>
+            <label class="field" data-port-field>
+                <span>Source port</span>
+                <input name="src_port" type="number" min="0" max="65535" value="0">
+            </label>
+            <label class="field" data-port-field>
+                <span>Destination port</span>
+                <input name="dst_port" type="number" min="0" max="65535" value="0">
+            </label>
+            <label class="field">
+                <span>Conntrack</span>
+                <select name="conntrack_mode">
+                    <option value="">any</option>
+                    <option value="new">NEW</option>
+                    <option value="established-related">ESTABLISHED,RELATED</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Mark</span>
+                <input name="mark_value" type="text" placeholder="optional">
+            </label>
+            <label class="field">
+                <span>DSCP</span>
+                <input name="dscp_value" type="text" placeholder="optional">
+            </label>
+            <label class="field">
+                <span>TOS</span>
+                <input name="tos_value" type="text" placeholder="optional">
+            </label>
+            <label class="field">
+                <span>TTL</span>
+                <input name="ttl_value" type="text" placeholder="optional">
+            </label>
+            <label class="field">
+                <span>Status</span>
+                <select name="enabled">
+                    <option value="1">enabled</option>
+                    <option value="0">disabled</option>
+                </select>
+            </label>
+        </div>
+        <div class="form-actions">
+            <button class="text-button compact" type="reset">Reset</button>
+            <button class="text-button compact" type="submit">Queue rule</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel" data-mangle-view="work-requests" hidden>
+    <div class="panel-head">
+        <h2>Work Requests</h2>
+        <span id="mangle-work-requests-count">requests=0</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table firewall-work-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Category</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Updated</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="mangle-work-requests-body">
+                <tr>
+                    <td colspan="7">
+                        <div class="terminal-empty">
+                            <span class="prompt">$</span>
+                            <span>loading mangle work requests</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal-backdrop" id="mangle-apply-modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="mangle-apply-title">
+        <div class="panel-head">
+            <h2 id="mangle-apply-title">Apply Mangle Rules</h2>
+            <span id="mangle-apply-chain">chain=-</span>
+        </div>
+        <div class="terminal-empty">
+            <span class="prompt">$</span>
+            <span id="mangle-apply-message">Confirm rule application.</span>
+        </div>
+        <div class="form-actions">
+            <button class="text-button" type="button" data-apply-cancel>Cancel</button>
+            <button class="text-button primary" type="button" data-apply-confirm>Apply</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="mangle-delete-modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="mangle-delete-title">
+        <div class="panel-head">
+            <h2 id="mangle-delete-title">Delete Mangle Rule</h2>
+            <span id="mangle-delete-rule">rule=-</span>
+        </div>
+        <div class="terminal-empty">
+            <span class="prompt">$</span>
+            <span id="mangle-delete-message">Confirm rule deletion.</span>
+        </div>
+        <div class="form-actions">
+            <button class="text-button" type="button" data-delete-cancel>Cancel</button>
+            <button class="text-button primary" type="button" data-delete-confirm>Delete</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/mangle_rules.js') }}" defer></script>
+{% endblock %}
