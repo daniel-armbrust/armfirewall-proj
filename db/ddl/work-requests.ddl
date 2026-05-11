@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS work_request_categories (
                'FIREWALL_RULES',
                'NAT_RULES',
                'MANGLE_RULES',
-               'POLICY_ROUTING'
+               'POLICY_ROUTING',
+               'SERVICE_MANAGEMENT'
           )
      ),
      family TEXT CHECK (family IN ('IPV4', 'IPV6')),
@@ -42,7 +43,8 @@ INSERT OR IGNORE INTO work_request_categories (name, category, family, target_na
      ('MANGLE_RULES.IPV6.mangle_output_rules', 'MANGLE_RULES', 'IPV6', 'mangle_output_rules', 'IPv6 mangle OUTPUT chain rules.'),
      ('MANGLE_RULES.IPV6.mangle_postrouting_rules', 'MANGLE_RULES', 'IPV6', 'mangle_postrouting_rules', 'IPv6 mangle POSTROUTING chain rules.'),
      ('POLICY_ROUTING.IPV4.main', 'POLICY_ROUTING', 'IPV4', 'main', 'IPv4 policy routing changes.'),
-     ('POLICY_ROUTING.IPV6.main', 'POLICY_ROUTING', 'IPV6', 'main', 'IPv6 policy routing changes.');
+     ('POLICY_ROUTING.IPV6.main', 'POLICY_ROUTING', 'IPV6', 'main', 'IPv6 policy routing changes.'),
+     ('SERVICE_MANAGEMENT.OPTIONAL_SERVICES', 'SERVICE_MANAGEMENT', NULL, 'optional_services', 'Optional ArmFirewall service package operations.');
 
 -- Stores daemon handlers used to execute each work request category.
 CREATE TABLE IF NOT EXISTS work_request_handlers (
@@ -51,7 +53,8 @@ CREATE TABLE IF NOT EXISTS work_request_handlers (
                'FIREWALL_RULES',
                'NAT_RULES',
                'MANGLE_RULES',
-               'POLICY_ROUTING'
+               'POLICY_ROUTING',
+               'SERVICE_MANAGEMENT'
           )
      ),
      script_name TEXT NOT NULL CHECK (
@@ -67,7 +70,8 @@ INSERT OR IGNORE INTO work_request_handlers (category, script_name, enabled, des
      ('FIREWALL_RULES', 'fwrulesd.py', 1, 'Applies filter table firewall rules.'),
      ('NAT_RULES', 'fwrulesd.py', 1, 'Applies NAT table firewall rules.'),
      ('MANGLE_RULES', 'fwrulesd.py', 1, 'Applies mangle table firewall rules.'),
-     ('POLICY_ROUTING', 'proutes.py', 1, 'Applies policy routing changes.');
+     ('POLICY_ROUTING', 'proutes.py', 1, 'Applies policy routing changes.'),
+     ('SERVICE_MANAGEMENT', 'servicemgmt.py', 1, 'Installs and removes optional ArmFirewall service packages.');
 
 -- Stores allowed operations accepted by the work queue.
 CREATE TABLE IF NOT EXISTS work_request_actions (
@@ -78,7 +82,9 @@ CREATE TABLE IF NOT EXISTS work_request_actions (
 INSERT OR IGNORE INTO work_request_actions (name, description) VALUES
      ('apply', 'Apply a requested change to the operating system.'),
      ('remove', 'Remove a configured item from the operating system.'),
-     ('change', 'Change an existing item in the operating system.');
+     ('change', 'Change an existing item in the operating system.'),
+     ('install', 'Install an optional ArmFirewall service package.'),
+     ('uninstall', 'Uninstall an optional ArmFirewall service package.');
 
 -- Stores asynchronous operating system changes requested by the GUI.
 CREATE TABLE IF NOT EXISTS work_requests (

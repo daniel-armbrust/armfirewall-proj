@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">services/status</p>
+        <h1>Services Status</h1>
+    </div>
+    <div class="refresh-state" id="services-status-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Services status summary">
+    <div class="metric">
+        <span class="metric-label">Services</span>
+        <strong id="services-summary-total">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Installed</span>
+        <strong id="services-summary-active">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Running</span>
+        <strong id="services-summary-inactive">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Inactive</span>
+        <strong id="services-summary-supervisor">-</strong>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Main Services</h2>
+        <span id="armfirewall-services-count">services=0</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Kind</th>
+                    <th>State</th>
+                    <th>PID</th>
+                    <th>Uptime</th>
+                    <th>Description</th>
+                    <th>Ops</th>
+                </tr>
+            </thead>
+            <tbody id="armfirewall-services-body">
+                <tr>
+                    <td colspan="7">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>loading ArmFirewall services</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Optional Services</h2>
+        <span id="optional-services-count">services=0</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Package</th>
+                    <th>State</th>
+                    <th>Description</th>
+                    <th>Ops</th>
+                </tr>
+            </thead>
+            <tbody id="optional-services-body">
+                <tr>
+                    <td colspan="5">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>loading optional services</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal-backdrop" id="service-action-modal" hidden>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="service-action-title">
+        <div class="modal-head">
+            <h2 id="service-action-title">Service action</h2>
+            <button class="icon-button" type="button" data-service-action-cancel aria-label="Close">X</button>
+        </div>
+        <p id="service-action-message">Run selected service action?</p>
+        <div class="form-actions">
+            <button class="text-button compact" type="button" data-service-action-cancel>Cancel</button>
+            <button class="text-button compact primary" type="button" data-service-action-confirm>Confirm</button>
+        </div>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="optional-service-modal" hidden>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="optional-service-title">
+        <div class="modal-head">
+            <h2 id="optional-service-title">Optional service</h2>
+            <button class="icon-button" type="button" data-optional-service-cancel aria-label="Close">X</button>
+        </div>
+        <p id="optional-service-message">Run selected optional service action?</p>
+        <div class="form-actions">
+            <button class="text-button compact" type="button" data-optional-service-cancel>Cancel</button>
+            <button class="text-button compact primary" type="button" data-optional-service-confirm>Confirm</button>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/services_status.js') }}?v=20260511-service-management" defer></script>
+{% endblock %}

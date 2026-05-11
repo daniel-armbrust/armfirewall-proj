@@ -754,6 +754,20 @@ body.graph-modal-open {
     z-index: 2;
 }
 
+.system-logs-table-wrap {
+    max-height: clamp(220px, calc(100vh - 360px), 420px);
+    min-height: 220px;
+    overflow-x: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.system-logs-table-wrap .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
 .interface-inventory-wrap {
     overflow: visible;
 }
@@ -1150,6 +1164,12 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     display: none !important;
 }
 
+.field textarea.is-disabled,
+.field textarea:disabled {
+    opacity: 0.58;
+    cursor: not-allowed;
+}
+
 .field.wide {
     grid-column: 1 / -1;
 }
@@ -1194,6 +1214,207 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+}
+
+.service-inline-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    margin: 0 0 14px;
+    flex-wrap: wrap;
+}
+
+.dnsmasq-interface-picker {
+    display: grid;
+    grid-template-columns: minmax(320px, 680px) 34px;
+    gap: 8px;
+    align-items: center;
+    max-width: 722px;
+}
+
+.dnsmasq-interface-picker .icon-button {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+}
+
+.dnsmasq-interface-field {
+    grid-column: 1 / -1;
+    width: min(722px, 100%);
+}
+
+.dnsmasq-interface-scroll {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-height: 166px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.dnsmasq-interface-scroll .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.dnsmasq-interface-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.dnsmasq-interface-table th,
+.dnsmasq-interface-table td {
+    padding: 7px 9px;
+    vertical-align: middle;
+}
+
+.dnsmasq-interface-table th:first-child,
+.dnsmasq-interface-table td:first-child {
+    width: 30%;
+}
+
+.dnsmasq-interface-table th:nth-child(2),
+.dnsmasq-interface-table td:nth-child(2) {
+    width: 110px;
+}
+
+.dnsmasq-interface-table th:nth-child(3),
+.dnsmasq-interface-table td:nth-child(3) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dnsmasq-interface-table th:last-child,
+.dnsmasq-interface-table td:last-child {
+    width: 100px;
+    text-align: right;
+}
+
+.dnsmasq-domain-upstream-servers {
+    grid-column: span 2;
+}
+
+.dnsmasq-domain-upstream-action {
+    align-content: end;
+}
+
+.dnsmasq-domain-upstream-action .icon-button {
+    width: 34px;
+    height: 34px;
+}
+
+.dnsmasq-domain-upstream-scroll {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-height: 166px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.dnsmasq-domain-upstream-scroll .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.dnsmasq-domain-upstream-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.dnsmasq-domain-upstream-table th,
+.dnsmasq-domain-upstream-table td {
+    padding: 7px 9px;
+    vertical-align: middle;
+}
+
+.dnsmasq-domain-upstream-table th:first-child,
+.dnsmasq-domain-upstream-table td:first-child {
+    width: 28%;
+}
+
+.dnsmasq-domain-upstream-table th:last-child,
+.dnsmasq-domain-upstream-table td:last-child {
+    width: 100px;
+    text-align: right;
+}
+
+.dnsmasq-scope-list {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.dnsmasq-scope-card {
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: rgba(46, 242, 124, 0.035);
+}
+
+.dnsmasq-scope-head {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--line);
+}
+
+.dnsmasq-scope-head strong {
+    color: var(--accent);
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.dnsmasq-scope-head span {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-align: left;
+}
+
+.dnsmasq-scope-head span b {
+    color: var(--ink);
+    font-size: 12px;
+    text-transform: none;
+}
+
+.dnsmasq-scope-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 11px;
+}
+
+.dnsmasq-scope-item {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.dnsmasq-scope-item span {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.dnsmasq-scope-item strong {
+    color: var(--ink);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dnsmasq-scope-form {
+    padding: 12px;
 }
 
 .text-button {
@@ -1351,6 +1572,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     font-size: 12px;
     font-weight: 800;
     text-transform: uppercase;
+}
+
+.check-line.wide {
+    grid-column: 1 / -1;
 }
 
 .packet-capture-promiscuous {
@@ -1621,6 +1846,15 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
     .data-table {
         min-width: 680px;
+    }
+
+    .dnsmasq-scope-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .dnsmasq-scope-grid {
+        grid-template-columns: 1fr;
     }
 
     .monitoring-grid {

@@ -664,7 +664,32 @@ stderr_logfile=$ROOT_DIR/logs/armfirewall-workreqd.err.log
 stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
+
+[program:armfirewall-dnsmasq]
+directory=$ROOT_DIR
+command=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=$ROOT_DIR/conf/dnsmasq.conf --pid-file=$ROOT_DIR/logs/dnsmasq.pid
+autostart=false
+autorestart=true
+startsecs=3
+stopsignal=TERM
+stopasgroup=true
+killasgroup=true
+stdout_logfile=$ROOT_DIR/logs/armfirewall-dnsmasq.out.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
+stderr_logfile=$ROOT_DIR/logs/armfirewall-dnsmasq.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=5
 SUPERVISOR
+
+    if [[ ! -f "$ROOT_DIR/conf/dnsmasq.conf" ]]; then
+        cat > "$ROOT_DIR/conf/dnsmasq.conf" <<DNSMASQ
+# ArmFirewall managed dnsmasq configuration.
+# DNS is disabled until the ArmFirewall GUI writes a managed configuration.
+port=0
+bind-interfaces
+DNSMASQ
+    fi
 }
 
 # Start supervisord with the ArmFirewall configuration when needed.

@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
+from web.settings import system_logs as system_logs_views
 from web.settings import users as user_views
 
 
@@ -15,6 +16,18 @@ router = APIRouter()
 def settings_users(request: Request) -> HTMLResponse:
     """Render the Settings / Users page."""
     return user_views.render_users(request)
+
+
+@router.get("/settings/system-logs", response_class=HTMLResponse)
+def settings_system_logs(request: Request) -> HTMLResponse:
+    """Render the ArmFirewall / System Logs page."""
+    return system_logs_views.render_system_logs(request)
+
+
+@router.get("/api/settings/system-logs")
+def api_system_logs(limit: int = 200) -> dict[str, Any]:
+    """Return recent ArmFirewall system logs."""
+    return system_logs_views.list_logs(limit)
 
 
 @router.get("/api/settings/users")

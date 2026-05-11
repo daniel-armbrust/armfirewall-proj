@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">services/dnsmasq</p>
+        <h1>Dnsmasq</h1>
+    </div>
+    <div class="refresh-state" id="dnsmasq-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Dnsmasq summary">
+    <div class="metric">
+        <span class="metric-label">Service</span>
+        <strong id="dnsmasq-summary-service">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">DNS</span>
+        <strong id="dnsmasq-summary-dns">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">DHCP</span>
+        <strong id="dnsmasq-summary-dhcp">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Interfaces</span>
+        <strong id="dnsmasq-summary-interfaces">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Dnsmasq version</span>
+        <strong id="dnsmasq-summary-version">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">PID</span>
+        <strong id="dnsmasq-summary-pid">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Uptime</span>
+        <strong id="dnsmasq-summary-uptime">-</strong>
+    </div>
+</section>
+
+<section class="service-inline-actions">
+    <button class="text-button compact" type="button" data-dnsmasq-action="start-restart">Start / Restart</button>
+    <button class="text-button compact danger" type="button" data-dnsmasq-action="stop">Stop</button>
+</section>
+
+<form id="dnsmasq-form">
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Listen interfaces</h2>
+            <span>bind-interfaces</span>
+        </div>
+        <div class="edit-form">
+            <div class="form-grid dnsmasq-legacy-config" hidden>
+                <label class="field dnsmasq-interface-field">
+                    <span>Interfaces</span>
+                    <div class="dnsmasq-interface-picker">
+                        <select id="dnsmasq-interface-picker" name="interface_picker"></select>
+                        <button class="icon-button" type="button" id="dnsmasq-interface-add" title="Add interface" aria-label="Add interface">+</button>
+                    </div>
+                </label>
+                <div class="table-wrap wide dnsmasq-interface-scroll">
+                    <table class="data-table dnsmasq-interface-table">
+                        <thead>
+                            <tr>
+                                <th>Interface</th>
+                                <th>Role</th>
+                                <th>Description</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dnsmasq-active-interfaces">
+                            <tr>
+                                <td colspan="4">
+                                    <div class="terminal-empty"><span class="prompt">$</span><span>no active interfaces</span></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <nav class="local-tabs dnsmasq-tabs" aria-label="Dnsmasq configuration sections">
+        <button class="local-tab active" type="button" data-dnsmasq-tab="dns">DNS</button>
+        <button class="local-tab" type="button" data-dnsmasq-tab="dhcp">DHCP</button>
+    </nav>
+
+    <section class="panel" data-dnsmasq-panel="dns">
+        <div class="panel-head">
+            <h2>DNS configuration</h2>
+            <span id="dnsmasq-config-path">config=-</span>
+        </div>
+        <div class="edit-form">
+            <div class="dnsmasq-scope-list" id="dnsmasq-dns-scope-list"></div>
+            <div class="form-grid dnsmasq-legacy-config" hidden>
+                <label class="field">
+                    <span>DNS enabled</span>
+                    <select id="dnsmasq-dns-enabled" name="dns_enabled">
+                        <option value="1">enabled</option>
+                        <option value="0">disabled</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>LAN local domain</span>
+                    <input id="dnsmasq-local-domain" name="local_domain" type="text" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>Cache size</span>
+                    <input id="dnsmasq-cache-size" name="cache_size" type="number" min="0" max="1000000">
+                </label>
+                <label class="field">
+                    <span>Expand hosts</span>
+                    <select id="dnsmasq-expand-hosts" name="expand_hosts">
+                        <option value="1">enabled</option>
+                        <option value="0">disabled</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Domain needed</span>
+                    <select id="dnsmasq-domain-needed" name="domain_needed">
+                        <option value="1">enabled</option>
+                        <option value="0">disabled</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Bogus priv</span>
+                    <select id="dnsmasq-bogus-priv" name="bogus_priv">
+                        <option value="1">enabled</option>
+                        <option value="0">disabled</option>
+                    </select>
+                </label>
+                <label class="field wide">
+                    <span>Default upstream DNS servers</span>
+                    <textarea id="dnsmasq-upstream-dns" name="upstream_dns_servers" rows="3" spellcheck="false"></textarea>
+                </label>
+                <label class="check-line wide">
+                    <input id="dnsmasq-pihole-upstream" name="pihole_upstream_enabled" type="checkbox">
+                    <span>Enable piHole DNS Upstream?</span>
+                </label>
+                <label class="check-line wide">
+                    <input id="dnsmasq-forwarded-domains-enabled" name="forwarded_domains_enabled" type="checkbox">
+                    <span>Enable forwarded domains?</span>
+                </label>
+                <label class="field dnsmasq-forwarded-domain-control" hidden>
+                    <span>Forwarded domain</span>
+                    <input id="dnsmasq-domain-upstream-domain" type="text" autocomplete="off" placeholder="empresa.local">
+                </label>
+                <label class="field dnsmasq-domain-upstream-servers dnsmasq-forwarded-domain-control" hidden>
+                    <span>Forward to DNS servers</span>
+                    <textarea id="dnsmasq-domain-upstream-servers" rows="2" spellcheck="false" placeholder="192.168.10.10 192.168.10.11"></textarea>
+                </label>
+                <div class="field dnsmasq-domain-upstream-action dnsmasq-forwarded-domain-control" hidden>
+                    <span>Action</span>
+                    <button class="icon-button" type="button" id="dnsmasq-domain-upstream-add" title="Add domain upstream" aria-label="Add domain upstream">+</button>
+                </div>
+                <div class="table-wrap wide dnsmasq-domain-upstream-scroll dnsmasq-forwarded-domain-control" hidden>
+                    <table class="data-table dnsmasq-domain-upstream-table">
+                        <thead>
+                            <tr>
+                                <th>Domain</th>
+                                <th>Upstreams</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dnsmasq-domain-upstreams">
+                            <tr>
+                                <td colspan="3">
+                                    <div class="terminal-empty"><span class="prompt">$</span><span>no domain upstreams</span></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel" data-dnsmasq-panel="dhcp" hidden>
+        <div class="panel-head">
+            <h2>DHCP configuration</h2>
+            <span>scope=dhcp</span>
+        </div>
+        <div class="edit-form">
+            <div class="dnsmasq-scope-list" id="dnsmasq-dhcp-scope-list"></div>
+            <div class="form-grid">
+                <label class="field">
+                    <span>DHCP enabled</span>
+                    <select id="dnsmasq-dhcp-enabled" name="dhcp_enabled">
+                        <option value="1">enabled</option>
+                        <option value="0">disabled</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>DHCP range start</span>
+                    <input id="dnsmasq-dhcp-start" name="dhcp_range_start" type="text" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>DHCP range end</span>
+                    <input id="dnsmasq-dhcp-end" name="dhcp_range_end" type="text" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>Lease time</span>
+                    <input id="dnsmasq-lease-time" name="lease_time" type="text" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>DHCP authoritative</span>
+                    <select id="dnsmasq-dhcp-authoritative" name="dhcp_authoritative">
+                        <option value="1">enabled</option>
+                        <option value="0">disabled</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+    </section>
+
+    <section class="dnsmasq-form-actions">
+        <div class="edit-form">
+            <input id="dnsmasq-extra-options" name="extra_options" type="hidden" value="">
+            <div class="form-actions">
+                <button class="text-button primary" type="submit" id="dnsmasq-apply" hidden>Apply</button>
+            </div>
+            <div class="form-status" id="dnsmasq-form-status"></div>
+        </div>
+    </section>
+</form>
+
+<div class="modal-backdrop" id="dnsmasq-action-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="dnsmasq-action-title">
+        <div class="modal-head">
+            <h2 id="dnsmasq-action-title">Confirm action</h2>
+            <button class="icon-button" type="button" data-dnsmasq-modal-cancel aria-label="Close">x</button>
+        </div>
+        <p class="modal-copy" id="dnsmasq-action-message">Run selected Dnsmasq action?</p>
+        <div class="form-actions">
+            <button class="text-button compact" type="button" data-dnsmasq-modal-cancel>Cancel</button>
+            <button class="text-button compact primary" type="button" data-dnsmasq-modal-confirm>Confirm</button>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260511-global-interface-label-2" defer></script>
+{% endblock %}

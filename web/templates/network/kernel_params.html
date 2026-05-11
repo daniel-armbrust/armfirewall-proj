@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">network</p>
+        <h1>Kernel Params</h1>
+    </div>
+    <div class="refresh-state" id="kernel-params-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Kernel params summary">
+    <div class="metric">
+        <span class="metric-label">Items</span>
+        <strong id="kernel-summary-items">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Available</span>
+        <strong id="kernel-summary-available">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Enabled</span>
+        <strong id="kernel-summary-enabled">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Missing</span>
+        <strong id="kernel-summary-missing">-</strong>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Global kernel parameters</h2>
+        <span id="kernel-params-count">items=0</span>
+    </div>
+    <div class="proc-groups" id="kernel-params-list">
+        <div class="terminal-empty"><span class="prompt">$</span><span>loading kernel params</span></div>
+    </div>
+</section>
+
+<div class="modal-backdrop" id="kernel-param-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="kernel-param-title">
+        <div class="modal-head">
+            <h2 id="kernel-param-title">Edit kernel param</h2>
+            <button class="icon-button" type="button" id="kernel-param-close" aria-label="Close popup">x</button>
+        </div>
+        <form class="edit-form" id="kernel-param-form">
+            <div class="form-grid">
+                <label class="field wide">
+                    <span>PATH</span>
+                    <input id="kernel-param-path" name="proc_path" type="text" readonly>
+                </label>
+                <label class="field wide">
+                    <span>Current</span>
+                    <input id="kernel-param-value" name="current_value" type="text">
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="text-button" type="button" id="kernel-param-cancel">Cancel</button>
+                <button class="text-button primary" type="submit">Save</button>
+            </div>
+            <div class="form-status" id="kernel-param-status"></div>
+        </form>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/kernel_params.js') }}?v=20260511-kernel-params" defer></script>
+{% endblock %}

@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from web.network import kernel_params as kernel_params_views
 from web.network import neighbor_table as neighbor_table_views
 from web.network import policy_routing as policy_routing_views
 
@@ -28,6 +29,19 @@ def api_policy_routing_work_requests() -> dict[str, Any]:
 def api_neighbor_table() -> dict[str, Any]:
     """Return the current operating system neighbor table."""
     return neighbor_table_views.get_neighbor_table()
+
+
+@router.get("/api/network/kernel-params")
+def api_kernel_params() -> dict[str, Any]:
+    """Return global kernel parameters collected from /proc/sys."""
+    return kernel_params_views.get_kernel_params()
+
+
+@router.put("/api/network/kernel-params/current-value")
+async def api_update_kernel_param_current_value(request: Request) -> dict[str, Any]:
+    """Update the runtime value for one allowed global kernel parameter."""
+    payload = await request.json()
+    return kernel_params_views.update_kernel_param_current_value(payload)
 
 
 @router.post("/api/network/policy-routing/tables")
@@ -80,6 +94,12 @@ def network_packet_capture_redirect() -> RedirectResponse:
 def network_neighbor_table(request: Request) -> HTMLResponse:
     """Render the neighbor table page."""
     return neighbor_table_views.render_neighbor_table(request)
+
+
+@router.get("/network/kernel-params", response_class=HTMLResponse)
+def network_kernel_params(request: Request) -> HTMLResponse:
+    """Render the Network / Kernel Params page."""
+    return kernel_params_views.render_kernel_params(request)
 
 
 @router.get("/network/policy-routing", response_class=HTMLResponse)

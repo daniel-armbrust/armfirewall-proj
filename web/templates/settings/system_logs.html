@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">ArmFirewall</p>
+        <h1>System Logs</h1>
+    </div>
+    <div class="refresh-state" id="system-logs-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="System logs summary">
+    <div class="metric">
+        <span class="metric-label">Rows</span>
+        <strong id="logs-summary-rows">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Warnings</span>
+        <strong id="logs-summary-warnings">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Errors</span>
+        <strong id="logs-summary-errors">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Last ID</span>
+        <strong id="logs-summary-last-id">-</strong>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Log inventory</h2>
+        <span>source=logs.db</span>
+    </div>
+    <div class="table-wrap system-logs-table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Created</th>
+                    <th>Level</th>
+                    <th>Source</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody id="system-logs-body">
+                <tr>
+                    <td colspan="5">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>loading system logs</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/system_logs.js') }}?v=20260511-system-logs" defer></script>
+{% endblock %}

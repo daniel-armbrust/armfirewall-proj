@@ -3,12 +3,14 @@
     <nav class="menu">
         <a class="menu-link {% if current_path == '/' %}active{% endif %}" href="/">Dashboard</a>
 
-        <div class="menu-group">Settings</div>
+        <div class="menu-group">ArmFirewall</div>
         <a class="menu-link child {% if current_path == '/settings/users' %}active{% endif %}" href="/settings/users">Users</a>
-        <a class="menu-link child {% if current_path == '/settings/system' %}active{% endif %}" href="/settings/system">Settings</a>
+        <a class="menu-link child {% if current_path == '/settings/system' %}active{% endif %}" href="/settings/system">Runtime Settings</a>
+        <a class="menu-link child {% if current_path == '/settings/system-logs' %}active{% endif %}" href="/settings/system-logs">System Logs</a>
 
         <div class="menu-group">Network</div>
         <a class="menu-link child {% if current_path == '/network/interfaces' %}active{% endif %}" href="/network/interfaces">Interfaces</a>
+        <a class="menu-link child {% if current_path == '/network/kernel-params' %}active{% endif %}" href="/network/kernel-params">Kernel Params</a>
         <a class="menu-link child {% if current_path == '/network/neighbor-table' %}active{% endif %}" href="/network/neighbor-table">Neighbor Table</a>
         <a class="menu-link child {% if current_path == '/network/policy-routing' %}active{% endif %}" href="/network/policy-routing">Policy Routing</a>
         <a class="menu-link child {% if current_path == '/network/qos' %}active{% endif %}" href="/network/qos">QoS</a>
@@ -39,8 +41,7 @@
 
         <div class="menu-group">Services</div>
         <a class="menu-link child {% if current_path == '/services/status' %}active{% endif %}" href="/services/status">Status</a>
-        <a class="menu-link child {% if current_path == '/services/dhcp' %}active{% endif %}" href="/services/dhcp">DHCP</a>
-        <a class="menu-link child {% if current_path == '/services/dns' %}active{% endif %}" href="/services/dns">DNS</a>
+        <a class="menu-link child {% if current_path == '/services/dnsmasq' %}active{% endif %}" href="/services/dnsmasq">Dnsmasq</a>
         <a class="menu-link child {% if current_path == '/services/proxy' %}active{% endif %}" href="/services/proxy">Proxy</a>
         <a class="menu-link child {% if current_path == '/services/link-failover' %}active{% endif %}" href="/services/link-failover">Link Failover</a>
         <a class="menu-link child {% if current_path == '/services/link-load-balance' %}active{% endif %}" href="/services/link-load-balance">Link Load Balance</a>
