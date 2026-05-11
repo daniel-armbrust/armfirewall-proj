@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+resolve_root_dir() {
+    cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd
+}
+
+ROOT_DIR="$(resolve_root_dir)"
 CONF_FILE="$ROOT_DIR/conf/armfw.conf"
 SUPERVISORD_CONF="$ROOT_DIR/conf/supervisord.conf"
-HOMEFIREWALL_LOG_CONTEXT="$(basename "$0")"
+ARMFIREWALL_LOG_CONTEXT="$(basename "$0")"
 
 # shellcheck source=scripts/log.sh
 . "$ROOT_DIR/bin/scripts/log.sh"
@@ -28,6 +32,8 @@ run_bootstrap_scripts() {
     "$ROOT_DIR/bin/scripts/addpkgmirrors.sh"; 
     "$ROOT_DIR/bin/scripts/osdeps.sh"; 
     "$ROOT_DIR/bin/scripts/execddl.sh"; 
+    "$ROOT_DIR/bin/scripts/adminusr.sh";
+    "$ROOT_DIR/bin/scripts/sslcert.sh";
 }
 
 # Detect the Linux distribution family from os-release metadata.
@@ -90,7 +96,7 @@ disable_firewall_service() {
     fi
 }
 
-# Disable known OS firewall services before applying HomeFirewall rules.
+# Disable known OS firewall services before applying ArmFirewall rules.
 disable_os_firewall_services() {
     local family service
 
@@ -152,7 +158,7 @@ interface_status() {
     fi
 }
 
-# Read a single key value from the HomeFirewall configuration file.
+# Read a single key value from the ArmFirewall configuration file.
 get_conf_value() {
     local key="$1"
 
@@ -168,7 +174,7 @@ get_conf_value() {
     ' "$CONF_FILE"
 }
 
-# Write or update a single key value in the HomeFirewall configuration file.
+# Write or update a single key value in the ArmFirewall configuration file.
 set_conf_value() {
     local key="$1"
     local value="$2"
@@ -562,8 +568,14 @@ configure_main_default_route() {
     set_conf_value wan_gateway "$gateway"
 }
 
-# Write the supervisord configuration used by HomeFirewall services.
+# Write the supervisord configuration used by ArmFirewall services.
 ensure_supervisord_conf() {
+    ROOT_DIR="$(resolve_root_dir)"
+    CONF_FILE="$ROOT_DIR/conf/armfw.conf"
+    SUPERVISORD_CONF="$ROOT_DIR/conf/supervisord.conf"
+
+    log "Resolved ArmFirewall root path for supervisord.conf: ${ROOT_DIR}."
+
     mkdir -p "$ROOT_DIR/conf" "$ROOT_DIR/logs"
 
     cat > "$SUPERVISORD_CONF" <<SUPERVISOR
@@ -585,24 +597,24 @@ supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 [supervisorctl]
 serverurl=unix://$ROOT_DIR/logs/supervisor.sock
 
-[program:homefirewall-api]
+[program:armfirewall-api]
 directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/uvicorn main:app --app-dir $ROOT_DIR --host 0.0.0.0 --port 8000
+command=$ROOT_DIR/.venv/bin/uvicorn main:app --app-dir $ROOT_DIR --host 0.0.0.0 --port 8000 --ssl-keyfile $ROOT_DIR/conf/armfirewall.key --ssl-certfile $ROOT_DIR/conf/armfirewall.crt
 autostart=true
 autorestart=true
 startsecs=3
 stopsignal=TERM
 stopasgroup=true
 killasgroup=true
-stdout_logfile=$ROOT_DIR/logs/homefirewall-api.out.log
+stdout_logfile=$ROOT_DIR/logs/armfirewall-api.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=5
-stderr_logfile=$ROOT_DIR/logs/homefirewall-api.err.log
+stderr_logfile=$ROOT_DIR/logs/armfirewall-api.err.log
 stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
 
-[program:homefirewall-ifaced]
+[program:armfirewall-ifaced]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/python $ROOT_DIR/daemons/ifaced.py
 autostart=true
@@ -611,15 +623,15 @@ startsecs=3
 stopsignal=TERM
 stopasgroup=true
 killasgroup=true
-stdout_logfile=$ROOT_DIR/logs/homefirewall-ifaced.out.log
+stdout_logfile=$ROOT_DIR/logs/armfirewall-ifaced.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=5
-stderr_logfile=$ROOT_DIR/logs/homefirewall-ifaced.err.log
+stderr_logfile=$ROOT_DIR/logs/armfirewall-ifaced.err.log
 stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
 
-[program:homefirewall-monitord]
+[program:armfirewall-monitord]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/python $ROOT_DIR/daemons/monitord/monitord.py
 autostart=true
@@ -628,15 +640,15 @@ startsecs=3
 stopsignal=TERM
 stopasgroup=true
 killasgroup=true
-stdout_logfile=$ROOT_DIR/logs/homefirewall-monitord.out.log
+stdout_logfile=$ROOT_DIR/logs/armfirewall-monitord.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=5
-stderr_logfile=$ROOT_DIR/logs/homefirewall-monitord.err.log
+stderr_logfile=$ROOT_DIR/logs/armfirewall-monitord.err.log
 stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
 
-[program:homefirewall-workreqd]
+[program:armfirewall-workreqd]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/python $ROOT_DIR/daemons/workreqd.py
 autostart=true
@@ -645,17 +657,17 @@ startsecs=3
 stopsignal=TERM
 stopasgroup=true
 killasgroup=true
-stdout_logfile=$ROOT_DIR/logs/homefirewall-workreqd.out.log
+stdout_logfile=$ROOT_DIR/logs/armfirewall-workreqd.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=5
-stderr_logfile=$ROOT_DIR/logs/homefirewall-workreqd.err.log
+stderr_logfile=$ROOT_DIR/logs/armfirewall-workreqd.err.log
 stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
 SUPERVISOR
 }
 
-# Start supervisord with the HomeFirewall configuration when needed.
+# Start supervisord with the ArmFirewall configuration when needed.
 start_supervisord() { 
     if ! command -v supervisord >/dev/null 2>&1; then 
         fatal "supervisord was not found."; 
@@ -678,7 +690,7 @@ ensure_fastapi_app() {
     cat > "$ROOT_DIR/main.py" <<'PY'
 from fastapi import FastAPI
 
-app = FastAPI(title="HomeFirewall")
+app = FastAPI(title="ArmFirewall")
 
 @app.get("/health")
 def health():
@@ -695,16 +707,16 @@ start_uvicorn() {
         fatal "supervisorctl was not found."
     fi
 
-    log "Ensuring HomeFirewall API is managed by supervisord."
+    log "Ensuring ArmFirewall API is managed by supervisord."
     supervisorctl -c "$SUPERVISORD_CONF" reread >/dev/null
     supervisorctl -c "$SUPERVISORD_CONF" update >/dev/null
 
-    if supervisorctl -c "$SUPERVISORD_CONF" status homefirewall-api 2>/dev/null | grep -Eq 'RUNNING|STARTING'; then
-        log "HomeFirewall API is already managed by supervisord."
+    if supervisorctl -c "$SUPERVISORD_CONF" status armfirewall-api 2>/dev/null | grep -Eq 'RUNNING|STARTING'; then
+        log "ArmFirewall API is already managed by supervisord."
         return 0
     fi
 
-    supervisorctl -c "$SUPERVISORD_CONF" start homefirewall-api >/dev/null || fatal "Could not start HomeFirewall API with supervisord."
+    supervisorctl -c "$SUPERVISORD_CONF" start armfirewall-api >/dev/null || fatal "Could not start ArmFirewall API with supervisord."
 }
 
 # Run the complete startup flow for interfaces, routing, firewall, and services.
@@ -730,7 +742,7 @@ main() {
     allow_forward_to_wan "$lan_iface" "$wan_iface"
     configure_masquerade "$wan_iface"
     apply_persisted_filter_rules
-    HOMEFIREWALL_BOOTSTRAP=1 set_default_policies
+    ARMFIREWALL_BOOTSTRAP=1 set_default_policies
     
     start_uvicorn
 }

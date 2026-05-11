@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VENV_DIR="$ROOT_DIR/.venv"
 LAST_LOG=""
-HOMEFIREWALL_LOG_CONTEXT="$(basename "$0")"
+ARMFIREWALL_LOG_CONTEXT="$(basename "$0")"
 PKG_MANAGER=""
 
 # shellcheck source=log.sh
@@ -163,12 +163,12 @@ install_system_deps() {
         dnf)
             sync_system_clock
             run_dnf_transaction upgrade
-            run_dnf_transaction install ethtool python3 python3-pip net-tools supervisor sqlite tar perl curl rrdtool traceroute mtr
+            run_dnf_transaction install ethtool python3 python3-pip net-tools supervisor sqlite tar perl curl openssl rrdtool traceroute mtr
             ;;
         apt)
             apt-get update
             run_apt_transaction upgrade
-            run_apt_transaction install ethtool python3 python3-pip net-tools supervisor sqlite3 tar perl curl python3-venv rrdtool traceroute mtr
+            run_apt_transaction install ethtool python3 python3-pip net-tools supervisor sqlite3 tar perl curl openssl python3-venv rrdtool traceroute mtr
             ;;
     esac
 }
@@ -188,7 +188,7 @@ main() {
     disable_selinux; 
     install_system_deps; 
     create_python_env; 
-    log "HomeFirewall dependencies were installed successfully."; 
+    log "ArmFirewall dependencies were installed successfully."; 
 }
 
 main "$@"

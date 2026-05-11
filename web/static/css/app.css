@@ -521,6 +521,14 @@ h2 {
     box-shadow: 0 0 0 1px rgba(46, 242, 124, 0.03);
 }
 
+.panel[data-dashboard-counters] {
+    overflow: visible;
+}
+
+.interface-inventory-panel {
+    overflow: visible;
+}
+
 .monitoring-grid {
     margin-top: 14px;
     display: grid;
@@ -727,6 +735,10 @@ body.graph-modal-open {
     overflow-x: auto;
 }
 
+.interface-inventory-wrap {
+    overflow: visible;
+}
+
 .data-table {
     width: 100%;
     min-width: 760px;
@@ -750,6 +762,23 @@ body.graph-modal-open {
 
 .data-table tr:hover td {
     background: rgba(46, 242, 124, 0.035);
+}
+
+.data-table tr:hover,
+.data-table tr:focus-within {
+    position: relative;
+    z-index: 200;
+}
+
+.data-table td:has(.arm-tooltip),
+.data-table td:has(.iface-tooltip) {
+    position: relative;
+    overflow: visible;
+}
+
+.panel:has(.arm-tooltip),
+.panel:has(.iface-tooltip) {
+    overflow: visible;
 }
 
 .latency-targets-table-wrap {
@@ -830,14 +859,83 @@ body.graph-modal-open {
     background: rgba(49, 213, 255, 0.12);
 }
 
+.status.pending {
+    color: var(--accent);
+    background: rgba(243, 200, 95, 0.12);
+}
+
 .role {
     color: var(--accent);
     font-weight: 900;
 }
 
+.arm-tooltip,
 .iface-tooltip {
+    position: relative;
+    display: inline-block;
+    color: var(--accent);
     cursor: help;
     border-bottom: 1px dotted currentColor;
+}
+
+.arm-tooltip[data-tooltip]::after,
+.iface-tooltip[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    z-index: 9999;
+    left: 0;
+    bottom: calc(100% + 8px);
+    width: max-content;
+    max-width: min(420px, 80vw);
+    padding: 10px 12px;
+    border: 1px solid var(--line-hot);
+    border-radius: 3px;
+    color: var(--text);
+    background: var(--panel);
+    box-shadow: 0 0 24px var(--shadow);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    white-space: pre-line;
+    text-align: left;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(4px);
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.arm-tooltip[data-tooltip]:hover::after,
+.arm-tooltip[data-tooltip]:focus::after,
+.iface-tooltip[data-tooltip]:hover::after,
+.iface-tooltip[data-tooltip]:focus::after {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+
+body.arm-tooltips-enabled .arm-tooltip[data-tooltip]::after,
+body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
+    display: none;
+}
+
+.arm-floating-tooltip {
+    position: fixed;
+    z-index: 2147483647;
+    max-width: min(420px, calc(100vw - 24px));
+    padding: 10px 12px;
+    border: 1px solid var(--line-hot);
+    border-radius: 3px;
+    color: var(--text);
+    background: var(--panel);
+    box-shadow: 0 0 24px var(--shadow);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    white-space: pre-line;
+    text-align: left;
+    pointer-events: none;
+    overflow-wrap: anywhere;
+    isolation: isolate;
 }
 
 .addresses {
@@ -886,16 +984,23 @@ body.graph-modal-open {
 }
 
 .counter-list {
+    position: relative;
     display: grid;
     gap: 10px;
     padding: 14px;
 }
 
 .counter-row {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(170px, 24%) minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px;
     align-items: center;
+}
+
+.counter-row:hover,
+.counter-row:focus-within {
+    z-index: 200;
 }
 
 .counter-row.single {
@@ -905,8 +1010,7 @@ body.graph-modal-open {
 .counter-name {
     color: var(--accent);
     font-weight: 900;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
     white-space: nowrap;
 }
 
@@ -1153,6 +1257,10 @@ body.graph-modal-open {
     font-weight: 800;
 }
 
+.form-status.error {
+    color: #ff5f6d;
+}
+
 .modal-backdrop {
     position: fixed;
     z-index: 80;
@@ -1165,6 +1273,80 @@ body.graph-modal-open {
 
 .modal-backdrop[hidden] {
     display: none;
+}
+
+.modal-dialog {
+    width: min(720px, 100%);
+    border: 1px solid var(--line-hot);
+    border-radius: 3px;
+    background: var(--panel);
+    box-shadow: 0 0 36px var(--shadow);
+}
+
+.modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.modal-head h2 {
+    margin: 4px 0 0;
+    font-size: 18px;
+}
+
+.rule-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    padding: 16px;
+}
+
+.rule-form .field,
+.rule-form .check-line,
+.rule-form .form-status,
+.rule-form .modal-actions {
+    grid-column: 1 / -1;
+}
+
+.check-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.modal-copy {
+    padding: 16px;
+    color: var(--text);
+    font-weight: 800;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.table-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.text-button.danger {
+    color: #ff5f6d;
+    border-color: rgba(255, 95, 109, 0.45);
+}
+
+.data-table tr.is-disabled td {
+    color: var(--muted);
 }
 
 .modal-panel {

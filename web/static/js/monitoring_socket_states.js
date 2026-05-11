@@ -145,16 +145,18 @@
 
     async function refreshGraphs() {
         try {
-            const response = await fetch("/api/monitoring/socket-states", { cache: "no-store" });
+            const response = await fetch("/api/monitoring/socket-states", { cache: "no-store", credentials: "same-origin" });
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                if (response.status === 401) { window.location.href = "/login"; return; }
+                if (response.status === 403) { window.location.href = "/login/change-password"; return; }
+                throw new Error("HTTP " + response.status);
             }
             const data = await response.json();
             refreshToken = Date.now();
             lastGraphs = data.graphs || [];
             updateAllGraphs();
         } catch (error) {
-            setRefreshState("Error");
+            setRefreshState("Error " + (error.message || "refresh failed"));
         }
     }
 
@@ -190,4 +192,10 @@
     setState("Loading");
     refreshGraphs();
     window.setInterval(refreshGraphs, 10000);
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            refreshGraphs();
+        }
+    });
+    window.addEventListener("pageshow", refreshGraphs);
 })();

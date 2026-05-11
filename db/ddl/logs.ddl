@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
 
--- Stores daemon log messages emitted by HomeFirewall processes.
+-- Stores daemon log messages emitted by ArmFirewall processes.
 CREATE TABLE IF NOT EXISTS logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source TEXT NOT NULL,

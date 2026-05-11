@@ -126,7 +126,7 @@
         }
         targetsBody.innerHTML = targets.map((target) => `
             <tr>
-                <td><span class="iface-tooltip" title="${HF.escapeHtml(target.interface_tooltip || "")}">${HF.escapeHtml(target.iface || "-")}</span></td>
+                <td><span class="iface-tooltip" tabindex="0" title="${HF.escapeHtml(target.interface_tooltip || "")}" data-tooltip="${HF.escapeHtml(target.interface_tooltip || "")}">${HF.escapeHtml(target.iface || "-")}</span></td>
                 <td>${HF.escapeHtml(target.target || "-")}</td>
                 <td>${HF.escapeHtml(String(target.count || "-"))}</td>
                 <td>${HF.escapeHtml(String(target.timeout || "-"))}s</td>
@@ -322,9 +322,11 @@
 
     async function refreshGraphs() {
         try {
-            const response = await fetch("/api/monitoring/latency", { cache: "no-store" });
+            const response = await fetch("/api/monitoring/latency", { cache: "no-store", credentials: "same-origin" });
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                if (response.status === 401) { window.location.href = "/login"; return; }
+                if (response.status === 403) { window.location.href = "/login/change-password"; return; }
+                throw new Error("HTTP " + response.status);
             }
             const data = await response.json();
             refreshToken = Date.now();
@@ -333,7 +335,7 @@
             renderTargetRows(data.latency_targets || []);
             updateAllGraphs();
         } catch (error) {
-            setRefreshState("Error");
+            setRefreshState("Error " + (error.message || "refresh failed"));
         }
     }
 
@@ -380,7 +382,7 @@
         const toggleButton = event.target.closest("[data-latency-toggle]");
         if (toggleButton) {
             toggleTarget(toggleButton.dataset.latencyToggle, toggleButton.dataset.enabled !== "1").catch(() => {
-                setRefreshState("Error");
+                setRefreshState("Error " + (error.message || "refresh failed"));
             });
             return;
         }
@@ -464,4 +466,10 @@
     setState("Loading");
     refreshGraphs();
     window.setInterval(refreshGraphs, 10000);
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            refreshGraphs();
+        }
+    });
+    window.addEventListener("pageshow", refreshGraphs);
 })();

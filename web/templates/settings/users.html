@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Settings</p>
+        <h1>Users</h1>
+    </div>
+    <div class="refresh-state" id="users-state">Loading</div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>User inventory</h2>
+        <button class="text-button compact primary" type="button" id="user-add-button">Add</button>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Flags</th>
+                    <th>Last login</th>
+                    <th>Failed</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="users-body">
+                <tr>
+                    <td colspan="8">
+                        <div class="terminal-empty">
+                            <span class="prompt">$</span>
+                            <span>loading users</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal-backdrop" id="user-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+        <div class="panel-head">
+            <h2 id="user-modal-title">User</h2>
+            <button class="icon-button" type="button" data-user-modal-close aria-label="Close">X</button>
+        </div>
+        <form class="edit-form" id="user-form">
+            <input type="hidden" name="id">
+            <div class="form-grid">
+                <label class="field">
+                    <span>Username</span>
+                    <input name="username" type="text" autocomplete="username" required>
+                </label>
+                <label class="field">
+                    <span>Display name</span>
+                    <input name="display_name" type="text">
+                </label>
+                <label class="field">
+                    <span>Role</span>
+                    <select name="role">
+                        <option value="admin">admin</option>
+                        <option value="operator">operator</option>
+                        <option value="viewer">viewer</option>
+                    </select>
+                </label>
+                <label class="field" data-password-field>
+                    <span>Password</span>
+                    <input name="password" type="password" autocomplete="new-password">
+                </label>
+            </div>
+            <label class="check-line">
+                <input name="must_change_password" type="checkbox" checked>
+                <span>Require password change at next login</span>
+            </label>
+            <div class="form-actions">
+                <button class="text-button" type="button" data-user-modal-close>Cancel</button>
+                <button class="text-button primary" type="submit">Save</button>
+            </div>
+            <div class="form-status" id="user-form-status"></div>
+        </form>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="password-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
+        <div class="panel-head">
+            <h2 id="password-modal-title">Reset password</h2>
+            <button class="icon-button" type="button" data-password-modal-close aria-label="Close">X</button>
+        </div>
+        <form class="edit-form" id="password-form">
+            <input type="hidden" name="id">
+            <div class="form-grid">
+                <label class="field wide">
+                    <span>New password</span>
+                    <input name="password" type="password" autocomplete="new-password" required>
+                </label>
+            </div>
+            <label class="check-line">
+                <input name="must_change_password" type="checkbox" checked>
+                <span>Require password change at next login</span>
+            </label>
+            <div class="form-actions">
+                <button class="text-button" type="button" data-password-modal-close>Cancel</button>
+                <button class="text-button primary" type="submit">Update password</button>
+            </div>
+            <div class="form-status" id="password-form-status"></div>
+        </form>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="confirm-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="panel-head">
+            <h2 id="confirm-modal-title">Confirm action</h2>
+            <button class="icon-button" type="button" data-confirm-cancel aria-label="Close">X</button>
+        </div>
+        <div class="terminal-empty">
+            <span class="prompt">$</span>
+            <span id="confirm-message">Confirm this operation?</span>
+        </div>
+        <div class="form-actions">
+            <button class="text-button" type="button" data-confirm-cancel>Cancel</button>
+            <button class="text-button primary" type="button" id="confirm-accept">Confirm</button>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/settings_users.js') }}?v=20260511-users-modal" defer></script>
+{% endblock %}

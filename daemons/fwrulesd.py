@@ -573,7 +573,7 @@ def run_action(args: argparse.Namespace) -> int:
 
 def main() -> int:
     """Execute a single dispatched firewall work request."""
-    parser = argparse.ArgumentParser(description="HomeFirewall firewall rule executor.")
+    parser = argparse.ArgumentParser(description="ArmFirewall firewall rule executor.")
     parser.add_argument("--work-request-id")
     parser.add_argument("--request-uid")
     parser.add_argument("--category-name")

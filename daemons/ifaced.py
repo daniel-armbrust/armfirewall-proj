@@ -19,7 +19,7 @@ if str(ROOT_DIR) not in sys.path:
 from core import db
 from core import log as logger
 
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("HOMEFIREWALL_IFACED_INTERVAL", "10"))
+COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFIREWALL_IFACED_INTERVAL", "10"))
 LOG_SOURCE = "ifaced.py"
 
 CONF_PATH = ROOT_DIR / "conf" / "armfw.conf"
@@ -90,7 +90,7 @@ def run_text(command: list[str]) -> str:
 
 
 def read_hf_conf() -> dict[str, str]:
-    """Read HomeFirewall key-value configuration."""
+    """Read ArmFirewall key-value configuration."""
     values: dict[str, str] = {}
     if not CONF_PATH.exists():
         return values

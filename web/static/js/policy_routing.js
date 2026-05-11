@@ -108,8 +108,8 @@
             return "-";
         }
         const description = interfaceDescription(value);
-        const title = description ? ` title="${HF.escapeHtml(description)}"` : "";
-        return `<span class="iface-tooltip"${title}>${HF.escapeHtml(value)}</span>`;
+        const tooltip = description ? ` title="${HF.escapeHtml(description)}" data-tooltip="${HF.escapeHtml(description)}" tabindex="0"` : "";
+        return `<span class="iface-tooltip"${tooltip}>${HF.escapeHtml(value)}</span>`;
     }
 
     async function loadInterfaceChoices() {

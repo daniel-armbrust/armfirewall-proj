@@ -34,10 +34,10 @@ ArmFirewall is organized around clear responsibility boundaries:
 
 The project uses `supervisord` to keep long-running services under control:
 
-- `homefirewall-api`: runs the FastAPI web application.
-- `homefirewall-ifaced`: collects network interface inventory and counters into SQLite.
-- `homefirewall-monitord`: runs monitoring collectors and generates RRD graphs.
-- `homefirewall-workreqd`: processes queued work requests and dispatches operating system actions.
+- `armfirewall-api`: runs the FastAPI web application.
+- `armfirewall-ifaced`: collects network interface inventory and counters into SQLite.
+- `armfirewall-monitord`: runs monitoring collectors and generates RRD graphs.
+- `armfirewall-workreqd`: processes queued work requests and dispatches operating system actions.
 
 Supervisor log rotation is configured for each managed process.
 

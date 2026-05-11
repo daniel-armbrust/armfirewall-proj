@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Shared logging helpers for HomeFirewall shell scripts.
+# Shared logging helpers for ArmFirewall shell scripts.
 
-homefirewall_log_context() {
-    if [[ -n "${HOMEFIREWALL_LOG_CONTEXT:-}" ]]; then
-        printf '%s' "$HOMEFIREWALL_LOG_CONTEXT"
+armfirewall_log_context() {
+    if [[ -n "${ARMFIREWALL_LOG_CONTEXT:-}" ]]; then
+        printf '%s' "$ARMFIREWALL_LOG_CONTEXT"
     else
         basename "$0"
     fi
@@ -14,7 +14,7 @@ log_timestamp() {
 }
 
 log() {
-    printf '[%s] [%s] %s\n' "$(log_timestamp)" "$(homefirewall_log_context)" "$*" >&2
+    printf '[%s] [%s] %s\n' "$(log_timestamp)" "$(armfirewall_log_context)" "$*" >&2
 }
 
 log_info() {

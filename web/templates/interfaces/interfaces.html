@@ -6,7 +6,7 @@
         <p class="eyebrow">network</p>
         <h1>Interfaces</h1>
     </div>
-    <div class="refresh-state">Ready</div>
+    <div class="refresh-state" id="refresh-state">Loading</div>
 </section>
 
 <section class="summary-grid compact" aria-label="Interface summary">
@@ -20,12 +20,11 @@
     </div>
 </section>
 
-<section class="panel">
+<section class="panel interface-inventory-panel">
     <div class="panel-head">
         <h2>Interface inventory</h2>
-        <span id="interface-inventory-updated">updated=-</span>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap interface-inventory-wrap">
         <table class="data-table">
             <thead>
                 <tr>
@@ -56,12 +55,12 @@
 <section class="panel">
     <div class="panel-head">
         <h2>Traffic counters</h2>
-        <span id="counters-updated">Raw counters from iface.db</span>
+        <span>Raw counters from iface.db</span>
     </div>
     <div class="counter-list" id="counter-list"></div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/interfaces.js') }}" defer></script>
+<script src="{{ url_for('static', path='/js/interfaces.js') }}?v=20260510-interfaces-state" defer></script>
 {% endblock %}

@@ -298,7 +298,7 @@ apply_persisted_filter_rules() {
 initialize_firewall_rules() {
     disable_os_firewall_services
 
-    log "Clearing existing iptables and ip6tables rules before rebuilding HomeFirewall rules."
+    log "Clearing existing iptables and ip6tables rules before rebuilding ArmFirewall rules."
 
     iptables -t filter -P INPUT ACCEPT
     iptables -t filter -P FORWARD ACCEPT
@@ -321,8 +321,8 @@ initialize_firewall_rules() {
 
 # Set restrictive default policies after required allow rules exist.
 set_default_policies() {
-    [[ "${HOMEFIREWALL_BOOTSTRAP:-0}" == "1" ]] || \
-        fatal "set_default_policies can only run during HomeFirewall bootstrap."
+    [[ "${ARMFIREWALL_BOOTSTRAP:-0}" == "1" ]] || \
+        fatal "set_default_policies can only run during ArmFirewall bootstrap."
 
     log "Setting INPUT and FORWARD policies to DROP."
 

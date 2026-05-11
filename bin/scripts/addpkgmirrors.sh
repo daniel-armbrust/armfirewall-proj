@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOMEFIREWALL_LOG_CONTEXT="$(basename "$0")"
+ARMFIREWALL_LOG_CONTEXT="$(basename "$0")"
 
 OS_ID="" 
 OS_VERSION_ID="" 
@@ -49,7 +49,7 @@ backup_path() {
 
     if [[ -e "$path" ]]; then
         stamp="$(date '+%Y%m%d%H%M%S')"
-        cp -a "$path" "${path}.homefirewall.${stamp}.bak"
+        cp -a "$path" "${path}.armfirewall.${stamp}.bak"
         log "Backed up ${path}."
     fi
 }
@@ -154,12 +154,12 @@ REPO
     esac
 
     backup_path "$repo_dir"
-    find "$repo_dir" -maxdepth 1 -type f -name '*.repo' -exec mv {} {}.homefirewall.disabled \;
+    find "$repo_dir" -maxdepth 1 -type f -name '*.repo' -exec mv {} {}.armfirewall.disabled \;
 
     case "$OS_ID" in
-        ol|oracle|oraclelinux) install -m 0644 "$temp_repo" "$repo_dir/homefirewall-oraclelinux.repo" ;;
-        fedora) install -m 0644 "$temp_repo" "$repo_dir/homefirewall-fedora.repo" ;;
-        *) install -m 0644 "$temp_repo" "$repo_dir/homefirewall-epel.repo" ;;
+        ol|oracle|oraclelinux) install -m 0644 "$temp_repo" "$repo_dir/armfirewall-oraclelinux.repo" ;;
+        fedora) install -m 0644 "$temp_repo" "$repo_dir/armfirewall-fedora.repo" ;;
+        *) install -m 0644 "$temp_repo" "$repo_dir/armfirewall-epel.repo" ;;
     esac
 
 	    log "Refreshing dnf metadata after repository validation."
@@ -180,17 +180,17 @@ write_apt_repos() {
     backup_path /etc/apt/sources.list
     mkdir -p /etc/apt/sources.list.d
 
-    find /etc/apt/sources.list.d -maxdepth 1 -type f -name '*.list' -exec mv {} {}.homefirewall.disabled \;
+    find /etc/apt/sources.list.d -maxdepth 1 -type f -name '*.list' -exec mv {} {}.armfirewall.disabled \;
     : > /etc/apt/sources.list
 
     if [[ "$OS_ID" == ubuntu ]]; then
-        cat > /etc/apt/sources.list.d/homefirewall.list <<APT
+        cat > /etc/apt/sources.list.d/armfirewall.list <<APT
 deb http://archive.ubuntu.com/ubuntu ${codename} main universe multiverse restricted
 deb http://archive.ubuntu.com/ubuntu ${codename}-updates main universe multiverse restricted
 deb http://security.ubuntu.com/ubuntu ${codename}-security main universe multiverse restricted
 APT
     else
-        cat > /etc/apt/sources.list.d/homefirewall.list <<APT
+        cat > /etc/apt/sources.list.d/armfirewall.list <<APT
 deb http://deb.debian.org/debian ${codename} main contrib non-free non-free-firmware
 deb http://deb.debian.org/debian ${codename}-updates main contrib non-free non-free-firmware
 deb http://security.debian.org/debian-security ${codename}-security main contrib non-free non-free-firmware

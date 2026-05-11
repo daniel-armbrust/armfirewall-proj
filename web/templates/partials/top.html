@@ -21,8 +21,8 @@
             </select>
         </label>
         <div class="topbar-user">
-            <span>{{ user_name }}</span>
-            <a href="#" aria-label="Logout">logout</a>
+            <span>{{ request.state.current_user.username if request.state.current_user else user_name }}</span>
+            <a href="/logout" aria-label="Logout">logout</a>
         </div>
     </div>
 </header>

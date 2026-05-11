@@ -1,9 +1,20 @@
 (function () {
     const stateLabel = document.querySelector("#refresh-state");
     const counterList = document.querySelector("#counter-list");
-    const countersUpdated = document.querySelector("#counters-updated");
     const interfaceInventoryBody = document.querySelector("#interface-inventory-body");
-    const interfaceInventoryUpdated = document.querySelector("#interface-inventory-updated");
+
+    function setRefreshState(state, updated = "") {
+        if (!stateLabel) {
+            return;
+        }
+
+        if (updated) {
+            stateLabel.innerHTML = `${HF.escapeHtml(state)} / <span class="refresh-state-label">updated=</span>${HF.escapeHtml(updated)}`;
+            return;
+        }
+
+        stateLabel.textContent = state;
+    }
 
     function interfaceTooltip(iface) {
         const state = HF.number(iface.is_actived) === 1 ? "UP" : "DOWN";
@@ -56,7 +67,7 @@
                     <td>
                         <div class="iface-name-cell">
                             <a class="icon-button iface-edit" href="/network/interfaces/${encodeURIComponent(iface.name)}/edit" title="Edit properties" aria-label="Edit ${HF.escapeHtml(iface.name)} properties">&#9881;</a>
-                            <strong class="iface-tooltip" title="${HF.escapeHtml(tooltip)}">${HF.escapeHtml(iface.name)}</strong>
+                            <strong class="iface-tooltip" tabindex="0" title="${HF.escapeHtml(tooltip)}" data-tooltip="${HF.escapeHtml(tooltip)}">${HF.escapeHtml(iface.name)}</strong>
                         </div>
                     </td>
                     <td><span class="role">${HF.escapeHtml(iface.role)}</span></td>
@@ -73,30 +84,16 @@
 
     async function pollTrafficCounters() {
         try {
-            if (stateLabel) {
-                stateLabel.textContent = "Polling";
-            }
+            setRefreshState("Polling");
 
             const data = await HF.fetchJson("/api/traffic-counters");
             HF.renderSummary(data.summary);
             renderInterfaceInventory(data.interfaces);
             HF.renderCounterList(counterList, data.interfaces);
 
-            if (countersUpdated) {
-                countersUpdated.textContent = data.summary.updated_at ? `updated=${data.summary.updated_at}` : "updated=-";
-            }
-
-            if (interfaceInventoryUpdated) {
-                interfaceInventoryUpdated.textContent = data.summary.updated_at ? `updated=${data.summary.updated_at}` : "updated=-";
-            }
-
-            if (stateLabel) {
-                stateLabel.textContent = "Live";
-            }
+            setRefreshState("Live", data.summary.updated_at || "-");
         } catch (error) {
-            if (stateLabel) {
-                stateLabel.textContent = "Offline";
-            }
+            setRefreshState("Offline");
             if (counterList) {
                 counterList.innerHTML = `<div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div>`;
             }

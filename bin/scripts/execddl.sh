@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DDL_DIR="$ROOT_DIR/db/ddl"
 DB_DIR="$ROOT_DIR/db"
-HOMEFIREWALL_LOG_CONTEXT="$(basename "$0")"
+ARMFIREWALL_LOG_CONTEXT="$(basename "$0")"
 
 # shellcheck source=log.sh
 . "$ROOT_DIR/bin/scripts/log.sh"

@@ -1,5 +1,5 @@
 (function () {
-    const themeStorageKey = "homefirewall-theme";
+    const themeStorageKey = "armfirewall-theme";
     const availableThemes = new Set(["default", "blue", "light", "red"]);
 
     function text(value) {
@@ -125,6 +125,89 @@
         window.addEventListener("beforeunload", saveScroll);
     }
 
+    function initializeArmTooltips() {
+        const tooltip = document.querySelector(".arm-floating-tooltip") || document.createElement("div");
+        tooltip.className = "arm-floating-tooltip";
+        tooltip.hidden = true;
+        if (!tooltip.parentElement) {
+            document.body.appendChild(tooltip);
+        }
+        document.body.classList.add("arm-tooltips-enabled");
+
+        let activeElement = null;
+
+        function positionTooltip(element) {
+            const value = element.dataset.tooltip || element.getAttribute("title") || "";
+            if (!value) {
+                tooltip.hidden = true;
+                return;
+            }
+
+            tooltip.textContent = value;
+            tooltip.hidden = false;
+            tooltip.style.visibility = "hidden";
+            tooltip.style.top = "0";
+            tooltip.style.left = "0";
+
+            const rect = element.getBoundingClientRect();
+            const tipRect = tooltip.getBoundingClientRect();
+            const margin = 12;
+            const aboveTop = rect.top - tipRect.height - margin;
+            const belowTop = rect.bottom + margin;
+            const top = aboveTop >= margin ? aboveTop : Math.min(belowTop, window.innerHeight - tipRect.height - margin);
+            const centeredLeft = rect.left + (rect.width / 2) - (tipRect.width / 2);
+            const left = Math.min(Math.max(centeredLeft, margin), window.innerWidth - tipRect.width - margin);
+
+            tooltip.style.top = `${Math.max(margin, top)}px`;
+            tooltip.style.left = `${left}px`;
+            tooltip.style.visibility = "visible";
+        }
+
+        function showTooltip(event) {
+            const element = event.target.closest(".arm-tooltip[data-tooltip], .iface-tooltip[data-tooltip]");
+            if (!element) {
+                return;
+            }
+            if (element.hasAttribute("title")) {
+                element.dataset.armTitle = element.getAttribute("title");
+                element.removeAttribute("title");
+            }
+            activeElement = element;
+            positionTooltip(element);
+        }
+
+        function restoreNativeTitle(element) {
+            if (element && element.dataset.armTitle) {
+                element.setAttribute("title", element.dataset.armTitle);
+                delete element.dataset.armTitle;
+            }
+        }
+
+        function hideTooltip(event) {
+            if (!activeElement || (event.relatedTarget && activeElement.contains(event.relatedTarget))) {
+                return;
+            }
+            restoreNativeTitle(activeElement);
+            activeElement = null;
+            tooltip.hidden = true;
+        }
+
+        document.addEventListener("mouseover", showTooltip);
+        document.addEventListener("focusin", showTooltip);
+        document.addEventListener("mouseout", hideTooltip);
+        document.addEventListener("focusout", hideTooltip);
+        window.addEventListener("scroll", () => {
+            if (activeElement) {
+                positionTooltip(activeElement);
+            }
+        }, true);
+        window.addEventListener("resize", () => {
+            if (activeElement) {
+                positionTooltip(activeElement);
+            }
+        });
+    }
+
     function renderSummary(summary) {
         const interfaces = document.querySelector("#summary-interfaces");
         const active = document.querySelector("#summary-active");
@@ -136,6 +219,25 @@
         if (active) {
             active.textContent = summary.active;
         }
+    }
+
+    function interfaceTooltip(iface) {
+        const state = number(iface.is_actived) === 1 ? "UP" : "DOWN";
+        const addresses = (iface.addresses || [])
+            .map((address) => `${text(address.addr_family).toUpperCase()} ${text(address.addr)}/${text(address.prefixlen)}`)
+            .join(", ");
+
+        return [
+            `Interface: ${text(iface.name).replace(/^if:/i, "")}`,
+            `Role: ${text(iface.role || "UNKNOWN")}`,
+            `Description: ${text(iface.description)}`,
+            `MAC: ${text(iface.mac_address)}`,
+            `MTU: ${text(iface.mtu)}`,
+            `State: ${state}`,
+            `Speed: ${number(iface.speed_mbps).toLocaleString()} Mb/s`,
+            `Duplex: ${text(iface.duplex || "unknown")}`,
+            addresses ? `Addresses: ${addresses}` : "Addresses: -",
+        ].join("\n");
     }
 
     function renderCounterList(counterList, interfaces) {
@@ -159,10 +261,11 @@
             const role = text(iface.role || "UNKNOWN");
             const ifaceName = text(iface.name).replace(/^if:/i, "");
             const ifaceLabel = `${ifaceName} (${role})`;
+            const tooltip = interfaceTooltip(iface);
 
             return `
                 <div class="counter-row">
-                    <div class="counter-name">${escapeHtml(ifaceLabel)}</div>
+                    <div class="counter-name"><span class="iface-tooltip" tabindex="0" title="${escapeHtml(tooltip)}" data-tooltip="${escapeHtml(tooltip)}">${escapeHtml(ifaceLabel)}</span></div>
                     <div class="bar-item">
                         <div class="bar-label">
                             <span>RX ${number(iface.rx_packets).toLocaleString()} pkts</span>
@@ -194,4 +297,5 @@
     initializeTheme();
     initializeMobileMenu();
     initializeSidebarScrollMemory();
+    initializeArmTooltips();
 }());

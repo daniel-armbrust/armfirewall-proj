@@ -33,7 +33,7 @@
             <tbody id="latency-targets-body">
                 {% for target in latency_targets %}
                 <tr>
-                    <td><span class="iface-tooltip" title="{{ target.interface_tooltip }}">{{ target.iface }}</span></td>
+                    <td><span class="iface-tooltip" tabindex="0" title="{{ target.interface_tooltip }}" data-tooltip="{{ target.interface_tooltip }}">{{ target.iface }}</span></td>
                     <td>{{ target.target }}</td>
                     <td>{{ target.count }}</td>
                     <td>{{ target.timeout }}s</td>
@@ -180,5 +180,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/monitoring_latency.js') }}" defer></script>
+<script src="{{ url_for('static', path='/js/monitoring_latency.js') }}?v=20260510-monitoring-refresh" defer></script>
 {% endblock %}

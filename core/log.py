@@ -1,4 +1,4 @@
-"""Shared daemon logging helpers for HomeFirewall."""
+"""Shared daemon logging helpers for ArmFirewall."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ ERROR_LEVELS = {"ERROR", "FATAL"}
 
 def default_source() -> str:
     """Return the current process name used as the log source."""
-    return Path(sys.argv[0]).name or "homefirewall"
+    return Path(sys.argv[0]).name or "armfirewall"
 
 
 def format_message(level: str, message: str, source: str) -> str:
