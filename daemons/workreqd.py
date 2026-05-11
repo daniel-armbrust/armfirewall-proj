@@ -99,7 +99,10 @@ def queued_requests(conn: db.Connection) -> list[Any]:
 
 def command_for_request(request: Any) -> list[str]:
     """Build the action command for a work request."""
-    script_name = str(request["script_name"])
+    if str(request["category_name"]) == "SERVICE_MANAGEMENT.DNSMASQ_CONFIG":
+        script_name = "dnsmasq.py"
+    else:
+        script_name = str(request["script_name"])
 
     if "/" in script_name or ".." in script_name or not script_name.endswith(".py"):
         raise RuntimeError(f"Invalid action script name configured: {script_name}")

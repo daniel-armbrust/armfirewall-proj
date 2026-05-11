@@ -59,6 +59,12 @@ def api_dnsmasq_config() -> dict[str, Any]:
     return services_dnsmasq_views.get_dnsmasq_config()
 
 
+@router.get("/api/services/dnsmasq/work-requests")
+def api_dnsmasq_work_requests() -> dict[str, Any]:
+    """Return Dnsmasq configuration work requests."""
+    return services_dnsmasq_views.get_dnsmasq_work_requests()
+
+
 @router.put("/api/services/dnsmasq")
 async def api_save_dnsmasq_config(request: Request) -> dict[str, Any]:
     """Save dnsmasq configuration from the GUI."""

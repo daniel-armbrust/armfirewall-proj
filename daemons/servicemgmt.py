@@ -27,6 +27,14 @@ ALLOWED_SERVICES = {
         "binary": "/usr/sbin/squid",
     },
 }
+CONTROLLABLE_SERVICES = {
+    "armfirewall-ifaced",
+    "armfirewall-monitord",
+    "armfirewall-workreqd",
+    "armfirewall-dnsmasq",
+    "armfirewall-squid",
+}
+PROTECTED_SERVICES = {"armfirewall-api"}
 
 
 def command_exists(command: str) -> bool:
@@ -103,11 +111,34 @@ def validate_service(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def validate_control_service(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return validated metadata for a controllable supervisord service."""
+    service_name = str(payload.get("service_name") or "").strip()
+    if service_name in PROTECTED_SERVICES:
+        raise RuntimeError(f"Protected service cannot be controlled: {service_name}")
+    if service_name not in CONTROLLABLE_SERVICES:
+        raise RuntimeError(f"Unsupported controllable service: {service_name}")
+    return {"name": service_name}
+
+
 def supervisor_command(*args: str, timeout: int = 60, check: bool = True) -> subprocess.CompletedProcess[str]:
     """Run supervisorctl against the ArmFirewall supervisor configuration."""
     if not command_exists("supervisorctl"):
         raise RuntimeError("supervisorctl was not found.")
     return run_command(["supervisorctl", "-c", str(SUPERVISOR_CONF), *args], timeout=timeout, check=check)
+
+
+def supervisor_status(service_name: str) -> str:
+    """Return a supervisord program state, tolerating stopped return codes."""
+    result = supervisor_command("status", service_name, check=False)
+    output = (result.stdout + result.stderr).strip()
+    if "no such process" in output.lower():
+        raise RuntimeError(f"Supervisor program is not registered: {service_name}")
+    states = {"RUNNING", "STOPPED", "STARTING", "BACKOFF", "STOPPING", "EXITED", "FATAL", "UNKNOWN"}
+    state = next((item for item in states if item in output), "")
+    if not state:
+        raise RuntimeError(output or f"Could not read supervisor status for {service_name}.")
+    return state
 
 
 def supervisor_program_exists(service_name: str) -> bool:
@@ -176,6 +207,34 @@ def uninstall_service(service: dict[str, Any]) -> None:
     logger.log(f"Uninstalled optional service {service['name']}.", source=LOG_SOURCE)
 
 
+def control_service(service: dict[str, Any], action: str) -> None:
+    """Start, stop, or restart one ArmFirewall supervisord service."""
+    service_name = service["name"]
+    supervisor_command("reread", check=False)
+    supervisor_command("update", check=False)
+
+    state = supervisor_status(service_name)
+    if action == "start":
+        if state == "RUNNING":
+            logger.log(f"Service {service_name} is already running.", source=LOG_SOURCE)
+            return
+        supervisor_command("start", service_name, timeout=60)
+    elif action == "stop":
+        if state != "RUNNING":
+            logger.log(f"Service {service_name} is already stopped.", source=LOG_SOURCE)
+            return
+        supervisor_command("stop", service_name, timeout=60)
+    elif action == "restart":
+        if state == "RUNNING":
+            supervisor_command("restart", service_name, timeout=60)
+        else:
+            supervisor_command("start", service_name, timeout=60)
+    else:
+        raise RuntimeError(f"Unsupported service control action: {action}")
+
+    logger.log(f"Service {service_name} {action} completed.", source=LOG_SOURCE)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the work request executor argument parser."""
     parser = argparse.ArgumentParser(description="ArmFirewall optional service package executor.")
@@ -197,12 +256,16 @@ def main() -> int:
     if args.category != "SERVICE_MANAGEMENT":
         raise RuntimeError(f"Unsupported category for servicemgmt.py: {args.category}")
     payload = payload_from_args(args)
-    service = validate_service(payload)
 
     if args.action_name == "install":
+        service = validate_service(payload)
         install_service(service)
     elif args.action_name == "uninstall":
+        service = validate_service(payload)
         uninstall_service(service)
+    elif args.action_name in {"start", "stop", "restart"}:
+        service = validate_control_service(payload)
+        control_service(service, args.action_name)
     else:
         raise RuntimeError(f"Unsupported service management action: {args.action_name}")
     return 0

@@ -5,6 +5,7 @@ import json
 import re
 import shutil
 import subprocess
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -14,14 +15,17 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core import iface as iface_module
+from core import db
 from web.services import status as service_status
 
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 DNSMASQ_CONF = ROOT_DIR / "conf" / "dnsmasq.conf"
+DNSMASQ_DB_PATH = ROOT_DIR / "db" / "dnsmasq.db"
+WORK_REQUEST_DB_PATH = ROOT_DIR / "db" / "work-requests.db"
 templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
 
-DOMAIN_RE = re.compile(r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$")
+DOMAIN_LABEL_RE = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$")
 BOOL_DEFAULTS = {
     "expand_hosts": True,
     "domain_needed": True,
@@ -248,6 +252,323 @@ def parse_dnsmasq_config(lines: list[str]) -> dict[str, Any]:
     return config
 
 
+def json_array(value: Any) -> list[Any]:
+    """Return a JSON array value as a Python list."""
+    if isinstance(value, list):
+        return value
+    try:
+        parsed = json.loads(str(value or "[]"))
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def bool_from_db(value: Any) -> bool:
+    """Convert an SQLite integer boolean to bool."""
+    return int(value or 0) == 1
+
+
+def ensure_dnsmasq_schema(conn: db.Connection) -> None:
+    """Add global DNS columns when an older dnsmasq.db is found."""
+    columns = {row["name"] for row in db.execute_on(conn, "PRAGMA table_info(dnsmasq_settings)").fetchall()}
+    column_defs = {
+        "dns_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (dns_enabled IN (0, 1))",
+        "local_domain": "TEXT NOT NULL DEFAULT 'armfirewall.local'",
+        "upstream_dns_servers_json": "TEXT NOT NULL DEFAULT '[\"1.1.1.1\",\"8.8.8.8\"]'",
+        "pihole_upstream_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (pihole_upstream_enabled IN (0, 1))",
+        "cache_size": "INTEGER NOT NULL DEFAULT 1000 CHECK (cache_size BETWEEN 0 AND 1000000)",
+        "expand_hosts": "INTEGER NOT NULL DEFAULT 1 CHECK (expand_hosts IN (0, 1))",
+        "domain_needed": "INTEGER NOT NULL DEFAULT 1 CHECK (domain_needed IN (0, 1))",
+        "bogus_priv": "INTEGER NOT NULL DEFAULT 1 CHECK (bogus_priv IN (0, 1))",
+    }
+    for name, definition in column_defs.items():
+        if name not in columns:
+            db.execute_on(conn, f"ALTER TABLE dnsmasq_settings ADD COLUMN {name} {definition}")
+    db.execute_on(
+        conn,
+        """
+        CREATE TABLE IF NOT EXISTS dnsmasq_global_domain_upstreams (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             domain TEXT NOT NULL UNIQUE,
+             upstream_dns_servers_json TEXT NOT NULL,
+             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+    )
+    db.execute_on(
+        conn,
+        """
+        CREATE INDEX IF NOT EXISTS idx_dnsmasq_global_domain_upstreams_domain
+        ON dnsmasq_global_domain_upstreams (domain)
+        """,
+    )
+
+
+def load_config_from_db() -> dict[str, Any] | None:
+    """Load the pending or applied Dnsmasq configuration from SQLite."""
+    if not DNSMASQ_DB_PATH.exists():
+        return None
+
+    with db.connection(DNSMASQ_DB_PATH) as conn:
+        ensure_dnsmasq_schema(conn)
+        settings = db.fetch_one_on(
+            conn,
+            """
+            SELECT dns_enabled, local_domain, upstream_dns_servers_json,
+                   pihole_upstream_enabled, cache_size, expand_hosts,
+                   domain_needed, bogus_priv, extra_options
+            FROM dnsmasq_settings
+            WHERE id = 1
+            """,
+        )
+        global_upstream_rows = db.execute_on(
+            conn,
+            """
+            SELECT domain, upstream_dns_servers_json
+            FROM dnsmasq_global_domain_upstreams
+            ORDER BY id
+            """,
+        ).fetchall()
+        rows = db.execute_on(
+            conn,
+            """
+            SELECT id, iface, dns_enabled, local_domain, upstream_dns_servers_json,
+                   pihole_upstream_enabled, cache_size, expand_hosts, domain_needed,
+                   bogus_priv, dhcp_enabled, dhcp_range_start, dhcp_range_end,
+                   lease_time, dhcp_authoritative
+            FROM dnsmasq_interface_configs
+            WHERE enabled = 1
+            ORDER BY id
+            """,
+        ).fetchall()
+
+        if not rows and settings is None:
+            return None
+
+        interface_configs: list[dict[str, Any]] = []
+        for row in rows:
+            upstream_rows = db.execute_on(
+                conn,
+                """
+                SELECT domain, upstream_dns_servers_json
+                FROM dnsmasq_domain_upstreams
+                WHERE interface_config_id = ?
+                ORDER BY id
+                """,
+                (row["id"],),
+            ).fetchall()
+            interface_configs.append(
+                {
+                    "iface": row["iface"],
+                    "dns_enabled": bool_from_db(row["dns_enabled"]),
+                    "local_domain": row["local_domain"],
+                    "upstream_dns_servers": [str(item) for item in json_array(row["upstream_dns_servers_json"])],
+                    "domain_upstreams": [
+                        {
+                            "domain": upstream["domain"],
+                            "upstreams": [str(item) for item in json_array(upstream["upstream_dns_servers_json"])],
+                        }
+                        for upstream in upstream_rows
+                    ],
+                    "pihole_upstream_enabled": bool_from_db(row["pihole_upstream_enabled"]),
+                    "cache_size": int(row["cache_size"]),
+                    "expand_hosts": bool_from_db(row["expand_hosts"]),
+                    "domain_needed": bool_from_db(row["domain_needed"]),
+                    "bogus_priv": bool_from_db(row["bogus_priv"]),
+                    "dhcp_enabled": bool_from_db(row["dhcp_enabled"]),
+                    "dhcp_range_start": row["dhcp_range_start"],
+                    "dhcp_range_end": row["dhcp_range_end"],
+                    "lease_time": row["lease_time"],
+                    "dhcp_authoritative": bool_from_db(row["dhcp_authoritative"]),
+                }
+            )
+
+    config = default_config()
+    if settings:
+        config.update(
+            {
+                "dns_enabled": bool_from_db(settings["dns_enabled"]),
+                "local_domain": settings["local_domain"],
+                "upstream_dns_servers": [str(item) for item in json_array(settings["upstream_dns_servers_json"])],
+                "domain_upstreams": [
+                    {
+                        "domain": row["domain"],
+                        "upstreams": [str(item) for item in json_array(row["upstream_dns_servers_json"])],
+                    }
+                    for row in global_upstream_rows
+                ],
+                "pihole_upstream_enabled": bool_from_db(settings["pihole_upstream_enabled"]),
+                "cache_size": int(settings["cache_size"]),
+                "expand_hosts": bool_from_db(settings["expand_hosts"]),
+                "domain_needed": bool_from_db(settings["domain_needed"]),
+                "bogus_priv": bool_from_db(settings["bogus_priv"]),
+                "extra_options": settings["extra_options"],
+            }
+        )
+    legacy_dns = next((item for item in interface_configs if item["dns_enabled"]), None)
+    if legacy_dns and not config["dns_enabled"]:
+        config.update(
+            {
+                "dns_enabled": legacy_dns["dns_enabled"],
+                "local_domain": legacy_dns["local_domain"],
+                "upstream_dns_servers": legacy_dns["upstream_dns_servers"],
+                "domain_upstreams": legacy_dns["domain_upstreams"],
+                "pihole_upstream_enabled": legacy_dns["pihole_upstream_enabled"],
+                "cache_size": legacy_dns["cache_size"],
+                "expand_hosts": legacy_dns["expand_hosts"],
+                "domain_needed": legacy_dns["domain_needed"],
+                "bogus_priv": legacy_dns["bogus_priv"],
+            }
+        )
+    if not interface_configs:
+        return config
+
+    config.update(
+        {
+            "dhcp_enabled": any(item["dhcp_enabled"] for item in interface_configs),
+            "listen_interfaces": [item["iface"] for item in interface_configs],
+            "interface_configs": interface_configs,
+        }
+    )
+    return config
+
+
+def save_config_to_db(config: dict[str, Any]) -> int:
+    """Persist normalized Dnsmasq settings and return the work request id."""
+    request_uid = str(uuid.uuid4())
+    payload = {"config_db": str(DNSMASQ_DB_PATH), "config_path": str(DNSMASQ_CONF)}
+
+    with db.transaction(DNSMASQ_DB_PATH) as conn:
+        ensure_dnsmasq_schema(conn)
+        db.execute_on(
+            conn,
+            """
+            INSERT INTO dnsmasq_settings (
+                id, dns_enabled, local_domain, upstream_dns_servers_json,
+                pihole_upstream_enabled, cache_size, expand_hosts, domain_needed,
+                bogus_priv, extra_options, pending_apply, updated_at
+            )
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                dns_enabled = excluded.dns_enabled,
+                local_domain = excluded.local_domain,
+                upstream_dns_servers_json = excluded.upstream_dns_servers_json,
+                pihole_upstream_enabled = excluded.pihole_upstream_enabled,
+                cache_size = excluded.cache_size,
+                expand_hosts = excluded.expand_hosts,
+                domain_needed = excluded.domain_needed,
+                bogus_priv = excluded.bogus_priv,
+                extra_options = excluded.extra_options,
+                pending_apply = 1,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                int(config["dns_enabled"]),
+                config["local_domain"],
+                json.dumps(config["upstream_dns_servers"], sort_keys=True),
+                int(config["pihole_upstream_enabled"]),
+                int(config["cache_size"]),
+                int(config["expand_hosts"]),
+                int(config["domain_needed"]),
+                int(config["bogus_priv"]),
+                config["extra_options"],
+            ),
+        )
+        db.execute_on(conn, "DELETE FROM dnsmasq_global_domain_upstreams")
+        for domain_item in config.get("domain_upstreams", []):
+            db.execute_on(
+                conn,
+                """
+                INSERT INTO dnsmasq_global_domain_upstreams (domain, upstream_dns_servers_json)
+                VALUES (?, ?)
+                """,
+                (domain_item["domain"], json.dumps(domain_item["upstreams"], sort_keys=True)),
+            )
+        db.execute_on(conn, "DELETE FROM dnsmasq_interface_configs")
+
+        for item in config.get("interface_configs", []):
+            cursor = db.execute_on(
+                conn,
+                """
+                INSERT INTO dnsmasq_interface_configs (
+                    iface, dns_enabled, local_domain, upstream_dns_servers_json,
+                    pihole_upstream_enabled, cache_size, expand_hosts, domain_needed,
+                    bogus_priv, dhcp_enabled, dhcp_range_start, dhcp_range_end,
+                    lease_time, dhcp_authoritative, enabled
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    item["iface"],
+                    int(item["dns_enabled"]),
+                    item["local_domain"],
+                    json.dumps(item["upstream_dns_servers"], sort_keys=True),
+                    int(item["pihole_upstream_enabled"]),
+                    int(item["cache_size"]),
+                    int(item["expand_hosts"]),
+                    int(item["domain_needed"]),
+                    int(item["bogus_priv"]),
+                    int(item["dhcp_enabled"]),
+                    item["dhcp_range_start"],
+                    item["dhcp_range_end"],
+                    item["lease_time"],
+                    int(item["dhcp_authoritative"]),
+                ),
+            )
+            interface_config_id = int(cursor.lastrowid)
+            for domain_item in item.get("domain_upstreams", []):
+                db.execute_on(
+                    conn,
+                    """
+                    INSERT INTO dnsmasq_domain_upstreams (
+                        interface_config_id, domain, upstream_dns_servers_json
+                    )
+                    VALUES (?, ?, ?)
+                    """,
+                    (
+                        interface_config_id,
+                        domain_item["domain"],
+                        json.dumps(domain_item["upstreams"], sort_keys=True),
+                    ),
+                )
+
+    with db.transaction(WORK_REQUEST_DB_PATH) as conn:
+        cursor = db.execute_on(
+            conn,
+            """
+            INSERT INTO work_requests (
+                request_uid, source, category_name, action_name,
+                target_rule_id, priority, status, payload_json
+            )
+            VALUES (?, 'gui', 'SERVICE_MANAGEMENT.DNSMASQ_CONFIG', 'apply', NULL, 70, 'queue', ?)
+            """,
+            (request_uid, json.dumps(payload, sort_keys=True)),
+        )
+        work_request_id = int(cursor.lastrowid)
+        db.execute_on(
+            conn,
+            """
+            INSERT INTO work_request_events (work_request_id, event_type, message)
+            VALUES (?, 'queue', 'Queued Dnsmasq configuration apply.')
+            """,
+            (work_request_id,),
+        )
+
+    with db.transaction(DNSMASQ_DB_PATH) as conn:
+        db.execute_on(
+            conn,
+            """
+            UPDATE dnsmasq_settings
+            SET last_work_request_id = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            """,
+            (work_request_id,),
+        )
+
+    return work_request_id
+
+
 def list_interfaces() -> list[dict[str, Any]]:
     """Return available interfaces for dnsmasq binding."""
     try:
@@ -292,15 +613,71 @@ def dnsmasq_status() -> dict[str, Any]:
     }
 
 
+def get_dnsmasq_work_requests(limit: int = 50) -> dict[str, Any]:
+    """Return recent Dnsmasq configuration and service control work requests."""
+    query = """
+        SELECT
+            id,
+            request_uid,
+            status,
+            source,
+            category_name,
+            action_name,
+            target_rule_id,
+            payload_json,
+            error_message,
+            created_at,
+            updated_at
+        FROM work_requests
+        WHERE category_name IN (
+            'SERVICE_MANAGEMENT.DNSMASQ_CONFIG',
+            'SERVICE_MANAGEMENT.SERVICE_CONTROL'
+        )
+        ORDER BY id DESC
+    """
+    with db.connection(WORK_REQUEST_DB_PATH) as conn:
+        raw_rows = db.fetch_all_on(conn, query)
+
+    rows: list[dict[str, Any]] = []
+    for row in raw_rows:
+        category_name = str(row.get("category_name") or "")
+        payload = {}
+        try:
+            payload = json.loads(str(row.get("payload_json") or "{}"))
+        except json.JSONDecodeError:
+            payload = {}
+
+        if category_name == "SERVICE_MANAGEMENT.SERVICE_CONTROL":
+            if payload.get("service_name") != "armfirewall-dnsmasq":
+                continue
+
+        item = dict(row)
+        item.pop("payload_json", None)
+        rows.append(item)
+        if len(rows) >= limit:
+            break
+
+    summary = {"total": len(rows), "queue": 0, "running": 0, "success": 0, "failed": 0}
+    for row in rows:
+        status = str(row.get("status") or "")
+        if status in summary:
+            summary[status] += 1
+
+    return {"summary": summary, "requests": rows}
+
+
 def get_dnsmasq_config() -> dict[str, Any]:
     """Return dnsmasq configuration, interfaces, and service state."""
-    lines = read_config_lines()
+    config = load_config_from_db()
+    if config is None:
+        config = parse_dnsmasq_config(read_config_lines())
     return {
-        "config": parse_dnsmasq_config(lines),
+        "config": config,
         "interfaces": list_interfaces(),
         "service": dnsmasq_status(),
         "summary": {
             "config_path": str(DNSMASQ_CONF),
+            "config_db": str(DNSMASQ_DB_PATH),
             "exists": DNSMASQ_CONF.exists(),
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         },
@@ -324,7 +701,15 @@ def validate_optional_ip(value: Any, field_name: str) -> str:
 def validate_dns_domain(value: Any, field_name: str) -> str:
     """Validate one DNS domain field."""
     domain = str(value or "armfirewall.local").strip().strip(".")
-    if not domain or len(domain) > 253 or not DOMAIN_RE.match(domain):
+    labels = domain.split(".")
+    if (
+        not domain
+        or len(domain) > 253
+        or ".." in domain
+        or len(labels) < 2
+        or all(label.isdigit() for label in labels)
+        or any(not DOMAIN_LABEL_RE.match(label) for label in labels)
+    ):
         raise HTTPException(status_code=400, detail=f"{field_name} must be a valid DNS domain.")
     return domain
 
@@ -377,23 +762,15 @@ def normalize_interface_config(item: dict[str, Any]) -> dict[str, Any]:
     """Validate one per-interface dnsmasq configuration."""
     iface_name = validate_interfaces([item.get("iface")])[0]
     config = default_interface_config(iface_name)
-    config["dns_enabled"] = bool(item.get("dns_enabled"))
-    config["local_domain"] = validate_domain(item.get("local_domain"))
-    config["upstream_dns_servers"] = normalize_upstream_list(item.get("upstream_dns_servers"), f"{iface_name}.upstream_dns_servers")
-    config["pihole_upstream_enabled"] = bool(item.get("pihole_upstream_enabled"))
-    config["domain_upstreams"] = [] if config["pihole_upstream_enabled"] else validate_domain_upstreams(item.get("domain_upstreams"))
-    config["cache_size"] = validate_cache_size(item.get("cache_size", config["cache_size"]))
-    config["expand_hosts"] = bool(item.get("expand_hosts"))
-    config["domain_needed"] = bool(item.get("domain_needed"))
-    config["bogus_priv"] = bool(item.get("bogus_priv"))
+    config["dns_enabled"] = False
+    config["upstream_dns_servers"] = []
+    config["domain_upstreams"] = []
     config["dhcp_enabled"] = bool(item.get("dhcp_enabled"))
     config["dhcp_range_start"] = validate_optional_ip(item.get("dhcp_range_start"), f"{iface_name}.dhcp_range_start")
     config["dhcp_range_end"] = validate_optional_ip(item.get("dhcp_range_end"), f"{iface_name}.dhcp_range_end")
     config["lease_time"] = validate_lease_time(item.get("lease_time"))
     config["dhcp_authoritative"] = bool(item.get("dhcp_authoritative"))
 
-    if config["dns_enabled"] and not config["pihole_upstream_enabled"] and not config["upstream_dns_servers"]:
-        raise HTTPException(status_code=400, detail=f"At least one upstream DNS server is required for {iface_name}.")
     if config["dhcp_enabled"] and (not config["dhcp_range_start"] or not config["dhcp_range_end"]):
         raise HTTPException(status_code=400, detail=f"DHCP range start and end are required for {iface_name}.")
     if config["dhcp_enabled"]:
@@ -407,7 +784,18 @@ def normalize_interface_config(item: dict[str, Any]) -> dict[str, Any]:
 def normalize_interface_configs(values: Any, fallback: dict[str, Any]) -> list[dict[str, Any]]:
     """Validate per-interface DNS and DHCP settings."""
     if not values:
-        return [interface_config_from_global(iface_name, fallback) for iface_name in fallback["listen_interfaces"] if iface_name != ALL_INTERFACES_TOKEN]
+        configs = []
+        for iface_name in fallback["listen_interfaces"]:
+            if iface_name == ALL_INTERFACES_TOKEN:
+                continue
+            config = default_interface_config(iface_name)
+            config["dhcp_enabled"] = bool(fallback.get("dhcp_enabled"))
+            config["dhcp_range_start"] = fallback.get("dhcp_range_start", "")
+            config["dhcp_range_end"] = fallback.get("dhcp_range_end", "")
+            config["lease_time"] = fallback.get("lease_time", "12h")
+            config["dhcp_authoritative"] = bool(fallback.get("dhcp_authoritative"))
+            configs.append(normalize_interface_config(config))
+        return configs
     configs: list[dict[str, Any]] = []
     seen: set[str] = set()
     for item in values:
@@ -440,6 +828,16 @@ def validate_cache_size(value: Any) -> int:
     return cache_size
 
 
+def normalize_extra_options(value: Any) -> str:
+    """Normalize optional raw dnsmasq directives from the GUI."""
+    lines = []
+    for line in str(value or "").splitlines():
+        item = line.strip()
+        if item and item != "-":
+            lines.append(item)
+    return "\n".join(lines)
+
+
 def normalize_config(payload: dict[str, Any]) -> dict[str, Any]:
     """Validate and normalize dnsmasq GUI payload."""
     config = default_config()
@@ -459,28 +857,18 @@ def normalize_config(payload: dict[str, Any]) -> dict[str, Any]:
     config["domain_needed"] = bool(payload.get("domain_needed"))
     config["bogus_priv"] = bool(payload.get("bogus_priv"))
     config["dhcp_authoritative"] = bool(payload.get("dhcp_authoritative"))
-    config["extra_options"] = str(payload.get("extra_options") or "").strip()
+    config["extra_options"] = normalize_extra_options(payload.get("extra_options"))
+
+    if not config["listen_interfaces"] and not has_interface_configs:
+        config["dns_enabled"] = False
+        config["dhcp_enabled"] = False
+        config["domain_upstreams"] = []
+        config["interface_configs"] = []
+        return config
 
     if has_interface_configs:
         config["interface_configs"] = normalize_interface_configs(payload.get("interface_configs"), config)
         config["listen_interfaces"] = [item["iface"] for item in config["interface_configs"]]
-        first = config["interface_configs"][0] if config["interface_configs"] else default_interface_config("")
-        for key in (
-            "local_domain",
-            "upstream_dns_servers",
-            "domain_upstreams",
-            "pihole_upstream_enabled",
-            "cache_size",
-            "expand_hosts",
-            "domain_needed",
-            "bogus_priv",
-            "dhcp_range_start",
-            "dhcp_range_end",
-            "lease_time",
-            "dhcp_authoritative",
-        ):
-            config[key] = first[key]
-        config["dns_enabled"] = any(item["dns_enabled"] for item in config["interface_configs"])
         config["dhcp_enabled"] = any(item["dhcp_enabled"] for item in config["interface_configs"])
         return config
 
@@ -505,7 +893,8 @@ def render_config(config: dict[str, Any]) -> str:
         for iface_name in config.get("listen_interfaces", [])
         if iface_name != ALL_INTERFACES_TOKEN
     ]
-    dns_enabled = any(item["dns_enabled"] for item in interface_configs) or bool(config["dns_enabled"])
+    has_listen_scope = bool(config.get("listen_interfaces"))
+    dns_enabled = bool(config["dns_enabled"]) and has_listen_scope
     dhcp_enabled = any(item["dhcp_enabled"] for item in interface_configs) or bool(config["dhcp_enabled"])
     lines = [
         "# ArmFirewall managed dnsmasq configuration.",
@@ -521,71 +910,49 @@ def render_config(config: dict[str, Any]) -> str:
         for iface_name in config["listen_interfaces"]:
             lines.append(f"interface={iface_name}")
 
-    for item in interface_configs:
-        lines.append(f"{INTERFACE_CONFIG_PREFIX}{json.dumps(item, sort_keys=True, separators=(',', ':'))}")
-
     rendered_domains: set[str] = set()
     rendered_locals: set[str] = set()
     rendered_servers: set[str] = set()
     rendered_directives: set[str] = set()
     rendered_ranges: set[str] = set()
 
-    for item in interface_configs:
-        if item["dns_enabled"]:
-            domain = item["local_domain"]
-            if domain not in rendered_domains:
-                lines.append(f"domain={domain}")
-                rendered_domains.add(domain)
-            local_line = f"local=/{domain}/"
-            if local_line not in rendered_locals:
-                lines.append(local_line)
-                rendered_locals.add(local_line)
-            cache_line = f"cache-size={item['cache_size']}"
-            if cache_line not in rendered_directives:
-                lines.append(cache_line)
-                rendered_directives.add(cache_line)
-            for enabled, directive in (
-                (item["expand_hosts"], "expand-hosts"),
-                (item["domain_needed"], "domain-needed"),
-                (item["bogus_priv"], "bogus-priv"),
-            ):
-                if enabled and directive not in rendered_directives:
-                    lines.append(directive)
-                    rendered_directives.add(directive)
-            if item["pihole_upstream_enabled"]:
-                marker = f"# armfirewall-pihole-upstream-{item['iface']}=1"
-                lines.append(marker)
-            else:
-                marker = f"# armfirewall-pihole-upstream-{item['iface']}=0"
-                lines.append(marker)
-                for server in item["upstream_dns_servers"]:
-                    server_line = f"server={server}"
-                    if server_line not in rendered_servers:
-                        lines.append(server_line)
-                        rendered_servers.add(server_line)
-            for domain_item in item["domain_upstreams"]:
+    if dns_enabled:
+        domain = config["local_domain"]
+        lines.append(f"domain={domain}")
+        lines.append(f"local=/{domain}/")
+        lines.append(f"cache-size={config['cache_size']}")
+        for enabled, directive in (
+            (config["expand_hosts"], "expand-hosts"),
+            (config["domain_needed"], "domain-needed"),
+            (config["bogus_priv"], "bogus-priv"),
+        ):
+            if enabled:
+                lines.append(directive)
+        if not config["pihole_upstream_enabled"]:
+            for server in config["upstream_dns_servers"]:
+                lines.append(f"server={server}")
+            for domain_item in config["domain_upstreams"]:
                 for server in domain_item["upstreams"]:
-                    server_line = f"server=/{domain_item['domain']}/{server}"
-                    if server_line not in rendered_servers:
-                        lines.append(server_line)
-                        rendered_servers.add(server_line)
+                    lines.append(f"server=/{domain_item['domain']}/{server}")
 
+    for item in interface_configs:
         if item["dhcp_enabled"]:
-            range_line = f"dhcp-range={item['dhcp_range_start']},{item['dhcp_range_end']},{item['lease_time']}"
+            range_line = (
+                f"dhcp-range=tag:{item['iface']},"
+                f"{item['dhcp_range_start']},{item['dhcp_range_end']},{item['lease_time']}"
+            )
             if range_line not in rendered_ranges:
+                lines.append(f"# DHCP scope for {item['iface']}")
                 lines.append(range_line)
                 rendered_ranges.add(range_line)
             if item["dhcp_authoritative"] and "dhcp-authoritative" not in rendered_directives:
                 lines.append("dhcp-authoritative")
                 rendered_directives.add("dhcp-authoritative")
 
-    if not interface_configs:
-        lines.append(f"# armfirewall-pihole-upstream={'1' if config['pihole_upstream_enabled'] else '0'}")
-
     if config["extra_options"]:
         lines.append("")
         lines.append("# Extra options")
-        lines.extend(line.rstrip() for line in config["extra_options"].splitlines() if line.strip())
+        lines.extend(line.rstrip() for line in config["extra_options"].splitlines() if line.strip() and line.strip() != "-")
 
     return "\n".join(lines).rstrip() + "\n"
 
@@ -597,38 +964,47 @@ def validate_dnsmasq_syntax(config_text: str) -> tuple[bool, str]:
         return True, "dnsmasq binary was not found; syntax validation skipped."
 
     tmp_path = DNSMASQ_CONF.with_suffix(".conf.check")
+    tmp_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path.write_text(config_text, encoding="utf-8")
-    try:
-        result = subprocess.run(
-            [dnsmasq, "--test", f"--conf-file={tmp_path}"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    finally:
-        tmp_path.unlink(missing_ok=True)
+    result = subprocess.run(
+        [dnsmasq, "--test", f"--conf-file={tmp_path}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
 
     output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0:
+        match = re.search(r"line\s+(\d+)", output)
+        if match:
+            line_number = int(match.group(1))
+            lines = config_text.splitlines()
+            if 1 <= line_number <= len(lines):
+                output = f"{output}: {lines[line_number - 1]}"
+        return False, output or "dnsmasq syntax check failed."
+    tmp_path.unlink(missing_ok=True)
     return result.returncode == 0, output or "dnsmasq syntax check completed."
 
 
 def save_dnsmasq_config(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate and save dnsmasq.conf from the GUI."""
+    """Persist dnsmasq settings and queue an apply work request."""
     config = normalize_config(payload)
     config_text = render_config(config)
     ok, message = validate_dnsmasq_syntax(config_text)
     if not ok:
         raise HTTPException(status_code=400, detail=message)
 
-    DNSMASQ_CONF.parent.mkdir(parents=True, exist_ok=True)
-    DNSMASQ_CONF.write_text(config_text, encoding="utf-8")
+    work_request_id = save_config_to_db(config)
     return {
         "saved": True,
-        "message": message,
-        "config": parse_dnsmasq_config(config_text.splitlines()),
+        "queued": True,
+        "work_request_id": work_request_id,
+        "message": "Dnsmasq configuration queued for apply.",
+        "config": config,
         "summary": {
             "config_path": str(DNSMASQ_CONF),
+            "config_db": str(DNSMASQ_DB_PATH),
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         },
     }

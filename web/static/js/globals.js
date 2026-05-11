@@ -28,7 +28,16 @@
             },
         });
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            let message = `HTTP ${response.status}`;
+            try {
+                const payload = await response.json();
+                if (payload && payload.detail) {
+                    message = typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail);
+                }
+            } catch (_error) {
+                message = response.statusText || message;
+            }
+            throw new Error(message);
         }
         return response.json();
     }

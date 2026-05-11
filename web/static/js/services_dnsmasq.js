@@ -20,10 +20,16 @@
     const tabButtons = Array.from(document.querySelectorAll("[data-dnsmasq-tab]"));
     const tabPanels = Array.from(document.querySelectorAll("[data-dnsmasq-panel]"));
     const tabNav = document.querySelector(".dnsmasq-tabs");
+    const viewButtons = Array.from(document.querySelectorAll("[data-dnsmasq-view]"));
+    const workRequestsPanel = document.querySelector("#dnsmasq-work-requests-panel");
+    const workRequestsBody = document.querySelector("#dnsmasq-work-requests-body");
+    const workRequestsCount = document.querySelector("#dnsmasq-work-requests-count");
     const POLL_MS = 8000;
     const ALL_INTERFACES = "__all__";
     const ALL_INTERFACES_LABEL = "Global configuration applied to all interfaces";
+    const DNS_DOMAIN_LABEL_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
     let loading = false;
+    let workRequestsLoading = false;
     let dirty = false;
     let pendingAction = null;
     let currentServiceState = "";
@@ -51,6 +57,24 @@
         stateLabel.textContent = state;
     }
 
+    function clearFormStatus() {
+        if (!statusLabel) {
+            return;
+        }
+        statusLabel.textContent = "";
+        statusLabel.classList.remove("error");
+        statusLabel.hidden = true;
+    }
+
+    function showFormError(message) {
+        if (!statusLabel) {
+            return;
+        }
+        statusLabel.textContent = message;
+        statusLabel.classList.add("error");
+        statusLabel.hidden = false;
+    }
+
     function setText(selector, value) {
         const element = document.querySelector(selector);
         if (element) {
@@ -61,7 +85,7 @@
     function setValue(selector, value) {
         const element = document.querySelector(selector);
         if (element) {
-            element.value = HF.text(value);
+            element.value = value === null || value === undefined ? "" : String(value);
         }
     }
 
@@ -131,6 +155,42 @@
             .filter(Boolean);
     }
 
+    function isValidDnsDomain(value) {
+        const domain = HF.text(value).trim().replace(/\.$/, "");
+        if (!domain || domain.length > 253 || domain.includes("..") || isValidIpAddress(domain)) {
+            return false;
+        }
+        const labels = domain.split(".");
+        if (labels.length < 2) {
+            return false;
+        }
+        return labels.every((label) => DNS_DOMAIN_LABEL_RE.test(label));
+    }
+
+    function isValidIpv4Address(value) {
+        const parts = HF.text(value).trim().split(".");
+        return parts.length === 4 && parts.every((part) => {
+            if (!/^\d+$/.test(part)) {
+                return false;
+            }
+            const number = Number(part);
+            return number >= 0 && number <= 255 && String(number) === String(Number(part));
+        });
+    }
+
+    function isValidIpv6Address(value) {
+        const text = HF.text(value).trim();
+        return text.includes(":") && /^[0-9A-Fa-f:.]+$/.test(text) && text.split(":").length <= 8;
+    }
+
+    function isValidIpAddress(value) {
+        return isValidIpv4Address(value) || isValidIpv6Address(value);
+    }
+
+    function invalidUpstream(upstreams) {
+        return upstreams.find((server) => !isValidIpAddress(server));
+    }
+
     function selectedInterfaces() {
         return [...activeInterfaces];
     }
@@ -180,7 +240,20 @@
         if (activeInterfaces.includes(ALL_INTERFACES)) {
             return [ALL_INTERFACES];
         }
-        return [...activeInterfaces];
+        return uniqueInterfaceNames(activeInterfaces);
+    }
+
+    function uniqueInterfaceNames(values) {
+        const seen = new Set();
+        const names = [];
+        (values || []).forEach((value) => {
+            const name = HF.text(value).trim();
+            if (name && !seen.has(name)) {
+                seen.add(name);
+                names.push(name);
+            }
+        });
+        return names;
     }
 
     function formatEnabled(value) {
@@ -215,15 +288,16 @@
     function buildInterfaceConfig(name) {
         return {
             iface: name,
-            dns_enabled: Boolean(currentConfig.dns_enabled),
-            local_domain: currentConfig.local_domain || "armfirewall.local",
-            upstream_dns_servers: [...(currentConfig.upstream_dns_servers || ["1.1.1.1", "8.8.8.8"])],
-            domain_upstreams: (currentConfig.domain_upstreams || []).map((item) => ({domain: item.domain, upstreams: [...(item.upstreams || [])]})),
-            pihole_upstream_enabled: Boolean(currentConfig.pihole_upstream_enabled),
-            cache_size: currentConfig.cache_size || 1000,
-            expand_hosts: currentConfig.expand_hosts !== false,
-            domain_needed: currentConfig.domain_needed !== false,
-            bogus_priv: currentConfig.bogus_priv !== false,
+            dns_enabled: false,
+            local_domain: "armfirewall.local",
+            upstream_dns_servers: [],
+            domain_upstreams: [],
+            forwarded_domains_enabled: false,
+            pihole_upstream_enabled: false,
+            cache_size: 1000,
+            expand_hosts: true,
+            domain_needed: true,
+            bogus_priv: true,
             dhcp_enabled: Boolean(currentConfig.dhcp_enabled),
             dhcp_range_start: currentConfig.dhcp_range_start || "",
             dhcp_range_end: currentConfig.dhcp_range_end || "",
@@ -240,7 +314,31 @@
             const saved = incoming.find((item) => item.iface === name);
             return existing || saved || buildInterfaceConfig(name);
         });
-        domainUpstreams = interfaceConfigs[0]?.domain_upstreams || [];
+        domainUpstreams = currentConfig.domain_upstreams || [];
+    }
+
+    function globalDnsConfig() {
+        return {
+            dns_enabled: Boolean(currentConfig.dns_enabled),
+            local_domain: currentConfig.local_domain || "armfirewall.local",
+            upstream_dns_servers: [...(currentConfig.upstream_dns_servers || ["1.1.1.1", "8.8.8.8"])],
+            domain_upstreams: (currentConfig.domain_upstreams || []).map((item) => ({domain: item.domain, upstreams: [...(item.upstreams || [])]})),
+            forwarded_domains_enabled: Boolean(currentConfig.forwarded_domains_enabled || (currentConfig.domain_upstreams || []).length),
+            pihole_upstream_enabled: Boolean(currentConfig.pihole_upstream_enabled),
+            cache_size: currentConfig.cache_size || 1000,
+            expand_hosts: currentConfig.expand_hosts !== false,
+            domain_needed: currentConfig.domain_needed !== false,
+            bogus_priv: currentConfig.bogus_priv !== false,
+        };
+    }
+
+    function updateGlobalDnsConfig(field, value) {
+        currentConfig[field] = value;
+        if (field === "pihole_upstream_enabled" && value) {
+            currentConfig.domain_upstreams = [];
+            currentConfig.forwarded_domains_enabled = false;
+        }
+        domainUpstreams = currentConfig.domain_upstreams || [];
     }
 
     function updateInterfaceConfig(name, field, value) {
@@ -271,100 +369,91 @@
         if (!dnsScopeList) {
             return;
         }
-        const names = activeInterfaceNames();
-        if (!names.length) {
-            dnsScopeList.innerHTML = "";
-            return;
-        }
-        dnsScopeList.innerHTML = names.map((name) => {
-            const iface = interfaceMeta(name);
-            const displayName = interfaceDisplayName(name);
-            const config = configForInterface(name);
-            const forwardedEnabled = !config.pihole_upstream_enabled && (config.domain_upstreams || []).length > 0;
-            return `
-                <section class="dnsmasq-scope-card" data-dnsmasq-scope="dns" data-iface="${HF.escapeHtml(name)}">
-                    <div class="dnsmasq-scope-head">
-                        <strong>DNS configuration</strong>
-                        <span><b>${HF.escapeHtml(displayName)}</b> / ${HF.escapeHtml(iface.role || "GLOBAL")} / ${HF.escapeHtml(iface.description || "-")}</span>
+        const config = globalDnsConfig();
+        const forwardedEnabled = !config.pihole_upstream_enabled && (Boolean(config.forwarded_domains_enabled) || (config.domain_upstreams || []).length > 0);
+        dnsScopeList.innerHTML = `
+            <section class="dnsmasq-scope-card" data-dnsmasq-scope="dns-global">
+                <div class="dnsmasq-scope-head">
+                    <strong>DNS configuration</strong>
+                    <span><b>Global DNS configuration</b> / applied to every listen interface</span>
+                </div>
+                <div class="form-grid dnsmasq-scope-form">
+                    <label class="field">
+                        <span>DNS enabled</span>
+                        <select data-global-dns-field="dns_enabled">
+                            <option value="1"${selectedAttr(config.dns_enabled ? "1" : "0", "1")}>enabled</option>
+                            <option value="0"${selectedAttr(config.dns_enabled ? "1" : "0", "0")}>disabled</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>LAN local domain</span>
+                        <input data-global-dns-field="local_domain" type="text" autocomplete="off" value="${fieldValue(config.local_domain, "armfirewall.local")}">
+                    </label>
+                    <label class="field">
+                        <span>Cache size</span>
+                        <input data-global-dns-field="cache_size" type="number" min="0" max="1000000" value="${fieldValue(config.cache_size, 1000)}">
+                    </label>
+                    <label class="field">
+                        <span>Expand hosts</span>
+                        <select data-global-dns-field="expand_hosts">
+                            <option value="1"${selectedAttr(config.expand_hosts ? "1" : "0", "1")}>enabled</option>
+                            <option value="0"${selectedAttr(config.expand_hosts ? "1" : "0", "0")}>disabled</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Domain needed</span>
+                        <select data-global-dns-field="domain_needed">
+                            <option value="1"${selectedAttr(config.domain_needed ? "1" : "0", "1")}>enabled</option>
+                            <option value="0"${selectedAttr(config.domain_needed ? "1" : "0", "0")}>disabled</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Bogus priv</span>
+                        <select data-global-dns-field="bogus_priv">
+                            <option value="1"${selectedAttr(config.bogus_priv ? "1" : "0", "1")}>enabled</option>
+                            <option value="0"${selectedAttr(config.bogus_priv ? "1" : "0", "0")}>disabled</option>
+                        </select>
+                    </label>
+                    <label class="field wide">
+                        <span>Default upstream DNS servers</span>
+                        <textarea data-global-dns-field="upstream_dns_servers" rows="3" spellcheck="false"${config.pihole_upstream_enabled ? " disabled" : ""}>${fieldValue((config.upstream_dns_servers || []).join("\n"))}</textarea>
+                    </label>
+                    <label class="check-line wide">
+                        <input data-global-dns-field="pihole_upstream_enabled" type="checkbox"${checkedAttr(config.pihole_upstream_enabled)}>
+                        <span>Enable piHole DNS Upstream?</span>
+                    </label>
+                    <label class="check-line wide">
+                        <input data-global-dns-field="forwarded_domains_enabled" type="checkbox"${checkedAttr(forwardedEnabled)}${config.pihole_upstream_enabled ? " disabled" : ""}>
+                        <span>Enable forwarded domains?</span>
+                    </label>
+                    <label class="field dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
+                        <span>Forwarded domain</span>
+                        <input data-dnsmasq-scope-domain type="text" autocomplete="off" placeholder="empresa.local" pattern="(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?" title="Use a valid DNS domain such as empresa.local.">
+                    </label>
+                    <label class="field dnsmasq-domain-upstream-servers dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
+                        <span>Forward to DNS servers</span>
+                        <textarea data-dnsmasq-scope-servers rows="2" spellcheck="false" placeholder="192.168.10.10 192.168.10.11"></textarea>
+                    </label>
+                    <div class="field dnsmasq-domain-upstream-action dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
+                        <span>Action</span>
+                        <button class="icon-button" type="button" data-dnsmasq-scope-domain-add title="Add domain upstream" aria-label="Add domain upstream">+</button>
                     </div>
-                    <div class="form-grid dnsmasq-scope-form">
-                        <label class="field">
-                            <span>DNS enabled</span>
-                            <select data-scope-field="dns_enabled">
-                                <option value="1"${selectedAttr(config.dns_enabled ? "1" : "0", "1")}>enabled</option>
-                                <option value="0"${selectedAttr(config.dns_enabled ? "1" : "0", "0")}>disabled</option>
-                            </select>
-                        </label>
-                        <label class="field">
-                            <span>LAN local domain</span>
-                            <input data-scope-field="local_domain" type="text" autocomplete="off" value="${fieldValue(config.local_domain, "armfirewall.local")}">
-                        </label>
-                        <label class="field">
-                            <span>Cache size</span>
-                            <input data-scope-field="cache_size" type="number" min="0" max="1000000" value="${fieldValue(config.cache_size, 1000)}">
-                        </label>
-                        <label class="field">
-                            <span>Expand hosts</span>
-                            <select data-scope-field="expand_hosts">
-                                <option value="1"${selectedAttr(config.expand_hosts ? "1" : "0", "1")}>enabled</option>
-                                <option value="0"${selectedAttr(config.expand_hosts ? "1" : "0", "0")}>disabled</option>
-                            </select>
-                        </label>
-                        <label class="field">
-                            <span>Domain needed</span>
-                            <select data-scope-field="domain_needed">
-                                <option value="1"${selectedAttr(config.domain_needed ? "1" : "0", "1")}>enabled</option>
-                                <option value="0"${selectedAttr(config.domain_needed ? "1" : "0", "0")}>disabled</option>
-                            </select>
-                        </label>
-                        <label class="field">
-                            <span>Bogus priv</span>
-                            <select data-scope-field="bogus_priv">
-                                <option value="1"${selectedAttr(config.bogus_priv ? "1" : "0", "1")}>enabled</option>
-                                <option value="0"${selectedAttr(config.bogus_priv ? "1" : "0", "0")}>disabled</option>
-                            </select>
-                        </label>
-                        <label class="field wide">
-                            <span>Default upstream DNS servers</span>
-                            <textarea data-scope-field="upstream_dns_servers" rows="3" spellcheck="false"${config.pihole_upstream_enabled ? " disabled" : ""}>${fieldValue((config.upstream_dns_servers || []).join("\n"))}</textarea>
-                        </label>
-                        <label class="check-line wide">
-                            <input data-scope-field="pihole_upstream_enabled" type="checkbox"${checkedAttr(config.pihole_upstream_enabled)}>
-                            <span>Enable piHole DNS Upstream?</span>
-                        </label>
-                        <label class="check-line wide">
-                            <input data-scope-field="forwarded_domains_enabled" type="checkbox"${checkedAttr(forwardedEnabled)}${config.pihole_upstream_enabled ? " disabled" : ""}>
-                            <span>Enable forwarded domains?</span>
-                        </label>
-                        <label class="field dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
-                            <span>Forwarded domain</span>
-                            <input data-dnsmasq-scope-domain type="text" autocomplete="off" placeholder="empresa.local">
-                        </label>
-                        <label class="field dnsmasq-domain-upstream-servers dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
-                            <span>Forward to DNS servers</span>
-                            <textarea data-dnsmasq-scope-servers rows="2" spellcheck="false" placeholder="192.168.10.10 192.168.10.11"></textarea>
-                        </label>
-                        <div class="field dnsmasq-domain-upstream-action dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
-                            <span>Action</span>
-                            <button class="icon-button" type="button" data-dnsmasq-scope-domain-add title="Add domain upstream" aria-label="Add domain upstream">+</button>
-                        </div>
-                        <div class="table-wrap wide dnsmasq-domain-upstream-scroll dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
-                            <table class="data-table dnsmasq-domain-upstream-table">
-                                <thead><tr><th>Domain</th><th>Upstreams</th><th>Action</th></tr></thead>
-                                <tbody>${renderDomainRowsForConfig(config)}</tbody>
-                            </table>
-                        </div>
+                    <div class="table-wrap wide dnsmasq-domain-upstream-scroll dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
+                        <table class="data-table dnsmasq-domain-upstream-table">
+                            <thead><tr><th>Domain</th><th>Upstreams</th><th>Action</th></tr></thead>
+                            <tbody>${renderDomainRowsForConfig(config)}</tbody>
+                        </table>
                     </div>
-                </section>
-            `;
-        }).join("");
+                </div>
+            </section>
+        `;
     }
 
     function renderDhcpScopeCards() {
         if (!dhcpScopeList) {
             return;
         }
-        const names = activeInterfaceNames();
+        const names = uniqueInterfaceNames(activeInterfaceNames());
         if (!names.length) {
             dhcpScopeList.innerHTML = "";
             return;
@@ -415,6 +504,19 @@
     function renderScopeCards() {
         renderDnsScopeCards();
         renderDhcpScopeCards();
+        removeDuplicateScopeCards();
+    }
+
+    function removeDuplicateScopeCards() {
+        const seen = new Set();
+        document.querySelectorAll(".dnsmasq-scope-card[data-dnsmasq-scope][data-iface]").forEach((card) => {
+            const key = `${card.dataset.dnsmasqScope}:${card.dataset.iface}`;
+            if (seen.has(key)) {
+                card.remove();
+                return;
+            }
+            seen.add(key);
+        });
     }
 
     function renderInterfacePicker() {
@@ -447,6 +549,7 @@
         if (!activeInterfacesBody) {
             return;
         }
+        activeInterfaces = uniqueInterfaceNames(activeInterfaceNames());
         if (!activeInterfaces.length) {
             activeInterfacesBody.innerHTML = `
                 <tr>
@@ -500,6 +603,7 @@
                     activeInterfaces.push(name);
                 }
             }
+            activeInterfaces = uniqueInterfaceNames(activeInterfaces);
         }
         syncInterfaceConfigs();
         renderInterfacePicker();
@@ -569,9 +673,18 @@
         const domain = HF.text(domainUpstreamDomain?.value).trim().replace(/\.$/, "");
         const upstreams = splitServerTokens(domainUpstreamServers?.value || "");
         if (!domain || !upstreams.length) {
-            if (statusLabel) {
-                statusLabel.textContent = "domain and upstream servers are required";
-            }
+            showFormError("domain and upstream servers are required");
+            return;
+        }
+        if (!isValidDnsDomain(domain)) {
+            showFormError("Forwarded domain must be a valid DNS domain.");
+            domainUpstreamDomain?.focus();
+            return;
+        }
+        const badUpstream = invalidUpstream(upstreams);
+        if (badUpstream) {
+            showFormError(`Invalid upstream DNS server: ${badUpstream}`);
+            domainUpstreamServers?.focus();
             return;
         }
         const existing = domainUpstreams.find((item) => item.domain === domain);
@@ -601,22 +714,40 @@
     }
 
     function addScopeDomainUpstream(button) {
-        const card = button.closest("[data-iface]");
+        const card = button.closest("[data-dnsmasq-scope='dns-global']");
         if (!card) {
             return;
         }
-        const iface = card.dataset.iface;
         const domainInput = card.querySelector("[data-dnsmasq-scope-domain]");
         const serversInput = card.querySelector("[data-dnsmasq-scope-servers]");
         const domain = HF.text(domainInput?.value).trim().replace(/\.$/, "");
         const upstreams = splitServerTokens(serversInput?.value || "");
-        if (!domain || !upstreams.length) {
-            if (statusLabel) {
-                statusLabel.textContent = "domain and upstream servers are required";
+        [domainInput, serversInput].forEach((element) => {
+            if (element) {
+                element.setCustomValidity("");
+                element.classList.remove("is-invalid");
+                element.closest(".field")?.classList.remove("is-invalid");
             }
+        });
+        if (!domain) {
+            showScopeValidationError(domainInput, "Forwarded domain is required.");
             return;
         }
-        const config = configForInterface(iface);
+        if (!isValidDnsDomain(domain)) {
+            showScopeValidationError(domainInput, "Forwarded domain must be a valid DNS domain.");
+            return;
+        }
+        if (!upstreams.length) {
+            showScopeValidationError(serversInput, "Forward to DNS servers is required.");
+            return;
+        }
+        const badUpstream = invalidUpstream(upstreams);
+        if (badUpstream) {
+            showScopeValidationError(serversInput, `Invalid upstream DNS server: ${badUpstream}`);
+            return;
+        }
+        clearFormStatus();
+        const config = globalDnsConfig();
         const existing = (config.domain_upstreams || []).find((item) => item.domain === domain);
         if (existing) {
             upstreams.forEach((server) => {
@@ -627,20 +758,31 @@
         } else {
             config.domain_upstreams = (config.domain_upstreams || []).concat({domain, upstreams});
         }
-        updateInterfaceConfig(iface, "domain_upstreams", config.domain_upstreams);
+        updateGlobalDnsConfig("domain_upstreams", config.domain_upstreams);
         setDirty(true);
         renderScopeCards();
     }
 
+    function showScopeValidationError(element, message) {
+        showFormError(message);
+        if (!element) {
+            return;
+        }
+        element.setCustomValidity(message);
+        element.classList.add("is-invalid");
+        element.closest(".field")?.classList.add("is-invalid");
+        element.reportValidity();
+        element.focus();
+    }
+
     function removeScopeDomainUpstream(button) {
-        const card = button.closest("[data-iface]");
+        const card = button.closest("[data-dnsmasq-scope='dns-global']");
         if (!card) {
             return;
         }
-        const iface = card.dataset.iface;
-        const config = configForInterface(iface);
+        const config = globalDnsConfig();
         config.domain_upstreams = (config.domain_upstreams || []).filter((_, index) => index !== Number(button.dataset.dnsmasqScopeDomainRemove));
-        updateInterfaceConfig(iface, "domain_upstreams", config.domain_upstreams);
+        updateGlobalDnsConfig("domain_upstreams", config.domain_upstreams);
         setDirty(true);
         renderScopeCards();
     }
@@ -681,25 +823,112 @@
         setState("Live", summary.updated_at || "-");
     }
 
+    function renderWorkRequests(data) {
+        const requests = data.requests || [];
+        if (workRequestsCount) {
+            workRequestsCount.textContent = `requests=${requests.length}`;
+        }
+        if (!workRequestsBody) {
+            return;
+        }
+        if (!requests.length) {
+            workRequestsBody.innerHTML = `
+                <tr>
+                    <td colspan="6">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no dnsmasq work requests</span></div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        workRequestsBody.innerHTML = requests.map((request) => {
+            const failed = request.status === "failed";
+            const statusClass = failed ? "down" : "up";
+            return `
+                <tr>
+                    <td>${HF.escapeHtml(request.id)}</td>
+                    <td><span class="status ${statusClass}">${HF.escapeHtml(request.status)}</span></td>
+                    <td>${HF.escapeHtml(request.category_name)}</td>
+                    <td>${HF.escapeHtml(request.action_name)}</td>
+                    <td>${HF.escapeHtml(request.updated_at)}</td>
+                    <td>${HF.escapeHtml(request.error_message || "")}</td>
+                </tr>
+            `;
+        }).join("");
+    }
+
+    async function loadWorkRequests() {
+        if (workRequestsLoading || !workRequestsPanel || workRequestsPanel.hidden) {
+            return;
+        }
+        workRequestsLoading = true;
+        try {
+            const data = await HF.fetchJson("/api/services/dnsmasq/work-requests");
+            renderWorkRequests(data);
+        } catch (error) {
+            if (workRequestsBody) {
+                workRequestsBody.innerHTML = `
+                    <tr>
+                        <td colspan="6">
+                            <div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div>
+                        </td>
+                    </tr>
+                `;
+            }
+        } finally {
+            workRequestsLoading = false;
+        }
+    }
+
+    function setActiveView(viewName) {
+        const isWorkRequests = viewName === "work-requests";
+        if (workRequestsPanel) {
+            workRequestsPanel.hidden = !isWorkRequests;
+        }
+        if (form) {
+            form.hidden = isWorkRequests;
+        }
+        viewButtons.forEach((button) => {
+            button.classList.toggle("primary", button.dataset.dnsmasqView === viewName);
+        });
+        if (isWorkRequests) {
+            loadWorkRequests();
+        }
+    }
+
+    function showWorkRequests() {
+        if (!workRequestsPanel) {
+            return;
+        }
+        setActiveView("work-requests");
+        requestAnimationFrame(() => {
+            document.querySelector("#main-content")?.scrollTo({top: 0, behavior: "smooth"});
+            document.documentElement.scrollTo({top: 0, behavior: "smooth"});
+            document.body.scrollTo({top: 0, behavior: "smooth"});
+            window.scrollTo({top: 0, behavior: "smooth"});
+        });
+    }
+
     function formPayload() {
-        const firstConfig = interfaceConfigs[0] || buildInterfaceConfig("");
+        syncInterfaceConfigs();
+        const dnsConfig = globalDnsConfig();
         return {
-            dns_enabled: interfaceConfigs.some((item) => item.dns_enabled),
+            dns_enabled: Boolean(dnsConfig.dns_enabled),
             dhcp_enabled: interfaceConfigs.some((item) => item.dhcp_enabled),
             listen_interfaces: selectedInterfaces(),
             interface_configs: interfaceConfigs,
-            local_domain: firstConfig.local_domain || "",
-            upstream_dns_servers: firstConfig.upstream_dns_servers || [],
-            domain_upstreams: firstConfig.domain_upstreams || [],
-            pihole_upstream_enabled: Boolean(firstConfig.pihole_upstream_enabled),
-            dhcp_range_start: firstConfig.dhcp_range_start || "",
-            dhcp_range_end: firstConfig.dhcp_range_end || "",
-            lease_time: firstConfig.lease_time || "",
-            cache_size: firstConfig.cache_size || 0,
-            expand_hosts: Boolean(firstConfig.expand_hosts),
-            domain_needed: Boolean(firstConfig.domain_needed),
-            bogus_priv: Boolean(firstConfig.bogus_priv),
-            dhcp_authoritative: Boolean(firstConfig.dhcp_authoritative),
+            local_domain: dnsConfig.local_domain || "",
+            upstream_dns_servers: dnsConfig.upstream_dns_servers || [],
+            domain_upstreams: dnsConfig.domain_upstreams || [],
+            pihole_upstream_enabled: Boolean(dnsConfig.pihole_upstream_enabled),
+            dhcp_range_start: "",
+            dhcp_range_end: "",
+            lease_time: "",
+            cache_size: dnsConfig.cache_size || 0,
+            expand_hosts: Boolean(dnsConfig.expand_hosts),
+            domain_needed: Boolean(dnsConfig.domain_needed),
+            bogus_priv: Boolean(dnsConfig.bogus_priv),
+            dhcp_authoritative: interfaceConfigs.some((item) => item.dhcp_authoritative),
             extra_options: document.querySelector("#dnsmasq-extra-options")?.value || "",
         };
     }
@@ -746,12 +975,38 @@
             if (!element.checked) {
                 config.domain_upstreams = [];
             }
+            config.forwarded_domains_enabled = element.checked;
             interfaceConfigs = interfaceConfigs.filter((item) => item.iface !== iface).concat(config);
             setDirty(true);
             renderScopeCards();
             return true;
         }
         updateInterfaceConfig(iface, field, scopeFieldValue(element, field));
+        setDirty(true);
+        if (field === "pihole_upstream_enabled") {
+            if (scopeFieldValue(element, field)) {
+                updateInterfaceConfig(iface, "forwarded_domains_enabled", false);
+            }
+            renderScopeCards();
+        }
+        return true;
+    }
+
+    function handleGlobalDnsFieldChange(element) {
+        const field = element.dataset.globalDnsField;
+        if (!field) {
+            return false;
+        }
+        if (field === "forwarded_domains_enabled") {
+            if (!element.checked) {
+                updateGlobalDnsConfig("domain_upstreams", []);
+            }
+            updateGlobalDnsConfig(field, element.checked);
+            setDirty(true);
+            renderScopeCards();
+            return true;
+        }
+        updateGlobalDnsConfig(field, scopeFieldValue(element, field));
         setDirty(true);
         if (field === "pihole_upstream_enabled") {
             renderScopeCards();
@@ -781,40 +1036,37 @@
             }
         } catch (error) {
             setState("Offline");
-            if (statusLabel) {
-                statusLabel.textContent = error.message;
-            }
+            showFormError(error.message);
         } finally {
             loading = false;
         }
     }
 
     async function applyDnsmasq() {
-        if (statusLabel) {
-            statusLabel.textContent = "applying";
-        }
+        syncInterfaceConfigs();
+        clearFormStatus();
         const result = await HF.fetchJson("/api/services/dnsmasq", {
             method: "PUT",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(formPayload()),
         });
         setDirty(false);
-        if (statusLabel) {
-            statusLabel.textContent = result.message || "applied";
-        }
+        clearFormStatus();
+        showWorkRequests();
         await loadDnsmasq();
     }
 
     async function runServiceAction(action) {
         const resolvedAction = action === "start-restart" && currentServiceState === "RUNNING" ? "restart" : action === "start-restart" ? "start" : action;
-        if (statusLabel) {
-            statusLabel.textContent = resolvedAction;
-        }
+        clearFormStatus();
         await HF.fetchJson("/api/services/status/armfirewall-dnsmasq/action", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({action: resolvedAction}),
         });
+        clearFormStatus();
+        showWorkRequests();
+        await loadWorkRequests();
         await loadDnsmasq();
     }
 
@@ -861,6 +1113,10 @@
 
     if (form) {
         form.addEventListener("input", (event) => {
+            if (event.target.closest("[data-global-dns-field]")) {
+                handleGlobalDnsFieldChange(event.target);
+                return;
+            }
             if (event.target.closest("[data-scope-field]")) {
                 handleScopeFieldChange(event.target);
                 return;
@@ -892,6 +1148,12 @@
             const action = actionButton.dataset.dnsmasqAction;
             const label = action === "start-restart" ? "START / RESTART Dnsmasq service" : `${HF.text(action).toUpperCase()} Dnsmasq service`;
             openActionModal(action, label, () => runServiceAction(action));
+            return;
+        }
+
+        const viewButton = event.target.closest("[data-dnsmasq-view]");
+        if (viewButton) {
+            setActiveView(viewButton.dataset.dnsmasqView || "config");
             return;
         }
 
@@ -953,7 +1215,9 @@
     }
 
     showTab("dns");
+    setActiveView("config");
     setDirty(false);
     loadDnsmasq();
     setInterval(loadDnsmasq, POLL_MS);
+    setInterval(loadWorkRequests, POLL_MS);
 }());

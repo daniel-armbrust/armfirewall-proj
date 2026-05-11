@@ -44,7 +44,9 @@ INSERT OR IGNORE INTO work_request_categories (name, category, family, target_na
      ('MANGLE_RULES.IPV6.mangle_postrouting_rules', 'MANGLE_RULES', 'IPV6', 'mangle_postrouting_rules', 'IPv6 mangle POSTROUTING chain rules.'),
      ('POLICY_ROUTING.IPV4.main', 'POLICY_ROUTING', 'IPV4', 'main', 'IPv4 policy routing changes.'),
      ('POLICY_ROUTING.IPV6.main', 'POLICY_ROUTING', 'IPV6', 'main', 'IPv6 policy routing changes.'),
-     ('SERVICE_MANAGEMENT.OPTIONAL_SERVICES', 'SERVICE_MANAGEMENT', NULL, 'optional_services', 'Optional ArmFirewall service package operations.');
+     ('SERVICE_MANAGEMENT.OPTIONAL_SERVICES', 'SERVICE_MANAGEMENT', NULL, 'optional_services', 'Optional ArmFirewall service package operations.'),
+     ('SERVICE_MANAGEMENT.SERVICE_CONTROL', 'SERVICE_MANAGEMENT', NULL, 'service_control', 'ArmFirewall supervisord service control actions.'),
+     ('SERVICE_MANAGEMENT.DNSMASQ_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'dnsmasq_config', 'Dnsmasq DNS and DHCP configuration changes.');
 
 -- Stores daemon handlers used to execute each work request category.
 CREATE TABLE IF NOT EXISTS work_request_handlers (
@@ -71,7 +73,7 @@ INSERT OR IGNORE INTO work_request_handlers (category, script_name, enabled, des
      ('NAT_RULES', 'fwrulesd.py', 1, 'Applies NAT table firewall rules.'),
      ('MANGLE_RULES', 'fwrulesd.py', 1, 'Applies mangle table firewall rules.'),
      ('POLICY_ROUTING', 'proutes.py', 1, 'Applies policy routing changes.'),
-     ('SERVICE_MANAGEMENT', 'servicemgmt.py', 1, 'Installs and removes optional ArmFirewall service packages.');
+     ('SERVICE_MANAGEMENT', 'servicemgmt.py', 1, 'Installs and removes optional ArmFirewall service packages and service configuration changes.');
 
 -- Stores allowed operations accepted by the work queue.
 CREATE TABLE IF NOT EXISTS work_request_actions (
@@ -84,7 +86,10 @@ INSERT OR IGNORE INTO work_request_actions (name, description) VALUES
      ('remove', 'Remove a configured item from the operating system.'),
      ('change', 'Change an existing item in the operating system.'),
      ('install', 'Install an optional ArmFirewall service package.'),
-     ('uninstall', 'Uninstall an optional ArmFirewall service package.');
+     ('uninstall', 'Uninstall an optional ArmFirewall service package.'),
+     ('start', 'Start an ArmFirewall supervisord service.'),
+     ('stop', 'Stop an ArmFirewall supervisord service.'),
+     ('restart', 'Restart an ArmFirewall supervisord service.');
 
 -- Stores asynchronous operating system changes requested by the GUI.
 CREATE TABLE IF NOT EXISTS work_requests (

@@ -41,18 +41,51 @@
 </section>
 
 <section class="service-inline-actions">
-    <button class="text-button compact" type="button" data-dnsmasq-action="start-restart">Start / Restart</button>
-    <button class="text-button compact danger" type="button" data-dnsmasq-action="stop">Stop</button>
+    <button class="text-button compact primary" type="button" data-dnsmasq-view="config">Dnsmasq</button>
+    <button class="text-button compact" type="button" data-dnsmasq-view="work-requests">Work Requests</button>
+</section>
+
+<section class="panel" id="dnsmasq-work-requests-panel" hidden>
+    <div class="panel-head">
+        <h2>Work Requests</h2>
+        <span id="dnsmasq-work-requests-count">requests=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Category</th>
+                    <th>Action</th>
+                    <th>Updated</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="dnsmasq-work-requests-body">
+                <tr>
+                    <td colspan="6">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no dnsmasq work requests</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </section>
 
 <form id="dnsmasq-form">
+    <section class="service-inline-actions" aria-label="Dnsmasq service controls">
+        <button class="text-button compact" type="button" data-dnsmasq-action="start-restart">Start / Restart</button>
+        <button class="text-button compact danger" type="button" data-dnsmasq-action="stop">Stop</button>
+    </section>
+
     <section class="panel">
         <div class="panel-head">
             <h2>Listen interfaces</h2>
             <span>bind-interfaces</span>
         </div>
         <div class="edit-form">
-            <div class="form-grid dnsmasq-legacy-config" hidden>
+            <div class="form-grid dnsmasq-interface-config">
                 <label class="field dnsmasq-interface-field">
                     <span>Interfaces</span>
                     <div class="dnsmasq-interface-picker">
@@ -90,7 +123,7 @@
 
     <section class="panel" data-dnsmasq-panel="dns">
         <div class="panel-head">
-            <h2>DNS configuration</h2>
+            <h2>DNS</h2>
             <span id="dnsmasq-config-path">config=-</span>
         </div>
         <div class="edit-form">
@@ -180,39 +213,11 @@
 
     <section class="panel" data-dnsmasq-panel="dhcp" hidden>
         <div class="panel-head">
-            <h2>DHCP configuration</h2>
+            <h2>DHCP</h2>
             <span>scope=dhcp</span>
         </div>
         <div class="edit-form">
             <div class="dnsmasq-scope-list" id="dnsmasq-dhcp-scope-list"></div>
-            <div class="form-grid">
-                <label class="field">
-                    <span>DHCP enabled</span>
-                    <select id="dnsmasq-dhcp-enabled" name="dhcp_enabled">
-                        <option value="1">enabled</option>
-                        <option value="0">disabled</option>
-                    </select>
-                </label>
-                <label class="field">
-                    <span>DHCP range start</span>
-                    <input id="dnsmasq-dhcp-start" name="dhcp_range_start" type="text" autocomplete="off">
-                </label>
-                <label class="field">
-                    <span>DHCP range end</span>
-                    <input id="dnsmasq-dhcp-end" name="dhcp_range_end" type="text" autocomplete="off">
-                </label>
-                <label class="field">
-                    <span>Lease time</span>
-                    <input id="dnsmasq-lease-time" name="lease_time" type="text" autocomplete="off">
-                </label>
-                <label class="field">
-                    <span>DHCP authoritative</span>
-                    <select id="dnsmasq-dhcp-authoritative" name="dhcp_authoritative">
-                        <option value="1">enabled</option>
-                        <option value="0">disabled</option>
-                    </select>
-                </label>
-            </div>
         </div>
     </section>
 
@@ -222,7 +227,7 @@
             <div class="form-actions">
                 <button class="text-button primary" type="submit" id="dnsmasq-apply" hidden>Apply</button>
             </div>
-            <div class="form-status" id="dnsmasq-form-status"></div>
+            <div class="form-status" id="dnsmasq-form-status" hidden></div>
         </div>
     </section>
 </form>
@@ -243,5 +248,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260511-global-interface-label-2" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260512-dnsmasq-workreq-content-scroll" defer></script>
 {% endblock %}

@@ -248,45 +248,35 @@ def get_optional_service(name: str) -> dict[str, Any]:
 
 
 def control_service(name: str, action: str) -> dict[str, Any]:
-    """Start, stop, or restart one non-protected ArmFirewall service."""
+    """Queue start, stop, or restart for one non-protected ArmFirewall service."""
     expected_names = {service["name"] for service in ARMFIREWALL_SERVICES}
     optional_names = {service["name"] for service in OPTIONAL_SERVICES}
     if name in expected_names:
         service = get_expected_service(name)
         if service["protected"]:
             raise ValueError("Protected services cannot be controlled from the GUI.")
+        payload = {
+            "service_name": service["name"],
+            "display_name": service["name"],
+            "kind": service["kind"],
+        }
     elif name not in optional_names:
         raise ValueError("Unknown ArmFirewall service.")
+    else:
+        service = get_optional_service(name)
+        payload = {
+            "service_name": service["name"],
+            "display_name": service["display_name"],
+            "kind": service["kind"],
+        }
     if action not in SERVICE_ACTIONS:
         raise ValueError("Unsupported service action.")
-    if not SUPERVISOR_CONF.exists():
-        raise ValueError("ArmFirewall supervisord.conf was not found.")
-    if not command_exists("supervisorctl"):
-        raise ValueError("supervisorctl was not found.")
-
-    supervisor_command("reread")
-    supervisor_command("update")
-
-    command: tuple[str, ...]
-    if action == "restart":
-        command = ("restart", name)
-    else:
-        command = (action, name)
-
-    result = supervisor_command(*command, timeout=30)
-    output = (result.stdout + result.stderr).strip()
-    allowed_noop = (
-        action == "start" and "already started" in output.lower()
-    ) or (
-        action == "stop" and "not running" in output.lower()
-    )
-    if result.returncode != 0 and not allowed_noop:
-        raise RuntimeError(output or f"Could not {action} {name}.")
-
+    work_request_id = queue_service_work_request(action, payload, category_name="SERVICE_MANAGEMENT.SERVICE_CONTROL")
     return {
         "name": name,
         "action": action,
-        "status": "queued",
+        "status": "queue",
+        "work_request_id": work_request_id,
     }
 
 
@@ -327,10 +317,17 @@ def uninstall_optional_service(name: str) -> dict[str, Any]:
     }
 
 
-def queue_service_work_request(action: str, payload: dict[str, Any]) -> int:
+def queue_service_work_request(
+    action: str,
+    payload: dict[str, Any],
+    *,
+    category_name: str = "SERVICE_MANAGEMENT.OPTIONAL_SERVICES",
+) -> int:
     """Insert a service management work request and return its id."""
-    if action not in {"install", "uninstall"}:
+    if action not in {"install", "uninstall", "start", "stop", "restart"}:
         raise ValueError("Unsupported service management action.")
+    if category_name not in {"SERVICE_MANAGEMENT.OPTIONAL_SERVICES", "SERVICE_MANAGEMENT.SERVICE_CONTROL"}:
+        raise ValueError("Unsupported service management category.")
     request_uid = str(uuid.uuid4())
     with db.transaction(WORK_REQUEST_DB_PATH) as conn:
         cursor = db.execute_on(
@@ -340,9 +337,9 @@ def queue_service_work_request(action: str, payload: dict[str, Any]) -> int:
                 request_uid, source, category_name, action_name,
                 target_rule_id, priority, status, payload_json
             )
-            VALUES (?, 'gui', 'SERVICE_MANAGEMENT.OPTIONAL_SERVICES', ?, NULL, 80, 'queue', ?)
+            VALUES (?, 'gui', ?, ?, NULL, 80, 'queue', ?)
             """,
-            (request_uid, action, json.dumps(payload, sort_keys=True)),
+            (request_uid, category_name, action, json.dumps(payload, sort_keys=True)),
         )
         work_request_id = int(cursor.lastrowid)
         db.execute_on(
@@ -351,7 +348,7 @@ def queue_service_work_request(action: str, payload: dict[str, Any]) -> int:
             INSERT INTO work_request_events (work_request_id, event_type, message)
             VALUES (?, 'queue', ?)
             """,
-            (work_request_id, f"Queued optional service {action}: {payload.get('service_name')}"),
+            (work_request_id, f"Queued service {action}: {payload.get('service_name')}"),
         )
         return work_request_id
 

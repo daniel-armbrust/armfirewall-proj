@@ -1154,6 +1154,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     gap: 12px;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 .field {
     display: grid;
     gap: 6px;
@@ -1168,6 +1172,13 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 .field textarea:disabled {
     opacity: 0.58;
     cursor: not-allowed;
+}
+
+.field input.is-invalid,
+.field textarea.is-invalid,
+.field select.is-invalid {
+    border-color: #ff5f6d;
+    box-shadow: 0 0 0 1px rgba(255, 95, 109, 0.38);
 }
 
 .field.wide {
