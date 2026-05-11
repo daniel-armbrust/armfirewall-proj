@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Tools</p>
+        <h1>Ping</h1>
+    </div>
+    <div class="refresh-state" id="ping-state">Ready</div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>ICMP probe</h2>
+        <span>tool=ping</span>
+    </div>
+    <form class="edit-form" id="ping-form">
+        <div class="form-grid">
+            <label class="field wide">
+                <span>Target</span>
+                <input name="target" type="text" placeholder="8.8.8.8 or registro.br" required autofocus>
+            </label>
+            <label class="field">
+                <span>Interface</span>
+                <select name="iface" id="ping-iface">
+                    <option value="">auto</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Family</span>
+                <select name="family">
+                    <option value="auto">auto</option>
+                    <option value="ipv4">ipv4</option>
+                    <option value="ipv6">ipv6</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Count</span>
+                <input name="count" type="number" min="1" max="10" value="4" required>
+            </label>
+            <label class="field">
+                <span>Timeout</span>
+                <input name="timeout" type="number" min="1" max="10" value="3" required>
+            </label>
+        </div>
+        <div class="form-actions">
+            <button class="text-button primary" type="submit">Run</button>
+            <button class="text-button" type="button" id="ping-clear">Clear</button>
+        </div>
+        <div class="form-status" id="ping-form-status"></div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Result</h2>
+        <span id="ping-command">command=-</span>
+    </div>
+    <pre class="tool-output" id="ping-output">Waiting for execution.</pre>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/tools_ping.js') }}?v=20260511-ping-singleton" defer></script>
+{% endblock %}

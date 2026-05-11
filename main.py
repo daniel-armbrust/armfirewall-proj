@@ -16,6 +16,7 @@ from web.routes.monitoring import routes as monitoring_routes
 from web.routes.network import routes as network_routes
 from web.routes.settings import routes as settings_routes
 from web.routes.services import routes as service_routes
+from web.routes.tools import routes as tools_routes
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -34,4 +35,5 @@ app.include_router(firewall_routes.router)
 app.include_router(monitoring_routes.router)
 app.include_router(settings_routes.router)
 app.include_router(service_routes.router)
+app.include_router(tools_routes.router)
 app.include_router(menu_routes.router)

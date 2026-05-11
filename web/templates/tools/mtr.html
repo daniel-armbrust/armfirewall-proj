@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Tools</p>
+        <h1>MTR</h1>
+    </div>
+    <div class="refresh-state" id="mtr-state">Ready</div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>MTR probe</h2>
+        <span>tool=mtr</span>
+    </div>
+    <form class="edit-form" id="mtr-form">
+        <div class="form-grid">
+            <label class="field wide">
+                <span>Target</span>
+                <input name="target" type="text" placeholder="8.8.8.8 or registro.br" required autofocus>
+            </label>
+            <label class="field">
+                <span>Interface</span>
+                <select name="iface" id="mtr-iface">
+                    <option value="">auto</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Family</span>
+                <select name="family">
+                    <option value="auto">auto</option>
+                    <option value="ipv4">ipv4</option>
+                    <option value="ipv6">ipv6</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Protocol</span>
+                <select name="protocol">
+                    <option value="icmp">icmp</option>
+                    <option value="udp">udp</option>
+                    <option value="tcp">tcp</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Max hops</span>
+                <input name="max_hops" type="number" min="1" max="64" value="30" required>
+            </label>
+            <label class="field">
+                <span>Timeout</span>
+                <input name="timeout" type="number" min="1" max="10" value="3" required>
+            </label>
+            <label class="field">
+                <span>Count</span>
+                <input name="count" type="number" min="1" max="100" value="10" required>
+            </label>
+            <label class="field">
+                <span>Interval</span>
+                <input name="interval" type="number" min="0.2" max="10" step="0.1" value="1" required>
+            </label>
+            <label class="field">
+                <span>Port</span>
+                <input name="port" type="number" min="1" max="65535" placeholder="tcp/udp only">
+            </label>
+        </div>
+        <div class="form-actions">
+            <button class="text-button primary" type="submit">Run</button>
+            <button class="text-button" type="button" id="mtr-clear">Clear</button>
+        </div>
+        <div class="form-status" id="mtr-form-status"></div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Result</h2>
+        <span id="mtr-command">command=-</span>
+    </div>
+    <pre class="tool-output" id="mtr-output">Waiting for execution.</pre>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/tools_mtr.js') }}?v=20260511-mtr-singleton" defer></script>
+{% endblock %}

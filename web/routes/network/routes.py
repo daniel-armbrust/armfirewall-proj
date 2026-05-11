@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from web.network import policy_routing as policy_routing_views
 
@@ -61,6 +61,12 @@ def api_delete_policy_routing_item(table_name: str, item_id: int) -> dict[str, A
 def api_apply_policy_routing() -> dict[str, Any]:
     """Queue policy routing changes for application."""
     return policy_routing_views.apply_policy_routing()
+
+
+@router.get("/network/packet-capture")
+def network_packet_capture_redirect() -> RedirectResponse:
+    """Redirect the old Network packet capture URL to Tools."""
+    return RedirectResponse(url="/tools/packet-capture", status_code=308)
 
 
 @router.get("/network/policy-routing", response_class=HTMLResponse)

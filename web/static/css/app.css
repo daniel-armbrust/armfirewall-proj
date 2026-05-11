@@ -1637,6 +1637,21 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     font-weight: 900;
 }
 
+.tool-output {
+    min-height: 260px;
+    max-height: 520px;
+    margin: 0;
+    padding: 18px;
+    overflow: auto;
+    border-top: 1px solid var(--line);
+    color: var(--text);
+    background: var(--panel-2);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
 @media (max-width: 860px) {
     .summary-grid.compact {
         grid-template-columns: none;
