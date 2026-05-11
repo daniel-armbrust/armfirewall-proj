@@ -124,6 +124,13 @@ def api_apply_firewall_filter_chain(chain: str) -> dict[str, Any]:
     return firewall_filter_views.apply_filter_chain(chain)
 
 
+@router.put("/api/firewall/filter-rules/{chain}/policy")
+async def api_set_firewall_filter_chain_policy(request: Request, chain: str) -> dict[str, Any]:
+    """Persist the selected filter chain policy."""
+    payload = await request.json()
+    return firewall_filter_views.set_filter_chain_policy(chain, payload)
+
+
 @router.post("/api/firewall/nat-rules/{chain}/apply")
 def api_apply_firewall_nat_chain(chain: str) -> dict[str, Any]:
     """Queue enabled IPv4 and IPv6 NAT rules for one chain."""

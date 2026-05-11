@@ -24,17 +24,17 @@
     </div>
 </section>
 
-<section class="service-inline-actions">
-    <button class="text-button compact primary" type="button" data-linkfailover-view="links">Link Failover</button>
-    <button class="text-button compact" type="button" data-linkfailover-view="events">Events</button>
-    <button class="text-button compact" type="button" data-linkfailover-view="work-requests">Work Requests</button>
-</section>
+<nav class="local-tabs" aria-label="Link Failover menu">
+    <button class="local-tab active" type="button" data-linkfailover-view="links">LINK FAILOVER</button>
+    <button class="local-tab" type="button" data-linkfailover-view="events">EVENTS</button>
+    <button class="local-tab" type="button" data-linkfailover-view="work-requests">WORK REQUESTS</button>
+</nav>
 
 <section id="linkfailover-links-panel">
-    <section class="service-inline-actions" aria-label="Link Failover service controls">
-        <button class="text-button compact" type="button" data-linkfailover-service-action="restart">Start / Restart</button>
-        <button class="text-button compact danger" type="button" data-linkfailover-service-action="stop">Stop</button>
-    </section>
+    <nav class="local-tabs service-action-tabs" aria-label="Link Failover service controls">
+        <button class="local-tab" type="button" data-linkfailover-service-action="restart">START / RESTART</button>
+        <button class="local-tab" type="button" data-linkfailover-service-action="stop">STOP</button>
+    </nav>
 
     <section class="panel">
         <div class="panel-head">

@@ -32,6 +32,12 @@ PROTOCOLS = {
     "IPV6": {"all", "tcp", "udp", "icmpv6"},
 }
 ACTIONS = {"ACCEPT", "DROP", "REJECT"}
+POLICIES = {"ACCEPT", "DROP"}
+DEFAULT_POLICIES = {
+    "INPUT": "DROP",
+    "FORWARD": "DROP",
+    "OUTPUT": "ACCEPT",
+}
 
 
 def page_context(request: Request, title: str) -> dict[str, Any]:
@@ -87,6 +93,14 @@ def normalize_action(value: Any) -> str:
     return action
 
 
+def normalize_policy(value: Any) -> str:
+    """Normalize and validate a built-in chain policy."""
+    policy = str(value or "DROP").strip().upper()
+    if policy not in POLICIES:
+        raise HTTPException(status_code=400, detail="policy must be ACCEPT or DROP.")
+    return policy
+
+
 def normalize_enabled(value: Any) -> int:
     """Convert an enabled value to a SQLite flag."""
     return 1 if str(value).lower() in {"1", "true", "yes", "on"} else 0
@@ -118,6 +132,54 @@ def ensure_pending_delete_column(conn: db.Connection, table: str) -> None:
     columns = {str(row["name"]) for row in db.execute_on(conn, f"PRAGMA table_info({table})").fetchall()}
     if "pending_delete" not in columns:
         db.execute_on(conn, f"ALTER TABLE {table} ADD COLUMN pending_delete INTEGER NOT NULL DEFAULT 0")
+
+
+def ensure_filter_chain_policies(conn: db.Connection) -> None:
+    """Create and seed filter policy metadata for older firewall databases."""
+    row = db.fetch_one_on(
+        conn,
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'filter_chain_policies'",
+    )
+    if row is not None and "REJECT" in str(row["sql"]):
+        db.execute_on(conn, "DROP TABLE IF EXISTS filter_chain_policies_legacy")
+        db.execute_on(conn, "ALTER TABLE filter_chain_policies RENAME TO filter_chain_policies_legacy")
+        db.execute_on(
+            conn,
+            """
+            CREATE TABLE filter_chain_policies (
+                 chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
+                 policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        db.execute_on(
+            conn,
+            """
+            INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy, created_at, updated_at)
+            SELECT chain_name, CASE WHEN policy = 'REJECT' THEN 'DROP' ELSE policy END, created_at, updated_at
+            FROM filter_chain_policies_legacy
+            """,
+        )
+        db.execute_on(conn, "DROP TABLE filter_chain_policies_legacy")
+    db.execute_on(
+        conn,
+        """
+        CREATE TABLE IF NOT EXISTS filter_chain_policies (
+             chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
+             policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
+             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+    )
+    for chain, policy in DEFAULT_POLICIES.items():
+        db.execute_on(
+            conn,
+            "INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy) VALUES (?, ?)",
+            (chain, policy),
+        )
 
 
 def row_to_rule(family: str, chain: str, row: Any) -> dict[str, Any]:
@@ -206,8 +268,32 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
         """
 
     with db.connection(db_path) as conn:
+        ensure_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         return [row_to_rule(family, chain, row) for row in db.execute_on(conn, query).fetchall()]
+
+
+def get_filter_policies() -> dict[str, dict[str, Any]]:
+    """Return persisted filter policies by chain and family."""
+    policies: dict[str, dict[str, Any]] = {chain: {} for chain in CHAIN_TABLES}
+    for family, db_path in FAMILY_DATABASES.items():
+        with db.connection(db_path) as conn:
+            ensure_filter_chain_policies(conn)
+            rows = db.fetch_all_on(
+                conn,
+                """
+                SELECT chain_name, policy, updated_at
+                FROM filter_chain_policies
+                ORDER BY chain_name
+                """,
+            )
+        for row in rows:
+            chain = str(row["chain_name"])
+            policies.setdefault(chain, {})[family] = {
+                "policy": str(row["policy"]),
+                "updated_at": str(row["updated_at"]),
+            }
+    return policies
 
 
 def get_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
@@ -249,6 +335,7 @@ def get_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
         """
 
     with db.connection(db_path) as conn:
+        ensure_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         row = db.fetch_one_on(conn, query, (rule_id,))
 
@@ -279,6 +366,7 @@ def get_filter_rules() -> dict[str, Any]:
             "protected": protected,
         },
         "chains": by_chain,
+        "policies": get_filter_policies(),
         "rules": rules,
     }
 
@@ -447,6 +535,7 @@ def enabled_rule_ids_for_chain(family: str, chain: str) -> list[int]:
     db_path = FAMILY_DATABASES[family]
 
     with db.connection(db_path) as conn:
+        ensure_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         rows = db.fetch_all_on(conn, f"SELECT id FROM {table} WHERE enabled = 1 AND pending_delete = 0 ORDER BY rule_order, id")
 
@@ -461,6 +550,7 @@ def pending_delete_rule_ids_for_chain(family: str, chain: str) -> list[int]:
     db_path = FAMILY_DATABASES[family]
 
     with db.connection(db_path) as conn:
+        ensure_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         rows = db.fetch_all_on(conn, f"SELECT id FROM {table} WHERE pending_delete = 1 ORDER BY rule_order, id")
 
@@ -477,7 +567,20 @@ def filter_family_needs_apply(family: str, chain: str, apply_times: dict[str, st
     applied_at = apply_times.get(category_name)
 
     with db.connection(db_path) as conn:
+        ensure_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
+        policy_row = db.fetch_one_on(
+            conn,
+            "SELECT policy, updated_at FROM filter_chain_policies WHERE chain_name = ?",
+            (chain,),
+        )
+        if policy_row is not None:
+            default_policy = DEFAULT_POLICIES[chain]
+            policy_changed_without_apply = applied_at is None and str(policy_row["policy"]) != default_policy
+            policy_changed_after_apply = applied_at is not None and str(policy_row["updated_at"]) > applied_at
+            if policy_changed_without_apply or policy_changed_after_apply:
+                return True
+
         pending_delete = db.fetch_one_on(conn, f"SELECT COUNT(*) AS total FROM {table} WHERE pending_delete = 1")
         if int(pending_delete["total"]) > 0:
             return True
@@ -503,6 +606,7 @@ def create_filter_rule(payload: dict[str, Any]) -> dict[str, Any]:
     db_path = FAMILY_DATABASES[rule["family"]]
 
     with db.transaction(db_path) as conn:
+        ensure_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, rule["table"])
         rule_id = insert_rule(conn, rule)
 
@@ -521,6 +625,7 @@ def update_filter_rule(family_value: str, chain_value: str, rule_id: int, payloa
     rule = sanitize_rule_payload(payload)
 
     with db.transaction(db_path) as conn:
+        ensure_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         current = db.fetch_one_on(conn, f"SELECT protected, enabled, pending_delete FROM {table} WHERE id = ?", (rule_id,))
         if current is None:
@@ -601,11 +706,13 @@ def apply_filter_chain(chain_value: str) -> dict[str, Any]:
 
         rule_ids = enabled_rule_ids_for_chain(family, chain)
         delete_rule_ids = pending_delete_rule_ids_for_chain(family, chain)
+        policy = get_filter_policies().get(chain, {}).get(family, {}).get("policy", DEFAULT_POLICIES[chain])
         category_name = f"FIREWALL_RULES.{family}.{table}"
         payload = {
             "family": family,
             "chain": chain,
             "table": table,
+            "policy": policy,
             "rule_ids": rule_ids,
             "delete_rule_ids": delete_rule_ids,
         }
@@ -623,6 +730,37 @@ def apply_filter_chain(chain_value: str) -> dict[str, Any]:
     return {"chain": chain, "work_requests": work_requests, "work_request_count": len(work_requests)}
 
 
+def set_filter_chain_policy(chain_value: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Persist a filter chain policy for IPv4 and IPv6 without applying it."""
+    chain = normalize_chain(chain_value)
+    policy = normalize_policy(payload.get("policy"))
+
+    with db.transaction(FAMILY_DATABASES["IPV4"]) as conn:
+        ensure_filter_chain_policies(conn)
+        db.execute_on(
+            conn,
+            """
+            UPDATE filter_chain_policies
+            SET policy = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE chain_name = ?
+            """,
+            (policy, chain),
+        )
+    with db.transaction(FAMILY_DATABASES["IPV6"]) as conn:
+        ensure_filter_chain_policies(conn)
+        db.execute_on(
+            conn,
+            """
+            UPDATE filter_chain_policies
+            SET policy = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE chain_name = ?
+            """,
+            (policy, chain),
+        )
+
+    return {"chain": chain, "policy": policy, "status": "saved"}
+
+
 def set_filter_rule_enabled(family_value: str, chain_value: str, rule_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     """Update the enabled flag for a filter rule without applying it."""
     family = normalize_family(family_value)
@@ -632,6 +770,7 @@ def set_filter_rule_enabled(family_value: str, chain_value: str, rule_id: int, p
     db_path = FAMILY_DATABASES[family]
 
     with db.transaction(db_path) as conn:
+        ensure_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         current = db.fetch_one_on(conn, f"SELECT enabled, protected, pending_delete FROM {table} WHERE id = ?", (rule_id,))
         if current is None:

@@ -12,6 +12,11 @@
         FORWARD: document.querySelector("#filter-forward-count"),
         OUTPUT: document.querySelector("#filter-output-count"),
     };
+    const policySelects = {
+        INPUT: document.querySelector("[data-chain-policy='INPUT']"),
+        FORWARD: document.querySelector("[data-chain-policy='FORWARD']"),
+        OUTPUT: document.querySelector("[data-chain-policy='OUTPUT']"),
+    };
     const workRequestsBody = document.querySelector("#filter-work-requests-body");
     const workRequestsCount = document.querySelector("#filter-work-requests-count");
     const submitButton = document.querySelector("#filter-submit-button");
@@ -33,6 +38,7 @@
     const srcAddr = document.querySelector("#filter-src-addr");
     const dstAddr = document.querySelector("#filter-dst-addr");
     let currentRulesByKey = new Map();
+    let currentPolicies = {};
     let editingRule = null;
     let pendingApplyChain = "";
     let pendingDeleteButton = null;
@@ -396,6 +402,22 @@
         ].join("");
     }
 
+    function policyValueForChain(policies, chain) {
+        const chainPolicies = policies && policies[chain] ? policies[chain] : {};
+        const ipv4Policy = chainPolicies.IPV4 ? chainPolicies.IPV4.policy : "";
+        const ipv6Policy = chainPolicies.IPV6 ? chainPolicies.IPV6.policy : "";
+        return ipv4Policy || ipv6Policy || "DROP";
+    }
+
+    function renderPolicies(policies) {
+        currentPolicies = policies || {};
+        Object.entries(policySelects).forEach(([chain, select]) => {
+            if (select) {
+                select.value = policyValueForChain(currentPolicies, chain);
+            }
+        });
+    }
+
     function renderRules(data) {
         const chains = data.chains || {};
         currentRulesByKey = new Map();
@@ -406,6 +428,7 @@
         updateMetric("#filter-summary-enabled", data.summary.enabled);
         updateMetric("#filter-summary-disabled", data.summary.disabled);
         updateMetric("#filter-summary-protected", data.summary.protected);
+        renderPolicies(data.policies || {});
         ["INPUT", "FORWARD", "OUTPUT"].forEach((chain) => renderChain(chain, chains[chain] || []));
     }
 
@@ -591,12 +614,13 @@
         pendingApplyChain = chain;
         const chainRules = Array.from(currentRulesByKey.values()).filter((rule) => rule.chain === chain);
         const enabledCount = chainRules.filter((rule) => HF.number(rule.enabled) === 1).length;
+        const policy = policyValueForChain(currentPolicies, chain);
 
         if (applyChainLabel) {
             applyChainLabel.textContent = `chain=${chain}`;
         }
         if (applyMessage) {
-            applyMessage.textContent = `Are you sure you want to apply ${enabledCount} enabled rule(s) from the ${chain} chain?`;
+            applyMessage.textContent = `Are you sure you want to apply ${enabledCount} enabled rule(s) from the ${chain} chain with policy=${policy}?`;
         }
         if (applyModal) {
             applyModal.hidden = false;
@@ -747,6 +771,27 @@
         }
     }
 
+    async function saveChainPolicy(select) {
+        const chain = select.dataset.chainPolicy;
+        const policy = select.value;
+        try {
+            select.disabled = true;
+            setFormStatus("policy=saving");
+            const result = await HF.fetchJson(`/api/firewall/filter-rules/${chain}/policy`, {
+                method: "PUT",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({policy}),
+            });
+            setFormStatus(`policy=${result.policy}`);
+            await loadRules();
+        } catch (error) {
+            setFormStatus(`error=${error.message}`);
+            renderPolicies(currentPolicies);
+        } finally {
+            select.disabled = false;
+        }
+    }
+
     async function deleteRule(button) {
         const family = button.dataset.family;
         const chain = button.dataset.chain;
@@ -777,6 +822,12 @@
 
     document.querySelectorAll("[data-filter-tab]").forEach((tab) => {
         tab.addEventListener("click", () => setActiveTab(tab.dataset.filterTab, true));
+    });
+
+    Object.values(policySelects).forEach((select) => {
+        if (select) {
+            select.addEventListener("change", () => saveChainPolicy(select));
+        }
     });
 
     document.querySelectorAll("[data-chain-apply]").forEach((button) => {

@@ -12,6 +12,19 @@ INSERT OR IGNORE INTO protocols (name, description) VALUES
      ('udp', 'User Datagram Protocol'),
      ('icmpv6', 'Internet Control Message Protocol for IPv6');
 
+-- Stores IPv6 filter table built-in chain policies.
+CREATE TABLE IF NOT EXISTS filter_chain_policies (
+     chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
+     policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
+     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy) VALUES
+     ('INPUT', 'DROP'),
+     ('FORWARD', 'DROP'),
+     ('OUTPUT', 'ACCEPT');
+
 -- Stores IPv6 filter table rules for packets entering the firewall host.
 CREATE TABLE IF NOT EXISTS filter_input_rules (
      id INTEGER PRIMARY KEY AUTOINCREMENT,

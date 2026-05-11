@@ -382,7 +382,7 @@
             workRequestsPanel.hidden = !showWorkRequests;
         }
         viewButtons.forEach((button) => {
-            button.classList.toggle("primary", button.dataset.linkfailoverView === viewName);
+            button.classList.toggle("active", button.dataset.linkfailoverView === viewName);
         });
         if (showWorkRequests) {
             loadWorkRequests();

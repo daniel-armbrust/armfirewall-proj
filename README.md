@@ -1,3 +1,5 @@
+![ArmFirewall Logo](./armfirewall.png)
+
 # ArmFirewall
 
 ArmFirewall is a Linux firewall management platform designed to turn a small server or virtual machine into a controlled network security appliance. The project combines operating system automation, persistent configuration in SQLite, background daemons, RRD-based monitoring, and a responsive FastAPI web interface.

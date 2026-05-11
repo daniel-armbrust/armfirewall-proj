@@ -889,7 +889,7 @@
             form.hidden = isWorkRequests;
         }
         viewButtons.forEach((button) => {
-            button.classList.toggle("primary", button.dataset.dnsmasqView === viewName);
+            button.classList.toggle("active", button.dataset.dnsmasqView === viewName);
         });
         if (isWorkRequests) {
             loadWorkRequests();

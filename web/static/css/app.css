@@ -730,6 +730,24 @@ body.graph-modal-open {
     gap: 8px;
 }
 
+.chain-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chain-policy-select {
+    width: 92px;
+    min-height: 26px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    color: var(--accent);
+    background: var(--panel);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 900;
+}
+
 .table-wrap {
     width: 100%;
     overflow-x: auto;
@@ -1465,6 +1483,11 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     display: flex;
     gap: 8px;
     overflow-x: auto;
+}
+
+.dnsmasq-action-tabs,
+.service-action-tabs {
+    margin: 22px 0 14px;
 }
 
 .local-tab {

@@ -140,6 +140,13 @@ SELECT_COLUMNS = {
 
 WILDCARD_ADDRESSES = {"0.0.0.0/0", "::/0", "", None}
 FILTER_POLICY_CHAINS = ("INPUT", "FORWARD")
+FILTER_BUILTIN_CHAINS = ("INPUT", "FORWARD", "OUTPUT")
+DEFAULT_FILTER_POLICIES = {
+    "INPUT": "DROP",
+    "FORWARD": "DROP",
+    "OUTPUT": "ACCEPT",
+}
+FILTER_POLICIES = {"ACCEPT", "DROP"}
 FILTER_RULE_TABLES = ("filter_input_rules", "filter_forward_rules", "filter_output_rules")
 PROTECTED_RULE_TABLES = {
     "FIREWALL_RULES": FILTER_RULE_TABLES,
@@ -173,6 +180,54 @@ def ensure_pending_delete_column(conn: db.Connection, table: str) -> None:
     columns = {str(row["name"]) for row in db.execute_on(conn, f"PRAGMA table_info({table})").fetchall()}
     if "pending_delete" not in columns:
         db.execute_on(conn, f"ALTER TABLE {table} ADD COLUMN pending_delete INTEGER NOT NULL DEFAULT 0")
+
+
+def ensure_filter_chain_policies(conn: db.Connection) -> None:
+    """Create and seed filter policy metadata when an older database is used."""
+    row = db.fetch_one_on(
+        conn,
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'filter_chain_policies'",
+    )
+    if row is not None and "REJECT" in str(row["sql"]):
+        db.execute_on(conn, "DROP TABLE IF EXISTS filter_chain_policies_legacy")
+        db.execute_on(conn, "ALTER TABLE filter_chain_policies RENAME TO filter_chain_policies_legacy")
+        db.execute_on(
+            conn,
+            """
+            CREATE TABLE filter_chain_policies (
+                 chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
+                 policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        db.execute_on(
+            conn,
+            """
+            INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy, created_at, updated_at)
+            SELECT chain_name, CASE WHEN policy = 'REJECT' THEN 'DROP' ELSE policy END, created_at, updated_at
+            FROM filter_chain_policies_legacy
+            """,
+        )
+        db.execute_on(conn, "DROP TABLE filter_chain_policies_legacy")
+    db.execute_on(
+        conn,
+        """
+        CREATE TABLE IF NOT EXISTS filter_chain_policies (
+             chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
+             policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
+             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+    )
+    for chain, policy in DEFAULT_FILTER_POLICIES.items():
+        db.execute_on(
+            conn,
+            "INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy) VALUES (?, ?)",
+            (chain, policy),
+        )
 
 
 def payload_from_args(args: argparse.Namespace) -> dict[str, Any]:
@@ -341,19 +396,59 @@ def run_command(command: list[str], *, check: bool = True) -> subprocess.Complet
     return completed
 
 
-def enforce_filter_drop_policies() -> int:
-    """Ensure protected filter chains keep their DROP policy."""
+def filter_policy_for_chain(family: str, chain: str) -> str:
+    """Return the persisted filter policy for one family and chain."""
+    with db.connection(database_for_request("FIREWALL_RULES", family)) as conn:
+        ensure_filter_chain_policies(conn)
+        row = db.fetch_one_on(
+            conn,
+            "SELECT policy FROM filter_chain_policies WHERE chain_name = ?",
+            (chain,),
+        )
+    if row is None:
+        return DEFAULT_FILTER_POLICIES[chain]
+    policy = str(row["policy"]).upper()
+    return policy if policy in FILTER_POLICIES else DEFAULT_FILTER_POLICIES[chain]
+
+
+def remove_reject_policy_tail(family: str, chain: str) -> int:
+    """Remove ArmFirewall managed REJECT policy tail rules."""
+    removed = 0
+    command = command_name(family)
+    delete = [command, "-t", "filter", "-D", chain, "-m", "comment", "--comment", "armfirewall-policy-reject", "-j", "REJECT"]
+    while run_command(delete, check=False).returncode == 0:
+        removed += 1
+    return removed
+
+
+def enforce_configured_filter_policies() -> int:
+    """Ensure filter built-in chains use the policies stored in SQLite."""
     changed = 0
     for family in ("IPV4", "IPV6"):
         command = command_name(family)
-        for chain in FILTER_POLICY_CHAINS:
+        for chain in FILTER_BUILTIN_CHAINS:
+            policy = filter_policy_for_chain(family, chain)
             row = run_command([command, "-t", "filter", "-S", chain], check=False)
-            expected = f"-P {chain} DROP"
+            expected = f"-P {chain} {policy}"
+            changed += remove_reject_policy_tail(family, chain)
             if row.returncode == 0 and expected in row.stdout.splitlines():
                 continue
-            run_command([command, "-t", "filter", "-P", chain, "DROP"])
+            run_command([command, "-t", "filter", "-P", chain, policy])
             changed += 1
     return changed
+
+
+def apply_payload_filter_policy(args: argparse.Namespace, table_name: str, payload: dict[str, Any]) -> int:
+    """Apply the requested filter policy for a full chain work request."""
+    if args.category != "FIREWALL_RULES" or table_name not in FILTER_RULE_TABLES:
+        return 0
+    _, chain = TABLE_METADATA[table_name]
+    policy = str(payload.get("policy") or filter_policy_for_chain(args.family, chain)).upper()
+    if policy not in FILTER_POLICIES:
+        raise RuntimeError(f"Unsupported filter policy: {policy}")
+    remove_reject_policy_tail(args.family, chain)
+    run_command([command_name(args.family), "-t", "filter", "-P", chain, policy])
+    return 1
 
 
 def apply_rule(args: argparse.Namespace, rule: dict[str, Any]) -> bool:
@@ -513,6 +608,7 @@ def execute_work_request(args: argparse.Namespace, payload: dict[str, Any]) -> t
 
     if args.action_name == "apply" and isinstance(payload.get("rule_ids"), list):
         flush_chain(args, table)
+        applied += apply_payload_filter_policy(args, table, payload)
 
     for rule in rules:
         try:
@@ -534,7 +630,7 @@ def execute_work_request(args: argparse.Namespace, payload: dict[str, Any]) -> t
 
     if args.action_name == "apply":
         applied += reconcile_protected_rules()
-        enforce_filter_drop_policies()
+        enforce_configured_filter_policies()
 
     return applied, removed
 

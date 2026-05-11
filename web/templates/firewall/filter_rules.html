@@ -38,7 +38,13 @@
     {% for chain in ["INPUT", "FORWARD", "OUTPUT"] %}
     <section class="panel">
         <div class="panel-head">
-            <h2>{{ chain }}</h2>
+            <h2 class="chain-title">
+                <span>{{ chain }}</span>
+                <select class="chain-policy-select" data-chain-policy="{{ chain }}" aria-label="{{ chain }} policy">
+                    <option value="ACCEPT">ACCEPT</option>
+                    <option value="DROP">DROP</option>
+                </select>
+            </h2>
             <div class="panel-actions">
                 <span id="filter-{{ chain | lower }}-count">rules=-</span>
                 <button class="text-button compact" type="button" data-chain-apply="{{ chain }}">Apply</button>

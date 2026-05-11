@@ -40,10 +40,10 @@
     </div>
 </section>
 
-<section class="service-inline-actions">
-    <button class="text-button compact primary" type="button" data-dnsmasq-view="config">Dnsmasq</button>
-    <button class="text-button compact" type="button" data-dnsmasq-view="work-requests">Work Requests</button>
-</section>
+<nav class="local-tabs" aria-label="Dnsmasq menu">
+    <button class="local-tab active" type="button" data-dnsmasq-view="config">DNSMASQ</button>
+    <button class="local-tab" type="button" data-dnsmasq-view="work-requests">WORK REQUESTS</button>
+</nav>
 
 <section class="panel" id="dnsmasq-work-requests-panel" hidden>
     <div class="panel-head">
@@ -74,10 +74,10 @@
 </section>
 
 <form id="dnsmasq-form">
-    <section class="service-inline-actions" aria-label="Dnsmasq service controls">
-        <button class="text-button compact" type="button" data-dnsmasq-action="start-restart">Start / Restart</button>
-        <button class="text-button compact danger" type="button" data-dnsmasq-action="stop">Stop</button>
-    </section>
+    <nav class="local-tabs dnsmasq-action-tabs" aria-label="Dnsmasq service controls">
+        <button class="local-tab" type="button" data-dnsmasq-action="start-restart">START / RESTART</button>
+        <button class="local-tab" type="button" data-dnsmasq-action="stop">STOP</button>
+    </nav>
 
     <section class="panel">
         <div class="panel-head">

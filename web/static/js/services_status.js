@@ -69,7 +69,7 @@
             workRequestsPanel.hidden = !isWorkRequests;
         }
         viewButtons.forEach((button) => {
-            button.classList.toggle("primary", button.dataset.servicesView === viewName);
+            button.classList.toggle("active", button.dataset.servicesView === viewName);
         });
         if (isWorkRequests) {
             loadWorkRequests();
