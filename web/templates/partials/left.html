@@ -42,8 +42,9 @@
         <div class="menu-group">Services</div>
         <a class="menu-link child {% if current_path == '/services/status' %}active{% endif %}" href="/services/status">Status</a>
         <a class="menu-link child {% if current_path == '/services/dnsmasq' %}active{% endif %}" href="/services/dnsmasq">Dnsmasq</a>
+        {% if request.app.state.menu_context.proxy_service_installed %}
         <a class="menu-link child {% if current_path == '/services/proxy' %}active{% endif %}" href="/services/proxy">Proxy</a>
+        {% endif %}
         <a class="menu-link child {% if current_path == '/services/link-failover' %}active{% endif %}" href="/services/link-failover">Link Failover</a>
-        <a class="menu-link child {% if current_path == '/services/link-load-balance' %}active{% endif %}" href="/services/link-load-balance">Link Load Balance</a>
     </nav>
 </aside>

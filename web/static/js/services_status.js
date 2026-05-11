@@ -11,9 +11,15 @@
     const optionalServiceTitle = document.querySelector("#optional-service-title");
     const optionalServiceMessage = document.querySelector("#optional-service-message");
     const optionalServiceConfirm = document.querySelector("[data-optional-service-confirm]");
+    const statusPanel = document.querySelector("#services-status-panel");
+    const workRequestsPanel = document.querySelector("#services-work-requests-panel");
+    const workRequestsBody = document.querySelector("#services-work-requests-body");
+    const workRequestsCount = document.querySelector("#services-work-requests-count");
+    const viewButtons = Array.from(document.querySelectorAll("[data-services-view]"));
     let pendingAction = null;
     let pendingOptionalAction = null;
     let loading = false;
+    let workRequestsLoading = false;
     const POLL_MS = 5000;
 
     function setState(state, updated = "") {
@@ -45,6 +51,90 @@
         return "disabled";
     }
 
+    function scrollToTop() {
+        requestAnimationFrame(() => {
+            document.querySelector("#main-content")?.scrollTo({top: 0, behavior: "smooth"});
+            document.documentElement.scrollTo({top: 0, behavior: "smooth"});
+            document.body.scrollTo({top: 0, behavior: "smooth"});
+            window.scrollTo({top: 0, behavior: "smooth"});
+        });
+    }
+
+    function setActiveView(viewName) {
+        const isWorkRequests = viewName === "work-requests";
+        if (statusPanel) {
+            statusPanel.hidden = isWorkRequests;
+        }
+        if (workRequestsPanel) {
+            workRequestsPanel.hidden = !isWorkRequests;
+        }
+        viewButtons.forEach((button) => {
+            button.classList.toggle("primary", button.dataset.servicesView === viewName);
+        });
+        if (isWorkRequests) {
+            loadWorkRequests();
+        }
+    }
+
+    function showWorkRequests() {
+        setActiveView("work-requests");
+        scrollToTop();
+    }
+
+    function renderWorkRequests(data) {
+        const requests = data.requests || [];
+        if (workRequestsCount) {
+            workRequestsCount.textContent = `requests=${requests.length}`;
+        }
+        if (!workRequestsBody) {
+            return;
+        }
+        if (!requests.length) {
+            workRequestsBody.innerHTML = `
+                <tr>
+                    <td colspan="7"><div class="terminal-empty"><span class="prompt">$</span><span>no service work requests</span></div></td>
+                </tr>
+            `;
+            return;
+        }
+        workRequestsBody.innerHTML = requests.map((request) => {
+            const failed = request.status === "failed";
+            const status = failed ? "down" : request.status === "success" ? "up" : "disabled";
+            return `
+                <tr>
+                    <td>${HF.escapeHtml(request.id)}</td>
+                    <td><span class="status ${status}">${HF.escapeHtml(request.status)}</span></td>
+                    <td><strong>${HF.escapeHtml(request.display_name || request.service_name || "-")}</strong></td>
+                    <td>${HF.escapeHtml(request.category_name)}</td>
+                    <td>${HF.escapeHtml(request.action_name)}</td>
+                    <td>${HF.escapeHtml(request.updated_at)}</td>
+                    <td>${HF.escapeHtml(request.error_message || "")}</td>
+                </tr>
+            `;
+        }).join("");
+    }
+
+    async function loadWorkRequests() {
+        if (workRequestsLoading || !workRequestsPanel || workRequestsPanel.hidden) {
+            return;
+        }
+        workRequestsLoading = true;
+        try {
+            const data = await HF.fetchJson("/api/services/status/work-requests");
+            renderWorkRequests(data);
+        } catch (error) {
+            if (workRequestsBody) {
+                workRequestsBody.innerHTML = `
+                    <tr>
+                        <td colspan="7"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div></td>
+                    </tr>
+                `;
+            }
+        } finally {
+            workRequestsLoading = false;
+        }
+    }
+
     function renderArmFirewallServices(services) {
         if (!servicesBody) {
             return;
@@ -64,7 +154,7 @@
             const protectedBadge = protectedService ? '<span class="status protected">PROTECTED</span>' : "";
             const startDisabled = protectedService || !installed || running ? "disabled" : "";
             const stopDisabled = protectedService || !installed || !running ? "disabled" : "";
-            const restartDisabled = protectedService || !installed ? "disabled" : "";
+            const restartDisabled = protectedService || !installed || !running ? "disabled" : "";
             return `
                 <tr>
                     <td><strong>${HF.escapeHtml(service.name)}</strong> ${protectedBadge}</td>
@@ -99,7 +189,7 @@
             const installed = Boolean(service.installed);
             const installDisabled = service.can_install ? "" : "disabled";
             const startDisabled = installed && String(service.state || "").toUpperCase() !== "RUNNING" ? "" : "disabled";
-            const restartDisabled = installed ? "" : "disabled";
+            const restartDisabled = installed && String(service.state || "").toUpperCase() === "RUNNING" ? "" : "disabled";
             const stopDisabled = installed && String(service.state || "").toUpperCase() === "RUNNING" ? "" : "disabled";
             const uninstallDisabled = installed ? "" : "disabled";
             return `
@@ -185,6 +275,9 @@
             renderArmFirewallServices(services);
             renderOptionalServices(optionalServices);
             setState("Live", summary.updated_at || "-");
+            if (workRequestsPanel && !workRequestsPanel.hidden) {
+                loadWorkRequests();
+            }
         } catch (error) {
             setState("Offline");
             if (servicesBody) {
@@ -213,6 +306,8 @@
                 body: JSON.stringify({action}),
             });
             closeActionModal();
+            showWorkRequests();
+            await loadWorkRequests();
             await pollServices();
         } catch (error) {
             if (actionMessage) {
@@ -235,6 +330,8 @@
                 method: "POST",
             });
             closeOptionalServiceModal();
+            showWorkRequests();
+            await loadWorkRequests();
             await pollServices();
         } catch (error) {
             if (optionalServiceMessage) {
@@ -256,6 +353,11 @@
             openOptionalServiceModal(optionalButton.dataset.optionalServiceName, optionalButton.dataset.optionalServiceAction);
             return;
         }
+        const viewButton = event.target.closest("[data-services-view]");
+        if (viewButton) {
+            setActiveView(viewButton.dataset.servicesView || "status");
+            return;
+        }
         if (event.target.closest("[data-service-action-cancel]")) {
             closeActionModal();
         }
@@ -271,6 +373,8 @@
         optionalServiceConfirm.addEventListener("click", runPendingOptionalServiceAction);
     }
 
+    setActiveView("status");
     pollServices();
     setInterval(pollServices, POLL_MS);
+    setInterval(loadWorkRequests, POLL_MS);
 }());

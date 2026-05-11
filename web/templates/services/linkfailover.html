@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">services/link-failover</p>
+        <h1>Link Failover</h1>
+    </div>
+    <div class="refresh-state" id="linkfailover-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Link Failover summary">
+    <div class="metric">
+        <span class="metric-label">Links</span>
+        <strong id="linkfailover-summary-links">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Healthy</span>
+        <strong id="linkfailover-summary-healthy">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Active IF</span>
+        <strong id="linkfailover-summary-active">-</strong>
+    </div>
+</section>
+
+<section class="service-inline-actions">
+    <button class="text-button compact primary" type="button" data-linkfailover-view="links">Link Failover</button>
+    <button class="text-button compact" type="button" data-linkfailover-view="events">Events</button>
+    <button class="text-button compact" type="button" data-linkfailover-view="work-requests">Work Requests</button>
+</section>
+
+<section id="linkfailover-links-panel">
+    <section class="service-inline-actions" aria-label="Link Failover service controls">
+        <button class="text-button compact" type="button" data-linkfailover-service-action="restart">Start / Restart</button>
+        <button class="text-button compact danger" type="button" data-linkfailover-service-action="stop">Stop</button>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Daemon Settings</h2>
+            <span>supervisord=armfirewall-linkfailover</span>
+        </div>
+        <form class="edit-form" id="linkfailover-settings-form">
+            <div class="form-grid">
+                <label class="field">
+                    <span>Ping target</span>
+                    <input id="linkfailover-target" name="target" type="text" placeholder="registro.br" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>Timeout seconds</span>
+                    <input id="linkfailover-timeout" name="timeout_seconds" type="number" min="1" max="60" value="3">
+                </label>
+                <label class="field">
+                    <span>Attempts</span>
+                    <input id="linkfailover-attempts" name="attempts" type="number" min="1" max="20" value="3">
+                </label>
+                <label class="field">
+                    <span>Seconds between attempts</span>
+                    <input id="linkfailover-interval" name="interval_seconds" type="number" min="0" max="3600" value="1">
+                </label>
+                <label class="field">
+                    <span>Max latency ms</span>
+                    <input id="linkfailover-max-latency" name="max_latency_ms" type="number" min="0" step="0.1" placeholder="60">
+                </label>
+                <label class="field">
+                    <span>Check interval seconds</span>
+                    <input id="linkfailover-check-interval" name="check_interval_seconds" type="number" min="1" max="86400">
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="text-button compact primary" type="submit" id="linkfailover-apply" hidden>Apply</button>
+            </div>
+            <div class="form-status" id="linkfailover-settings-status" hidden></div>
+        </form>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Failover Links</h2>
+            <span id="linkfailover-links-count">links=0</span>
+        </div>
+        <div class="table-wrap wide">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>IF</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Last latency</th>
+                        <th>Ops</th>
+                    </tr>
+                </thead>
+                <tbody id="linkfailover-links-body">
+                    <tr>
+                        <td colspan="5">
+                            <div class="terminal-empty"><span class="prompt">$</span><span>loading failover links</span></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel" id="linkfailover-new-link-panel">
+        <div class="panel-head">
+            <h2>New Link</h2>
+            <span>ping based</span>
+        </div>
+        <form class="edit-form" id="linkfailover-link-form">
+            <input type="hidden" id="linkfailover-link-id">
+            <div class="form-grid">
+                <label class="field">
+                    <span>Interface</span>
+                    <select id="linkfailover-iface" name="iface"></select>
+                </label>
+                <label class="field">
+                    <span>Priority</span>
+                    <input id="linkfailover-priority" name="priority" type="number" min="1" max="999" value="100">
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="text-button compact primary" type="submit" id="linkfailover-link-submit">Add link</button>
+            </div>
+            <div class="form-status" id="linkfailover-form-status" hidden></div>
+        </form>
+    </section>
+
+</section>
+
+<section class="panel" id="linkfailover-events-panel" hidden>
+    <div class="panel-head">
+        <h2>Events</h2>
+        <span id="linkfailover-events-count">events=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Created</th>
+                    <th>Type</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody id="linkfailover-events-body">
+                <tr>
+                    <td colspan="3">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no failover events</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel" id="linkfailover-work-requests-panel" hidden>
+    <div class="panel-head">
+        <h2>Work Requests</h2>
+        <span id="linkfailover-work-requests-count">requests=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                    <th>Updated</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="linkfailover-work-requests-body">
+                <tr>
+                    <td colspan="5">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no link failover work requests</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal-backdrop" id="linkfailover-action-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="linkfailover-action-title">
+        <div class="modal-head">
+            <h2 id="linkfailover-action-title">Confirm action</h2>
+            <button class="icon-button" type="button" data-linkfailover-modal-cancel aria-label="Close">x</button>
+        </div>
+        <p class="modal-copy" id="linkfailover-action-message">Run selected action?</p>
+        <div class="form-actions">
+            <button class="text-button compact" type="button" data-linkfailover-modal-cancel>Cancel</button>
+            <button class="text-button compact primary" type="button" data-linkfailover-modal-confirm>Confirm</button>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/services_linkfailover.js') }}?v=20260512-linkfailover-apply" defer></script>
+{% endblock %}

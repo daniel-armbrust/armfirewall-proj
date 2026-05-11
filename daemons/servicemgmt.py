@@ -32,6 +32,7 @@ CONTROLLABLE_SERVICES = {
     "armfirewall-monitord",
     "armfirewall-workreqd",
     "armfirewall-dnsmasq",
+    "armfirewall-linkfailover",
     "armfirewall-squid",
 }
 PROTECTED_SERVICES = {"armfirewall-api"}

@@ -31,7 +31,6 @@ PAGES = {
     "/tools/traceroute": "Traceroute",
     "/services/status": "Status",
     "/services/link-failover": "Link Failover",
-    "/services/link-load-balance": "Link Load Balance",
 }
 
 

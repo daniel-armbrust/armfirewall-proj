@@ -51,6 +51,12 @@ ARMFIREWALL_SERVICES = [
         "protected": False,
         "description": "Dnsmasq DNS/DHCP service managed by ArmFirewall.",
     },
+    {
+        "name": "armfirewall-linkfailover",
+        "kind": "daemon",
+        "protected": False,
+        "description": "Ping-based default route failover daemon.",
+    },
 ]
 
 SERVICE_ACTIONS = {"start", "stop", "restart"}
@@ -229,6 +235,54 @@ def services_status() -> dict[str, Any]:
         "services": services,
         "optional_services": optional_services,
     }
+
+
+def get_service_work_requests(limit: int = 50) -> dict[str, Any]:
+    """Return recent ArmFirewall service management work requests."""
+    query = """
+        SELECT
+            id,
+            request_uid,
+            status,
+            source,
+            category_name,
+            action_name,
+            target_rule_id,
+            payload_json,
+            error_message,
+            created_at,
+            updated_at
+        FROM work_requests
+        WHERE category_name IN (
+            'SERVICE_MANAGEMENT.SERVICE_CONTROL',
+            'SERVICE_MANAGEMENT.OPTIONAL_SERVICES'
+        )
+        ORDER BY id DESC
+        LIMIT ?
+    """
+    with db.connection(WORK_REQUEST_DB_PATH) as conn:
+        raw_rows = db.fetch_all_on(conn, query, (limit,))
+
+    rows: list[dict[str, Any]] = []
+    for row in raw_rows:
+        payload = {}
+        try:
+            payload = json.loads(str(row.get("payload_json") or "{}"))
+        except json.JSONDecodeError:
+            payload = {}
+        item = dict(row)
+        item["service_name"] = payload.get("service_name", "-")
+        item["display_name"] = payload.get("display_name", item["service_name"])
+        item.pop("payload_json", None)
+        rows.append(item)
+
+    summary = {"total": len(rows), "queue": 0, "running": 0, "success": 0, "failed": 0}
+    for row in rows:
+        status = str(row.get("status") or "")
+        if status in summary:
+            summary[status] += 1
+
+    return {"summary": summary, "requests": rows}
 
 
 def get_expected_service(name: str) -> dict[str, Any]:

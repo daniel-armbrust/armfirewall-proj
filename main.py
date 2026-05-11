@@ -20,12 +20,23 @@ from web.routes.tools import routes as tools_routes
 
 
 ROOT_DIR = Path(__file__).resolve().parent
+SUPERVISOR_CONF = ROOT_DIR / "conf" / "supervisord.conf"
+
+
+def supervisor_program_installed(program_name: str) -> bool:
+    """Return whether a supervisord program is registered."""
+    if not SUPERVISOR_CONF.exists():
+        return False
+    return f"[program:{program_name}]" in SUPERVISOR_CONF.read_text(encoding="utf-8")
 
 app = FastAPI(title="ArmFirewall")
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 app.middleware("http")(auth.enforce_authentication)
 app.mount("/static", StaticFiles(directory=ROOT_DIR / "web" / "static"), name="static")
 app.mount("/rrd-img", StaticFiles(directory=ROOT_DIR / "rrd" / "img"), name="rrd_img")
+app.state.menu_context = {
+    "proxy_service_installed": supervisor_program_installed("armfirewall-squid"),
+}
 
 app.include_router(login_routes.router)
 app.include_router(dashboard_routes.router)

@@ -680,6 +680,23 @@ stdout_logfile_backups=5
 stderr_logfile=$ROOT_DIR/logs/armfirewall-dnsmasq.err.log
 stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
+
+[program:armfirewall-linkfailover]
+directory=$ROOT_DIR
+command=$ROOT_DIR/.venv/bin/python $ROOT_DIR/daemons/linkfailover.py
+autostart=false
+autorestart=true
+startsecs=3
+stopsignal=TERM
+stopasgroup=true
+killasgroup=true
+stdout_logfile=$ROOT_DIR/logs/armfirewall-linkfailover.out.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
+stderr_logfile=$ROOT_DIR/logs/armfirewall-linkfailover.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=5
+environment=PYTHONUNBUFFERED="1"
 SUPERVISOR
 
     if [[ ! -f "$ROOT_DIR/conf/dnsmasq.conf" ]]; then
