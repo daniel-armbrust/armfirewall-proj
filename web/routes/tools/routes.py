@@ -6,8 +6,8 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-from web.dashboard import views as dashboard_views
 from web.tools import mtr as mtr_views
+from web.tools import packet_capture as packet_capture_views
 from web.tools import ping as ping_views
 from web.tools import traceroute as traceroute_views
 
@@ -36,7 +36,7 @@ def tools_traceroute(request: Request) -> HTMLResponse:
 @router.get("/tools/packet-capture", response_class=HTMLResponse)
 def tools_packet_capture(request: Request) -> HTMLResponse:
     """Render the Tools / Packet Capture page."""
-    return dashboard_views.render_menu_page(request, "Packet Capture", "tools")
+    return packet_capture_views.render_packet_capture(request)
 
 
 @router.get("/api/tools/ping")
@@ -55,6 +55,12 @@ def api_mtr_context() -> dict[str, Any]:
 def api_traceroute_context() -> dict[str, Any]:
     """Return traceroute form context."""
     return {"interfaces": traceroute_views.list_interfaces()}
+
+
+@router.get("/api/tools/packet-capture")
+def api_packet_capture_context() -> dict[str, Any]:
+    """Return packet capture form context."""
+    return {"interfaces": packet_capture_views.list_interfaces()}
 
 
 @router.post("/api/tools/ping")
@@ -107,6 +113,23 @@ def api_stream_traceroute(payload: dict[str, Any] = Body(...)) -> StreamingRespo
     """Stream one bounded traceroute command in real time."""
     try:
         events = traceroute_views.stream_traceroute(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return StreamingResponse(
+        events,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/api/tools/packet-capture/stream")
+def api_stream_packet_capture(payload: dict[str, Any] = Body(...)) -> StreamingResponse:
+    """Stream one bounded packet capture in real time."""
+    try:
+        events = packet_capture_views.stream_packet_capture(payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return StreamingResponse(

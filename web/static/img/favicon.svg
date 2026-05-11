@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="7" y="9" width="50" height="46" rx="4" fill="#35f27f" stroke="#2ef27c" stroke-width="3"/>
+  <text x="32" y="41"
+        text-anchor="middle"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="26"
+        font-weight="900"
+        letter-spacing="0"
+        fill="#050807">AF</text>
+  <path d="M15 50h34" stroke="#31d5ff" stroke-width="3" stroke-linecap="round"/>
+</svg>

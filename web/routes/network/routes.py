@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from web.network import neighbor_table as neighbor_table_views
 from web.network import policy_routing as policy_routing_views
 
 
@@ -21,6 +22,12 @@ def api_policy_routing() -> dict[str, Any]:
 def api_policy_routing_work_requests() -> dict[str, Any]:
     """Return recent work requests for policy routing."""
     return policy_routing_views.get_policy_work_requests()
+
+
+@router.get("/api/network/neighbor-table")
+def api_neighbor_table() -> dict[str, Any]:
+    """Return the current operating system neighbor table."""
+    return neighbor_table_views.get_neighbor_table()
 
 
 @router.post("/api/network/policy-routing/tables")
@@ -67,6 +74,12 @@ def api_apply_policy_routing() -> dict[str, Any]:
 def network_packet_capture_redirect() -> RedirectResponse:
     """Redirect the old Network packet capture URL to Tools."""
     return RedirectResponse(url="/tools/packet-capture", status_code=308)
+
+
+@router.get("/network/neighbor-table", response_class=HTMLResponse)
+def network_neighbor_table(request: Request) -> HTMLResponse:
+    """Render the neighbor table page."""
+    return neighbor_table_views.render_neighbor_table(request)
 
 
 @router.get("/network/policy-routing", response_class=HTMLResponse)

@@ -735,6 +735,25 @@ body.graph-modal-open {
     overflow-x: auto;
 }
 
+.content:has(.neighbor-table-panel) {
+    overflow-y: hidden;
+    padding-bottom: 0;
+}
+
+.neighbor-table-wrap {
+    max-height: clamp(180px, calc(100vh - 340px), 390px);
+    min-height: 180px;
+    overflow-x: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.neighbor-table-wrap .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
 .interface-inventory-wrap {
     overflow: visible;
 }
@@ -952,6 +971,19 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     align-items: center;
     gap: 8px;
     white-space: nowrap;
+}
+
+.table-head-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.table-head-action .icon-button {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
 }
 
 .icon-button {
@@ -1319,6 +1351,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     font-size: 12px;
     font-weight: 800;
     text-transform: uppercase;
+}
+
+.packet-capture-promiscuous {
+    margin-top: 18px;
 }
 
 .modal-copy {

@@ -110,8 +110,8 @@
                     <td>${HF.escapeHtml(user.failed_login_count)}</td>
                     <td>
                         <div class="table-actions">
-                            <button class="icon-button" type="button" data-user-edit="${user.id}" aria-label="Edit ${HF.escapeHtml(user.username)}">E</button>
-                            <button class="icon-button" type="button" data-user-password="${user.id}" aria-label="Reset ${HF.escapeHtml(user.username)} password">K</button>
+                            <button class="text-button compact" type="button" data-user-edit="${user.id}" aria-label="Edit ${HF.escapeHtml(user.username)}">Edit</button>
+                            <button class="text-button compact" type="button" data-user-password="${user.id}" aria-label="Reset ${HF.escapeHtml(user.username)} password">Password</button>
                             <button class="text-button compact" type="button" data-user-enabled="${user.id}" data-enabled="${enabled ? "0" : "1"}" ${disabledProtected && enabled ? "disabled" : ""}>${enabled ? "Disable" : "Enable"}</button>
                             <button class="text-button compact danger" type="button" data-user-delete="${user.id}" ${disabledProtected ? "disabled" : ""}>Delete</button>
                         </div>

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Tools</p>
+        <h1>Packet Capture</h1>
+    </div>
+    <div class="refresh-state" id="packet-capture-state">Ready</div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Capture probe</h2>
+        <span>tool=tcpdump</span>
+    </div>
+    <form class="edit-form" id="packet-capture-form">
+        <div class="form-grid">
+            <label class="field">
+                <span>Interface IN</span>
+                <select name="iface_in" id="packet-capture-iface-in">
+                    <option value="">none</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Interface OUT</span>
+                <select name="iface_out" id="packet-capture-iface-out">
+                    <option value="">none</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Protocol filter</span>
+                <select name="protocol">
+                    <option value="any">any</option>
+                    <option value="tcp">tcp</option>
+                    <option value="udp">udp</option>
+                    <option value="icmp">icmp</option>
+                    <option value="icmp6">icmp6</option>
+                    <option value="arp">arp</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Host direction</span>
+                <select name="host_direction">
+                    <option value="any">any</option>
+                    <option value="src">src</option>
+                    <option value="dst">dst</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Host</span>
+                <input name="host" type="text" placeholder="ip or dns name">
+            </label>
+            <label class="field">
+                <span>Port direction</span>
+                <select name="port_direction">
+                    <option value="any">any</option>
+                    <option value="src">src</option>
+                    <option value="dst">dst</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Port</span>
+                <input name="port" type="number" min="1" max="65535" placeholder="optional">
+            </label>
+            <label class="field">
+                <span>Count</span>
+                <input name="count" type="number" min="1" max="10000" value="100" required>
+            </label>
+            <label class="field">
+                <span>Timeout</span>
+                <input name="timeout" type="number" min="1" max="3600" value="5" required>
+            </label>
+            <label class="field">
+                <span>Snaplen</span>
+                <input name="snaplen" type="number" min="64" max="262144" value="128" required>
+            </label>
+        </div>
+        <label class="check-line packet-capture-promiscuous">
+            <input name="promiscuous" type="checkbox">
+            <span>Enable promiscuous mode</span>
+        </label>
+        <div class="form-actions">
+            <button class="text-button primary" type="submit">Run</button>
+            <button class="text-button" type="button" id="packet-capture-clear">Clear</button>
+        </div>
+        <div class="form-status" id="packet-capture-form-status"></div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Result</h2>
+        <span id="packet-capture-command">command=-</span>
+    </div>
+    <pre class="tool-output" id="packet-capture-output">Waiting for execution.</pre>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/tools_packet_capture.js') }}?v=20260511-packet-capture-inout" defer></script>
+{% endblock %}

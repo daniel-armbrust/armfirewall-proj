@@ -12,6 +12,7 @@ PAGES = {
     "/settings/users": "Users",
     "/settings/system": "Settings",
     "/network/interfaces": "Interfaces",
+    "/network/neighbor-table": "Neighbor Table",
     "/network/policy-routing": "Policy Routing",
     "/network/qos": "QoS",
     "/routing/rip": "RIP",

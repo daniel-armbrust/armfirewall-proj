@@ -163,12 +163,12 @@ install_system_deps() {
         dnf)
             sync_system_clock
             run_dnf_transaction upgrade
-            run_dnf_transaction install ethtool python3 python3-pip net-tools supervisor sqlite tar perl curl openssl rrdtool traceroute mtr
+            run_dnf_transaction install ethtool python3 python3-pip net-tools supervisor sqlite tar perl curl openssl rrdtool traceroute mtr tcpdump dnsmasq
             ;;
         apt)
             apt-get update
             run_apt_transaction upgrade
-            run_apt_transaction install ethtool python3 python3-pip net-tools supervisor sqlite3 tar perl curl openssl python3-venv rrdtool traceroute mtr
+            run_apt_transaction install ethtool python3 python3-pip net-tools supervisor sqlite3 tar perl curl openssl python3-venv rrdtool traceroute mtr tcpdump dnsmasq
             ;;
     esac
 }

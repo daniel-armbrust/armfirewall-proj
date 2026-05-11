@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">network</p>
+        <h1>Neighbor Table</h1>
+    </div>
+    <div class="refresh-state" id="neighbor-table-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Neighbor table summary">
+    <div class="metric">
+        <span class="metric-label">Entries</span>
+        <strong id="neighbor-summary-entries">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Interfaces</span>
+        <strong id="neighbor-summary-interfaces">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Reachable</span>
+        <strong id="neighbor-summary-reachable">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">IPv4 / IPv6</span>
+        <strong id="neighbor-summary-families">-</strong>
+    </div>
+</section>
+
+<section class="panel neighbor-table-panel">
+    <div class="panel-head">
+        <h2>Kernel neighbor cache</h2>
+        <span id="neighbor-table-count">entries=0</span>
+    </div>
+    <div class="table-wrap neighbor-table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Family</th>
+                    <th>
+                        <span class="table-head-action">
+                            IP address
+                            <button class="icon-button" type="button" id="neighbor-ip-sort" title="Sort by IP address" aria-label="Sort by IP address">↕</button>
+                        </span>
+                    </th>
+                    <th>MAC address</th>
+                    <th>Interface</th>
+                    <th>State</th>
+                    <th>Flags</th>
+                    <th>Raw</th>
+                </tr>
+            </thead>
+            <tbody id="neighbor-table-body">
+                <tr>
+                    <td colspan="7">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>loading neighbor table</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/neighbor_table.js') }}?v=20260511-neighbor-scroll" defer></script>
+{% endblock %}

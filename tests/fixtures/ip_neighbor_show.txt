@@ -1,0 +1,4 @@
+192.0.2.1 dev eth0 lladdr 02:00:00:00:00:01 REACHABLE
+198.51.100.10 dev eth1 FAILED
+fe80::200:ff:fe00:1 dev eth0 lladdr 02:00:00:00:00:02 router STALE
+203.0.113.1 dev eth2 lladdr 02:00:00:00:00:03 used 12/8/4 probes 1 DELAY
