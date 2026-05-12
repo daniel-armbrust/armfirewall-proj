@@ -4,64 +4,19 @@
 from __future__ import annotations
 
 import ipaddress
-import os
 import re
 import shutil
 import subprocess
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
+from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..periods import GRAPH_PERIODS, period_image_path
 from core import db
 from core import log as logger
-from periods import GRAPH_PERIODS, period_image_path
 
-
-LOG_SOURCE = "monitord/latency.py"
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_INTERVAL", "10"))
-LATENCY_DB_PATH = ROOT_DIR / "db" / "latency.db"
-RRD_DIR = ROOT_DIR / "rrd"
-RRD_IMG_DIR = RRD_DIR / "img"
-LATENCY_DS = {"min", "avg", "max", "loss"}
-MONITORIX_GRAPH_COLORS = [
-    "--color=CANVAS#000000",
-    "--color=BACK#101010",
-    "--color=FONT#C0C0C0",
-    "--color=MGRID#80C080",
-    "--color=GRID#808020",
-    "--color=FRAME#808080",
-    "--color=ARROW#FFFFFF",
-    "--color=SHADEA#404040",
-    "--color=SHADEB#404040",
-    "--color=AXIS#101010",
-]
-
-
-@dataclass(frozen=True)
-class LatencyTarget:
-    """Describe one latency monitoring target."""
-
-    name: str
-    address: str
-    iface: str = ""
-    description: str = ""
-    packet_count: int = 3
-    timeout_seconds: int = 3
-
-
-@dataclass(frozen=True)
-class PingResult:
-    """Hold latency and packet loss values returned by ping."""
-
-    min_ms: float | None
-    avg_ms: float | None
-    max_ms: float | None
-    loss_pct: float
+from .constants import LATENCY_DB_PATH, LATENCY_DS, LOG_SOURCE, MONITORIX_GRAPH_COLORS
+from .models import LatencyTarget, PingResult
 
 
 def run_command(command: list[str]) -> None:

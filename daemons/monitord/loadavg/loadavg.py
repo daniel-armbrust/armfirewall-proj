@@ -3,52 +3,15 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
+from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..periods import GRAPH_PERIODS, period_image_path
 from core import log as logger
-from periods import GRAPH_PERIODS, period_image_path
 
-
-LOG_SOURCE = "monitord/loadavg.py"
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_INTERVAL", "10"))
-RRD_DIR = ROOT_DIR / "rrd"
-RRD_IMG_DIR = RRD_DIR / "img"
-RRD_PATH = RRD_DIR / "loadavg.rrd"
-PROC_LOADAVG = Path("/proc/loadavg")
-LOADAVG_DS = [
-    "loadavg_load1",
-    "loadavg_load5",
-    "loadavg_load15",
-]
-MONITORIX_GRAPH_COLORS = [
-    "--color=CANVAS#000000",
-    "--color=BACK#101010",
-    "--color=FONT#C0C0C0",
-    "--color=MGRID#80C080",
-    "--color=GRID#808020",
-    "--color=FRAME#808080",
-    "--color=ARROW#FFFFFF",
-    "--color=SHADEA#404040",
-    "--color=SHADEB#404040",
-    "--color=AXIS#101010",
-]
-
-
-@dataclass(frozen=True)
-class LoadAvgCounters:
-    """Hold Linux load average counters."""
-
-    load1: float = 0.0
-    load5: float = 0.0
-    load15: float = 0.0
+from .constants import LOADAVG_DS, LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_LOADAVG, RRD_PATH
+from .models import LoadAvgCounters
 
 
 def run_command(command: list[str]) -> None:

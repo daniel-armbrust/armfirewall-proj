@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.pycache-check/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -27,7 +28,6 @@ pip-wheel-metadata/
 *.pfx
 
 # ArmFirewall runtime configuration generated on target hosts
-conf/armfw.conf
 conf/dnsmasq.conf
 conf/supervisord.conf
 conf/*.local

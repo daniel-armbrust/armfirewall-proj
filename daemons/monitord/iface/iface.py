@@ -3,61 +3,18 @@
 
 from __future__ import annotations
 
-import os
 import re
 import subprocess
-import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
+from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..periods import GRAPH_PERIODS, period_image_path
 from core import db
 from core import log as logger
-from periods import GRAPH_PERIODS, period_image_path
 
-LOG_SOURCE = "monitord/iface.py"
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_INTERVAL", "10"))
-RRD_DIR = ROOT_DIR / "rrd"
-RRD_IMG_DIR = RRD_DIR / "img"
-PROC_NET_DEV = Path("/proc/net/dev")
-MONITORIX_GRAPH_COLORS = [
-    "--color=CANVAS#000000",
-    "--color=BACK#101010",
-    "--color=FONT#C0C0C0",
-    "--color=MGRID#80C080",
-    "--color=GRID#808020",
-    "--color=FRAME#808080",
-    "--color=ARROW#FFFFFF",
-    "--color=SHADEA#404040",
-    "--color=SHADEB#404040",
-    "--color=AXIS#101010",
-]
-
-
-@dataclass(frozen=True)
-class InterfaceCounters:
-    """Hold raw counters collected from /proc/net/dev."""
-
-    rx_bytes: int = 0
-    rx_packets: int = 0
-    rx_errors: int = 0
-    rx_dropped: int = 0
-    tx_bytes: int = 0
-    tx_packets: int = 0
-    tx_errors: int = 0
-    tx_dropped: int = 0
-
-
-@dataclass(frozen=True)
-class CounterSnapshot:
-    """Hold one timestamped interface counter sample."""
-
-    timestamp: float
-    counters: InterfaceCounters
+from .constants import LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_NET_DEV
+from .models import CounterSnapshot, InterfaceCounters
 
 
 def sanitize_iface_name(iface_name: str) -> str:

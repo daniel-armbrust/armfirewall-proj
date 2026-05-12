@@ -3,102 +3,24 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
+from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..periods import GRAPH_PERIODS, period_image_path
 from core import log as logger
-from periods import GRAPH_PERIODS, period_image_path
 
-
-LOG_SOURCE = "monitord/kern.py"
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_INTERVAL", "10"))
-RRD_DIR = ROOT_DIR / "rrd"
-RRD_IMG_DIR = RRD_DIR / "img"
-RRD_PATH = RRD_DIR / "kern.rrd"
-PROC_STAT = Path("/proc/stat")
-PROC_DENTRY = Path("/proc/sys/fs/dentry-state")
-PROC_FILE_NR = Path("/proc/sys/fs/file-nr")
-PROC_INODE_NR = Path("/proc/sys/fs/inode-nr")
-KERN_DS = [
-    "kern_user",
-    "kern_nice",
-    "kern_sys",
-    "kern_idle",
-    "kern_iow",
-    "kern_irq",
-    "kern_sirq",
-    "kern_steal",
-    "kern_guest",
-    "kern_cs",
-    "kern_dentry",
-    "kern_file",
-    "kern_inode",
-    "kern_forks",
-    "kern_vforks",
-    "kern_val03",
-    "kern_val04",
-    "kern_val05",
-]
-MONITORIX_GRAPH_COLORS = [
-    "--color=CANVAS#000000",
-    "--color=BACK#101010",
-    "--color=FONT#C0C0C0",
-    "--color=MGRID#80C080",
-    "--color=GRID#808020",
-    "--color=FRAME#808080",
-    "--color=ARROW#FFFFFF",
-    "--color=SHADEA#404040",
-    "--color=SHADEB#404040",
-    "--color=AXIS#101010",
-]
-
-
-@dataclass(frozen=True)
-class KernelRawCounters:
-    """Hold raw Linux kernel counters read from procfs."""
-
-    user: int = 0
-    nice: int = 0
-    sys: int = 0
-    idle: int = 0
-    iow: int = 0
-    irq: int = 0
-    sirq: int = 0
-    steal: int = 0
-    guest: int = 0
-    context_switches: int | None = None
-    forks: int | None = None
-
-
-@dataclass(frozen=True)
-class KernelCounters:
-    """Hold normalized kernel metrics ready for RRD update."""
-
-    user: float | None = None
-    nice: float | None = None
-    sys: float | None = None
-    idle: float | None = None
-    iow: float | None = None
-    irq: float | None = None
-    sirq: float | None = None
-    steal: float | None = None
-    guest: float | None = None
-    context_switches: int | None = None
-    dentry: float = 0.0
-    file: float = 0.0
-    inode: float = 0.0
-    forks: int | None = None
-    vforks: int = 0
-    val03: int = 0
-    val04: int = 0
-    val05: int = 0
+from .constants import (
+    KERN_DS,
+    LOG_SOURCE,
+    MONITORIX_GRAPH_COLORS,
+    PROC_DENTRY,
+    PROC_FILE_NR,
+    PROC_INODE_NR,
+    PROC_STAT,
+    RRD_PATH,
+)
+from .models import KernelCounters, KernelRawCounters
 
 
 def run_command(command: list[str]) -> None:

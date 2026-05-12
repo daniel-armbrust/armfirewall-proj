@@ -34,12 +34,12 @@
             </label>
             <label class="field">
                 <span>Protected</span>
-                <select id="iface-edit-protected" name="protected" {% if protected_readonly %}disabled aria-readonly="true" title="First LAN interface from armfw.conf is always protected"{% endif %}>
+                <select id="iface-edit-protected" name="protected" {% if protected_readonly %}disabled aria-readonly="true" title="Protected LAN interface from iface.db"{% endif %}>
                     <option value="1">yes</option>
                     <option value="0">no</option>
                 </select>
                 {% if protected_readonly %}
-                <small class="field-note">first LAN from armfw.conf</small>
+                <small class="field-note">protected LAN from iface.db</small>
                 {% endif %}
             </label>
             <label class="field">

@@ -135,7 +135,7 @@ environment=PYTHONUNBUFFERED="1"
 
 [program:armfirewall-ifaced]
 directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/python $ROOT_DIR/daemons/ifaced.py
+command=$ROOT_DIR/.venv/bin/python -m daemons.ifaced.ifaced
 user=armfw
 autostart=true
 autorestart=true
@@ -153,7 +153,7 @@ environment=PYTHONUNBUFFERED="1"
 
 [program:armfirewall-monitord]
 directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/python $ROOT_DIR/daemons/monitord/monitord.py
+command=$ROOT_DIR/.venv/bin/python -m daemons.monitord
 user=armfw
 autostart=true
 autorestart=true

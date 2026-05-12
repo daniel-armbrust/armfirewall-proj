@@ -3,118 +3,29 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
-import sys
-from dataclasses import dataclass, fields
+from dataclasses import fields
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
+from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..periods import GRAPH_PERIODS, period_image_path
 from core import log as logger
-from periods import GRAPH_PERIODS, period_image_path
 
-
-LOG_SOURCE = "monitord/netstat.py"
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_INTERVAL", "10"))
-RRD_DIR = ROOT_DIR / "rrd"
-RRD_IMG_DIR = RRD_DIR / "img"
-RRD_PATH = RRD_DIR / "netstat.rrd"
-PROC_TCP4 = Path("/proc/net/tcp")
-PROC_TCP6 = Path("/proc/net/tcp6")
-PROC_UDP4 = Path("/proc/net/udp")
-PROC_UDP6 = Path("/proc/net/udp6")
-TCP_STATES = [
-    "closed",
-    "listen",
-    "synsent",
-    "synrecv",
-    "estblshd",
-    "finwait1",
-    "finwait2",
-    "closing",
-    "timewait",
-    "closewait",
-    "lastack",
-    "unknown",
-]
-EXTRA_VALUES = ["val1", "val2", "val3", "val4", "val5"]
-NETSTAT_DS = [f"nstat{family}_{state}" for family in ("4", "6") for state in [*TCP_STATES, "udp", *EXTRA_VALUES]]
-SS_TCP_STATE_MAP = {
-    "UNCONN": "closed",
-    "LISTEN": "listen",
-    "SYN-SENT": "synsent",
-    "SYN-RECV": "synrecv",
-    "ESTAB": "estblshd",
-    "ESTABLISHED": "estblshd",
-    "FIN-WAIT-1": "finwait1",
-    "FIN-WAIT-2": "finwait2",
-    "CLOSING": "closing",
-    "TIME-WAIT": "timewait",
-    "CLOSE-WAIT": "closewait",
-    "LAST-ACK": "lastack",
-    "UNKNOWN": "unknown",
-}
-PROC_TCP_STATE_MAP = {
-    "01": "estblshd",
-    "02": "synsent",
-    "03": "synrecv",
-    "04": "finwait1",
-    "05": "finwait2",
-    "06": "timewait",
-    "07": "closed",
-    "08": "closewait",
-    "09": "lastack",
-    "0A": "listen",
-    "0B": "closing",
-}
-MONITORIX_GRAPH_COLORS = [
-    "--color=CANVAS#000000",
-    "--color=BACK#101010",
-    "--color=FONT#C0C0C0",
-    "--color=MGRID#80C080",
-    "--color=GRID#808020",
-    "--color=FRAME#808080",
-    "--color=ARROW#FFFFFF",
-    "--color=SHADEA#404040",
-    "--color=SHADEB#404040",
-    "--color=AXIS#101010",
-]
-
-
-@dataclass
-class FamilySocketCounters:
-    """Hold TCP state and UDP socket counts for one address family."""
-
-    closed: int = 0
-    listen: int = 0
-    synsent: int = 0
-    synrecv: int = 0
-    estblshd: int = 0
-    finwait1: int = 0
-    finwait2: int = 0
-    closing: int = 0
-    timewait: int = 0
-    closewait: int = 0
-    lastack: int = 0
-    unknown: int = 0
-    udp: int = 0
-    val1: int = 0
-    val2: int = 0
-    val3: int = 0
-    val4: int = 0
-    val5: int = 0
-
-
-@dataclass
-class SocketCounters:
-    """Hold IPv4 and IPv6 socket counters."""
-
-    ipv4: FamilySocketCounters
-    ipv6: FamilySocketCounters
+from .constants import (
+    NETSTAT_DS,
+    LOG_SOURCE,
+    MONITORIX_GRAPH_COLORS,
+    PROC_TCP4,
+    PROC_TCP6,
+    PROC_TCP_STATE_MAP,
+    PROC_UDP4,
+    PROC_UDP6,
+    RRD_PATH,
+    SS_TCP_STATE_MAP,
+    TCP_STATES,
+)
+from .models import FamilySocketCounters, SocketCounters
 
 
 def run_command(command: list[str]) -> None:

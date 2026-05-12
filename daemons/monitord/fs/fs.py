@@ -6,110 +6,22 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
+from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..periods import GRAPH_PERIODS, period_image_path
 from core import log as logger
-from periods import GRAPH_PERIODS, period_image_path
 
-
-LOG_SOURCE = "monitord/fs.py"
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_INTERVAL", "10"))
-RRD_DIR = ROOT_DIR / "rrd"
-RRD_IMG_DIR = RRD_DIR / "img"
-PROC_MOUNTINFO = Path("/proc/self/mountinfo")
-PROC_DISKSTATS = Path("/proc/diskstats")
-RRD_DATA_SOURCES = {"usage_pct", "inode_pct", "io_ops", "io_time_ms"}
-PSEUDO_FILESYSTEMS = {
-    "autofs",
-    "binfmt_misc",
-    "bpf",
-    "cgroup",
-    "cgroup2",
-    "configfs",
-    "debugfs",
-    "devpts",
-    "devtmpfs",
-    "efivarfs",
-    "fusectl",
-    "hugetlbfs",
-    "mqueue",
-    "nsfs",
-    "proc",
-    "pstore",
-    "rpc_pipefs",
-    "securityfs",
-    "selinuxfs",
-    "sysfs",
-    "tmpfs",
-    "tracefs",
-}
-MONITORIX_GRAPH_COLORS = [
-    "--color=CANVAS#000000",
-    "--color=BACK#101010",
-    "--color=FONT#C0C0C0",
-    "--color=MGRID#80C080",
-    "--color=GRID#808020",
-    "--color=FRAME#808080",
-    "--color=ARROW#FFFFFF",
-    "--color=SHADEA#404040",
-    "--color=SHADEB#404040",
-    "--color=AXIS#101010",
-]
-MONITORIX_FS_LINE_COLORS = [
-    "#FFA500",
-    "#44EEEE",
-    "#44EE44",
-    "#4444EE",
-    "#448844",
-    "#5F04B4",
-    "#EE44EE",
-    "#EEEE44",
-]
-
-
-@dataclass(frozen=True)
-class MountInfo:
-    """Describe one mounted filesystem from Linux mountinfo."""
-
-    mountpoint: str
-    fstype: str
-    source: str
-    major: int
-    minor: int
-
-
-@dataclass(frozen=True)
-class DiskStats:
-    """Hold raw Linux diskstats counters used by Monitorix fs graphs."""
-
-    read_count: int = 0
-    write_count: int = 0
-    read_ms: int = 0
-    write_ms: int = 0
-
-
-@dataclass(frozen=True)
-class FilesystemCounters:
-    """Hold filesystem usage and disk activity counters."""
-
-    usage_pct: float = 0.0
-    inode_pct: float = 0.0
-    io_ops: float = 0.0
-    io_time_ms: float = 0.0
-
-
-@dataclass(frozen=True)
-class FilesystemSnapshot:
-    """Hold one filesystem sample prepared for RRD update."""
-
-    mount: MountInfo
-    counters: FilesystemCounters
+from .constants import (
+    LOG_SOURCE,
+    MONITORIX_FS_LINE_COLORS,
+    MONITORIX_GRAPH_COLORS,
+    PROC_DISKSTATS,
+    PROC_MOUNTINFO,
+    PSEUDO_FILESYSTEMS,
+    RRD_DATA_SOURCES,
+)
+from .models import DiskStats, FilesystemCounters, FilesystemSnapshot, MountInfo
 
 
 def run_command(command: list[str]) -> None:

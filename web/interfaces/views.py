@@ -7,9 +7,9 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from core import db
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-CONF_PATH = ROOT_DIR / "conf" / "armfw.conf"
 templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
 
 
@@ -33,23 +33,21 @@ def render_interfaces(request: Request) -> HTMLResponse:
 
 
 def first_lan_iface() -> str:
-    """Return the first LAN interface configured in armfw.conf."""
-    if not CONF_PATH.exists():
+    """Return the first protected LAN interface persisted in iface.db."""
+    try:
+        row = db.fetch_one(
+            """
+            SELECT name
+            FROM ifaces
+            WHERE role = 'LAN'
+              AND protected = 1
+            ORDER BY id
+            LIMIT 1
+            """
+        )
+    except (FileNotFoundError, db.DatabaseError):
         return ""
-
-    for raw_line in CONF_PATH.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        if key.strip() != "lan_iface":
-            continue
-
-        normalized = value.replace(",", " ")
-        parts = [part.strip() for part in normalized.split() if part.strip()]
-        return parts[0] if parts else ""
-
-    return ""
+    return str(row["name"]) if row else ""
 
 
 def render_interface_edit(request: Request, iface_name: str) -> HTMLResponse:

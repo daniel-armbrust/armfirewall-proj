@@ -6,26 +6,32 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from core import db
 from core import iface as iface_module
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-CONF_PATH = ROOT_DIR / "conf" / "armfw.conf"
 _LAST_CPU_TIMES: tuple[int, int] | None = None
 
 
 def read_conf() -> dict[str, str]:
-    """Read key-value settings from the ArmFirewall config file."""
+    """Return interface roles persisted by the installer."""
     values: dict[str, str] = {}
-    if not CONF_PATH.exists():
+    try:
+        rows = db.fetch_all(
+            """
+            SELECT role, name
+            FROM ifaces
+            WHERE role IN ('LAN', 'WAN')
+            ORDER BY CASE role WHEN 'LAN' THEN 0 WHEN 'WAN' THEN 1 ELSE 2 END, id
+            """
+        )
+    except (FileNotFoundError, db.DatabaseError):
         return values
 
-    for raw_line in CONF_PATH.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        values[key.strip()] = value.strip()
+    for row in rows:
+        key = "lan_iface" if row["role"] == "LAN" else "wan_iface"
+        values.setdefault(key, str(row["name"]))
     return values
 
 

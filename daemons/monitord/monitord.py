@@ -3,46 +3,22 @@
 
 from __future__ import annotations
 
-import os
-import shutil
-import sys
 import time
-from pathlib import Path
-from typing import Protocol
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-MONITORD_DIR = Path(__file__).resolve().parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-if str(MONITORD_DIR) not in sys.path:
-    sys.path.insert(0, str(MONITORD_DIR))
-
+from . import entropy
+from . import fs
+from . import iface
+from . import kern
+from . import latency
+from . import loadavg
+from . import mem
+from . import netstat
+from . import procstatus
+from . import uptime
+from .constants import COLLECT_INTERVAL_SECONDS, LOG_SOURCE
+from .models import MonitorCollector
+from .runtime import ensure_directories, require_rrdtool
 from core import log as logger
-import entropy
-import fs
-import iface
-import kern
-import latency
-import loadavg
-import mem
-import netstat
-import procstatus
-import uptime
-
-
-LOG_SOURCE = "monitord.py"
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_INTERVAL", "10"))
-RRD_DIR = ROOT_DIR / "rrd"
-RRD_IMG_DIR = RRD_DIR / "img"
-
-
-class MonitorCollector(Protocol):
-    """Describe a monitoring collector invoked by the daemon loop."""
-
-    name: str
-
-    def collect(self) -> None:
-        """Run one collection cycle."""
 
 
 def build_collectors() -> list[MonitorCollector]:
@@ -61,20 +37,6 @@ def build_collectors() -> list[MonitorCollector]:
         fs.FilesystemMonitor(rrdtool),
         netstat.NetstatMonitor(rrdtool),
     ]
-
-
-def require_rrdtool() -> str:
-    """Return the rrdtool binary path or fail clearly."""
-    rrdtool = shutil.which("rrdtool")
-    if not rrdtool:
-        raise RuntimeError("rrdtool command was not found.")
-    return rrdtool
-
-
-def ensure_directories() -> None:
-    """Create the RRD data and image directories."""
-    RRD_DIR.mkdir(parents=True, exist_ok=True)
-    RRD_IMG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def run_cycle(collectors: list[MonitorCollector]) -> None:

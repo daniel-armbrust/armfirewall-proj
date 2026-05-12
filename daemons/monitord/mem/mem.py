@@ -3,58 +3,15 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
+from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..periods import GRAPH_PERIODS, period_image_path
 from core import log as logger
-from periods import GRAPH_PERIODS, period_image_path
 
-
-LOG_SOURCE = "monitord/mem.py"
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_INTERVAL", "10"))
-RRD_DIR = ROOT_DIR / "rrd"
-RRD_IMG_DIR = RRD_DIR / "img"
-RRD_PATH = RRD_DIR / "mem.rrd"
-PROC_MEMINFO = Path("/proc/meminfo")
-MEMORY_DS = [
-    "mem_total",
-    "mem_buffers",
-    "mem_cached",
-    "mem_free",
-    "mem_active",
-    "mem_inactive",
-]
-MONITORIX_GRAPH_COLORS = [
-    "--color=CANVAS#000000",
-    "--color=BACK#101010",
-    "--color=FONT#C0C0C0",
-    "--color=MGRID#80C080",
-    "--color=GRID#808020",
-    "--color=FRAME#808080",
-    "--color=ARROW#FFFFFF",
-    "--color=SHADEA#404040",
-    "--color=SHADEB#404040",
-    "--color=AXIS#101010",
-]
-
-
-@dataclass(frozen=True)
-class MemoryCounters:
-    """Hold Linux memory counters in KiB."""
-
-    total: int = 0
-    buffers: int = 0
-    cached: int = 0
-    free: int = 0
-    active: int = 0
-    inactive: int = 0
+from .constants import LOG_SOURCE, MEMORY_DS, MONITORIX_GRAPH_COLORS, PROC_MEMINFO, RRD_PATH
+from .models import MemoryCounters
 
 
 def run_command(command: list[str]) -> None:

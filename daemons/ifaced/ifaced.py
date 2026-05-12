@@ -4,104 +4,17 @@
 from __future__ import annotations
 
 import ipaddress
-import os
 import re
 import subprocess
-import sys
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
-
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
 
 from core import db
 from core import log as logger
+from core.process import run_command_stdout
 
-COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFIREWALL_IFACED_INTERVAL", "10"))
-LOG_SOURCE = "ifaced.py"
-
-CONF_PATH = ROOT_DIR / "conf" / "armfw.conf"
-
-PROC_ITEMS = [
-    ("ipv4", "forwarding", "Enables IPv4 packet forwarding on this interface."),
-    ("ipv4", "rp_filter", "Controls reverse path filtering for IPv4 packets."),
-    ("ipv4", "accept_redirects", "Controls whether ICMP redirect messages are accepted."),
-    ("ipv4", "send_redirects", "Controls whether ICMP redirect messages are sent."),
-    ("ipv4", "accept_source_route", "Controls whether source-routed IPv4 packets are accepted."),
-    ("ipv4", "log_martians", "Controls logging of packets with impossible or suspicious source addresses."),
-    ("ipv4", "arp_filter", "Controls whether ARP replies are filtered according to the route table."),
-    ("ipv4", "arp_ignore", "Controls when the kernel replies to ARP requests for local addresses."),
-    ("ipv4", "arp_announce", "Controls how local source IP addresses are announced in ARP requests."),
-    ("ipv6", "disable_ipv6", "Controls whether IPv6 is disabled on this interface."),
-    ("ipv6", "forwarding", "Enables IPv6 packet forwarding on this interface."),
-    ("ipv6", "accept_redirects", "Controls whether ICMPv6 redirect messages are accepted."),
-    ("ipv6", "accept_ra", "Controls whether IPv6 Router Advertisement messages are accepted."),
-]
-
-
-@dataclass
-class InterfaceAddress:
-    addr_family: str
-    addr: str
-    prefixlen: str
-    broadcast: str | None = None
-    scopeid: str | None = None
-    is_secondary: int = 0
-    iface_name_secondary: str | None = None
-
-
-@dataclass
-class InterfaceStats:
-    rx_bytes: int = 0
-    rx_packets: int = 0
-    rx_errors: int = 0
-    rx_dropped: int = 0
-    rx_fifo: int = 0
-    rx_frame: int = 0
-    rx_multicast: int = 0
-    tx_bytes: int = 0
-    tx_packets: int = 0
-    tx_errors: int = 0
-    tx_dropped: int = 0
-    tx_fifo: int = 0
-    tx_collisions: int = 0
-    tx_carrier: int = 0
-
-
-@dataclass
-class InterfaceInfo:
-    name: str
-    flags: set[str] = field(default_factory=set)
-    mtu: int | None = None
-    mac_address: str | None = None
-    type: str = "Ethernet"
-    speed_mbps: int = 0
-    duplex: str = "unknown"
-    addresses: list[InterfaceAddress] = field(default_factory=list)
-    stats: InterfaceStats = field(default_factory=InterfaceStats)
-
-
-def run_text(command: list[str]) -> str:
-    """Run a command and return its standard output."""
-    completed = subprocess.run(command, check=True, text=True, capture_output=True)
-    return completed.stdout
-
-
-def read_hf_conf() -> dict[str, str]:
-    """Read ArmFirewall key-value configuration."""
-    values: dict[str, str] = {}
-    if not CONF_PATH.exists():
-        return values
-
-    for line in CONF_PATH.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        values[key.strip()] = value.strip()
-    return values
+from .constants import COLLECT_INTERVAL_SECONDS, LOG_SOURCE, PROC_ITEMS
+from .models import InterfaceAddress, InterfaceInfo, InterfaceStats
 
 
 def netmask_to_prefixlen(netmask: str) -> str:
@@ -114,7 +27,7 @@ def netmask_to_prefixlen(netmask: str) -> str:
 
 def parse_ifconfig() -> list[InterfaceInfo]:
     """Parse ifconfig output into interface objects."""
-    output = run_text(["ifconfig", "-a"])
+    output = run_command_stdout(["ifconfig", "-a"])
     interfaces: list[InterfaceInfo] = []
 
     for block in re.split(r"\n\s*\n", output.strip()):
@@ -124,6 +37,7 @@ def parse_ifconfig() -> list[InterfaceInfo]:
 
         header = lines[0]
         match = re.match(r"^([^:\s]+):\s+flags=\d+<([^>]*)>\s+mtu\s+(\d+)", header)
+
         if not match:
             continue
 
@@ -141,6 +55,7 @@ def parse_ifconfig() -> list[InterfaceInfo]:
                 addr = parts[1]
                 netmask = parts[parts.index("netmask") + 1] if "netmask" in parts else ""
                 broadcast = parts[parts.index("broadcast") + 1] if "broadcast" in parts else None
+
                 iface.addresses.append(
                     InterfaceAddress(
                         addr_family="ipv4",
@@ -149,6 +64,7 @@ def parse_ifconfig() -> list[InterfaceInfo]:
                         broadcast=broadcast,
                     )
                 )
+
                 continue
 
             if line.startswith("inet6 "):
@@ -156,6 +72,7 @@ def parse_ifconfig() -> list[InterfaceInfo]:
                 addr = parts[1]
                 prefixlen = parts[parts.index("prefixlen") + 1] if "prefixlen" in parts else ""
                 scopeid = parts[parts.index("scopeid") + 1] if "scopeid" in parts else None
+
                 iface.addresses.append(
                     InterfaceAddress(
                         addr_family="ipv6",
@@ -164,12 +81,14 @@ def parse_ifconfig() -> list[InterfaceInfo]:
                         scopeid=scopeid,
                     )
                 )
+
                 continue
 
             if line.startswith("ether "):
                 parts = line.split()
                 iface.mac_address = parts[1]
                 type_match = re.search(r"\(([^)]+)\)", line)
+
                 if type_match:
                     iface.type = type_match.group(1)
                 continue
@@ -180,9 +99,11 @@ def parse_ifconfig() -> list[InterfaceInfo]:
 
             if line.startswith("RX packets"):
                 packet_match = re.search(r"RX packets\s+(\d+)\s+bytes\s+(\d+)", line)
+
                 if packet_match:
                     iface.stats.rx_packets = int(packet_match.group(1))
                     iface.stats.rx_bytes = int(packet_match.group(2))
+
                 continue
 
             if line.startswith("RX errors"):
@@ -191,22 +112,27 @@ def parse_ifconfig() -> list[InterfaceInfo]:
                 iface.stats.rx_dropped = int(fields.get("dropped", 0))
                 iface.stats.rx_fifo = int(fields.get("overruns", 0))
                 iface.stats.rx_frame = int(fields.get("frame", 0))
+
                 continue
 
             if line.startswith("TX packets"):
                 packet_match = re.search(r"TX packets\s+(\d+)\s+bytes\s+(\d+)", line)
+
                 if packet_match:
                     iface.stats.tx_packets = int(packet_match.group(1))
                     iface.stats.tx_bytes = int(packet_match.group(2))
+
                 continue
 
             if line.startswith("TX errors"):
                 fields = dict(re.findall(r"(errors|dropped|overruns|carrier|collisions)\s+(\d+)", line))
+
                 iface.stats.tx_errors = int(fields.get("errors", 0))
                 iface.stats.tx_dropped = int(fields.get("dropped", 0))
                 iface.stats.tx_fifo = int(fields.get("overruns", 0))
                 iface.stats.tx_carrier = int(fields.get("carrier", 0))
                 iface.stats.tx_collisions = int(fields.get("collisions", 0))
+
                 continue
 
         iface.speed_mbps, iface.duplex = read_ethtool_data(iface.name)
@@ -218,7 +144,7 @@ def parse_ifconfig() -> list[InterfaceInfo]:
 def read_ethtool_data(iface_name: str) -> tuple[int, str]:
     """Read link speed and duplex information from ethtool."""
     try:
-        output = run_text(["ethtool", iface_name])
+        output = run_command_stdout(["ethtool", iface_name])
     except (subprocess.CalledProcessError, FileNotFoundError):
         return 0, "unknown"
 
@@ -226,12 +152,15 @@ def read_ethtool_data(iface_name: str) -> tuple[int, str]:
     duplex = "unknown"
 
     speed_match = re.search(r"Speed:\s+(\d+)Mb/s", output)
+
     if speed_match:
         speed_mbps = int(speed_match.group(1))
 
     duplex_match = re.search(r"Duplex:\s+(\w+)", output)
+
     if duplex_match:
         value = duplex_match.group(1).lower()
+
         if value == "full":
             duplex = "full-duplex"
         elif value == "half":
@@ -240,26 +169,43 @@ def read_ethtool_data(iface_name: str) -> tuple[int, str]:
     return speed_mbps, duplex
 
 
-def role_for_interface(iface_name: str, config: dict[str, str]) -> str:
-    """Resolve the configured role for an interface name."""
-    if iface_name == config.get("lan_iface"):
-        return "LAN"
-    if iface_name == config.get("wan_iface"):
-        return "WAN"
-    return "UNKNOWN"
+def existing_iface_metadata(conn: db.Connection, iface_name: str) -> dict[str, object]:
+    """Return role metadata already persisted for one interface."""
+    row = db.fetch_one_on(
+        conn,
+        """
+        SELECT role, description, protected
+        FROM ifaces
+        WHERE name = ?
+        """,
+        (iface_name,),
+    )
+
+    if row is None:
+        return {"role": "UNKNOWN", "description": "", "protected": 0}
+    
+    return dict(row)
 
 
 def description_for_interface(iface_name: str, role: str) -> str:
     """Build a human-readable description for an interface."""
+
     if role == "LAN":
-        return f"LAN interface configured in conf/armfw.conf: {iface_name}"
+        return f"LAN interface persisted in iface.db: {iface_name}"
+    
     if role == "WAN":
-        return f"WAN interface configured in conf/armfw.conf: {iface_name}"
+        return f"WAN interface persisted in iface.db: {iface_name}"
+    
     return f"Network interface discovered by ifconfig -a: {iface_name}"
 
 
-def upsert_iface(conn: db.Connection, iface: InterfaceInfo, role: str) -> int:
+def upsert_iface(conn: db.Connection, iface: InterfaceInfo) -> int:
     """Insert or update the main interface row."""
+    metadata = existing_iface_metadata(conn, iface.name)
+    role = str(metadata["role"] or "UNKNOWN")
+    description = str(metadata["description"] or description_for_interface(iface.name, role))
+    protected = int(metadata["protected"] or 0)
+
     db.execute_on(
         conn,
         """
@@ -272,7 +218,6 @@ def upsert_iface(conn: db.Connection, iface: InterfaceInfo, role: str) -> int:
             description = excluded.description,
             mtu = excluded.mtu,
             mac_address = excluded.mac_address,
-            role = excluded.role,
             type = excluded.type,
             speed_mbps = excluded.speed_mbps,
             duplex = excluded.duplex,
@@ -281,25 +226,29 @@ def upsert_iface(conn: db.Connection, iface: InterfaceInfo, role: str) -> int:
         (
             iface.name,
             1 if "UP" in iface.flags else 0,
-            description_for_interface(iface.name, role),
+            description,
             iface.mtu,
             iface.mac_address,
             role,
             iface.type,
             iface.speed_mbps,
             iface.duplex,
-            1 if role in {"LAN", "WAN"} else 0,
+            protected,
         ),
     )
+
     row = db.fetch_one_on(conn, "SELECT id FROM ifaces WHERE name = ?", (iface.name,))
+
     if row is None:
         raise RuntimeError(f"Could not locate iface row for {iface.name}")
+    
     return int(row[0])
 
 
 def replace_addresses(conn: db.Connection, iface_id: int, iface: InterfaceInfo) -> None:
     """Replace all stored addresses for an interface."""
     db.execute_on(conn, "DELETE FROM addresses WHERE iface_id = ?", (iface_id,))
+
     db.executemany_on(
         conn,
         """
@@ -409,13 +358,11 @@ def upsert_proc_values(conn: db.Connection, iface_id: int, iface_name: str) -> N
 
 def collect_once(conn: db.Connection) -> None:
     """Collect one snapshot of interface data into SQLite."""
-    config = read_hf_conf()
     interfaces = parse_ifconfig()
 
     with conn:
         for iface in interfaces:
-            role = role_for_interface(iface.name, config)
-            iface_id = upsert_iface(conn, iface, role)
+            iface_id = upsert_iface(conn, iface)
             replace_addresses(conn, iface_id, iface)
             upsert_stats(conn, iface_id, iface.stats)
             upsert_proc_values(conn, iface_id, iface.name)
@@ -429,6 +376,7 @@ def main() -> None:
     logger.log(f"Starting network interface daemon with {COLLECT_INTERVAL_SECONDS}s interval.", source=LOG_SOURCE)
 
     conn = db.connect()
+    
     try:
         while True:
             try:
