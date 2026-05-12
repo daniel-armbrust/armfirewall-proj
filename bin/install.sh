@@ -8,6 +8,21 @@ export LAN_IFACE=""
 # shellcheck source=scripts/globals.sh
 . "$ROOT_DIR/bin/scripts/globals.sh"
 
+# Print the ArmFirewall installer banner.
+print_banner() {
+    cat <<'BANNER'
+   ___                    ______ _                        _ _
+  / _ \                   |  ___(_)                      | | |
+ / /_\ \ _ __  _ __ ___   | |_   _ _ __ _____      ____ _| | |
+ |  _  || '__|| '_ ` _ \  |  _| | | '__/ _ \ \ /\ / / _` | | |
+ | | | || |   | | | | | | | |   | | | |  __/\ V  V / (_| | | |
+ \_| |_/\_|   |_| |_| |_| \_|   |_|_|  \___| \_/\_/ \__,_|_|_|
+
+        ./ArmFirewall (by Daniel Armbrust)
+        secure edge routing / firewall / monitoring
+BANNER
+}
+
 # Print command install.sh usage
 usage() {
     cat <<USAGE
@@ -44,6 +59,9 @@ parse_args() {
 }
 
 main() {
+    # Print installer banner
+    print_banner
+
     # Parse install command line arguments
     parse_args "$@"
 

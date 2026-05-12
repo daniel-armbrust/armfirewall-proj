@@ -9,6 +9,34 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 VENV_DIR="$ROOT_DIR/.venv"
 LAST_LOG=""
+OS_ID=""
+OS_VERSION_ID=""
+OS_MAJOR=0
+
+# Load Linux distribution metadata used by package decisions.
+load_os_info() {
+    [[ -r /etc/os-release ]] || fatal "/etc/os-release was not found."
+
+    . /etc/os-release
+
+    OS_ID="${ID:-unknown}"
+    OS_VERSION_ID="${VERSION_ID:-0}"
+    OS_MAJOR="${OS_VERSION_ID%%.*}"
+    [[ "$OS_MAJOR" =~ ^[0-9]+$ ]] || OS_MAJOR=0
+}
+
+# Detect which operating system package manager should be used.
+identify_pm() {
+    if has_cmd dnf; then
+        PKG_MANAGER=dnf
+    elif has_cmd apt-get; then
+        PKG_MANAGER=apt
+    else
+        fatal "No supported package manager was found."
+    fi
+
+    log "Using package manager: ${PKG_MANAGER}."
+}
 
 # Cleans DNF package caches and rebuilds repository metadata
 clean_dnf_cache() { 
@@ -135,10 +163,24 @@ run_apt_transaction() {
         apt-get clean || true; 
         apt-get update; 
         
-        DEBIAN_FRONTEND=noninteractive 
-        
-        apt-get -y "$op" "$@"; 
+        DEBIAN_FRONTEND=noninteractive apt-get -y "$op" "$@"; 
     }
+}
+
+# Install a Python runtime supported by ArmFirewall.
+install_python_runtime() {
+    case "$PKG_MANAGER" in
+        dnf)
+            if [[ "$OS_MAJOR" -le 8 ]]; then
+                run_dnf_transaction install python39 python39-pip
+            else
+                run_dnf_transaction install python3 python3-pip
+            fi
+            ;;
+        apt)
+            run_apt_transaction install python3 python3-pip python3-venv
+            ;;
+    esac
 }
 
 # Installs required operating system packages using the detected package manager
@@ -146,30 +188,59 @@ install_system_deps() {
     case "$PKG_MANAGER" in
         dnf)
             run_dnf_transaction upgrade
-            run_dnf_transaction install ethtool python3 python3-pip net-tools \
+            run_dnf_transaction install ethtool net-tools \
                                 supervisor sqlite tar perl curl openssl rrdtool \
                                 traceroute mtr tcpdump dnsmasq
+            install_python_runtime
             ;;
         apt)
             apt-get update
             run_apt_transaction upgrade
-            run_apt_transaction install ethtool python3 python3-pip net-tools \
+            run_apt_transaction install ethtool net-tools \
                                 supervisor sqlite3 tar perl curl openssl \
-                                python3-venv rrdtool traceroute mtr tcpdump dnsmasq
+                                rrdtool traceroute mtr tcpdump dnsmasq
+            install_python_runtime
             ;;
     esac
+}
+
+# Return success when a Python binary meets the minimum supported version.
+python_version_is_supported() {
+    "$1" - <<'PY'
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 9) else 1)
+PY
+}
+
+# Select the newest installed Python binary supported by ArmFirewall.
+select_python_bin() {
+    local candidate
+
+    for candidate in python3.12 python3.11 python3.10 python3.9 python39 python3; do
+        if command -v "$candidate" >/dev/null 2>&1 && python_version_is_supported "$candidate"; then
+            command -v "$candidate"
+            return 0
+        fi
+    done
+
+    fatal "ArmFirewall requires Python 3.9 or newer. Oracle Linux 8 must install python39."
 }
 
 # Creates the Python virtual environment and installs ArmFirewall 
 # Python dependencies.
 create_python_env() {
+    local python_bin
+
+    python_bin="$(select_python_bin)"
+
     log "Creating Python virtual environment at ${VENV_DIR}."
+    log "Using Python runtime: $("${python_bin}" --version 2>&1)."
     
-    python3 -m venv "$VENV_DIR"
+    "$python_bin" -m venv "$VENV_DIR"
 
     . "$VENV_DIR/bin/activate"
     
-    python -m pip install --upgrade pip
+    python -m pip install --upgrade pip setuptools wheel
     python -m pip install -r "$ROOT_DIR/requirements.txt"
 }
 
@@ -183,6 +254,12 @@ disable_selinux() {
 }
 
 main() { 
+    # Load Linux distribution metadata used by package decisions
+    load_os_info
+
+    # Detect which operating system package manager should be used
+    identify_pm
+
     # Disables SELinux enforcement at runtime and persistently in the 
     # system configuration
     disable_selinux 
