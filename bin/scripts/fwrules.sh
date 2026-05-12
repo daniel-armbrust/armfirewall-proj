@@ -60,7 +60,7 @@ record_lan_input_rule() {
             protected, enabled, created_at, updated_at)
                 SELECT
                     $(sql_quote "$iface"), (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
-                    0, 0, 0, 0, $(sql_quote "$any_addr"), 0,
+                    1, 0, 0, 0, $(sql_quote "$any_addr"), 0,
                     $(sql_quote "$any_addr"), ${port},
                     $(sql_quote "$protocol"), NULL, NULL,
                     'ACCEPT', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -80,8 +80,98 @@ apply_lan_input_rule() {
     local iface="$3"
     local port="$4"
 
-    "$binary" -t filter -C INPUT -i "$iface" -p "$protocol" --dport "$port" -j ACCEPT 2>/dev/null || \
-    "$binary" -t filter -A INPUT -i "$iface" -p "$protocol" --dport "$port" -j ACCEPT
+    "$binary" -t filter -C INPUT -i "$iface" -p "$protocol" --dport "$port" -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null || \
+    "$binary" -t filter -A INPUT -i "$iface" -p "$protocol" --dport "$port" -m conntrack --ctstate NEW -j ACCEPT
+}
+
+# Apply base conntrack rules required for replies and forwarded return traffic.
+apply_conntrack_base_rules() {
+    log "Applying base conntrack rules for INPUT and FORWARD."
+
+    iptables -t filter -C INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+    iptables -t filter -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+    ip6tables -t filter -C INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+    ip6tables -t filter -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+    iptables -t filter -C FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+    iptables -t filter -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+    ip6tables -t filter -C FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+    ip6tables -t filter -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+}
+
+# Record one protected INPUT conntrack return rule in SQLite.
+record_input_conntrack_return_rule() {
+    local family="$1"
+    local db_path
+    local any_addr
+
+    db_path="$(filter_rules_db "$family")"
+    any_addr="$(filter_any_addr "$family")"
+
+    sqlite_exec "$db_path" "
+        INSERT INTO filter_input_rules (
+            iface_in, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at)
+                SELECT
+                    'ANY', (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
+                    0, 1, 1, 0, $(sql_quote "$any_addr"), NULL,
+                    $(sql_quote "$any_addr"), NULL,
+                    'all', NULL, NULL,
+                    'ACCEPT', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM filter_input_rules
+                        WHERE iface_in = 'ANY'
+                            AND protocol_name = 'all'
+                            AND ct_established = 1
+                            AND ct_related = 1
+                            AND action = 'ACCEPT'
+                            AND protected = 1
+                );"
+}
+
+# Record one protected FORWARD conntrack return rule in SQLite.
+record_forward_conntrack_return_rule() {
+    local family="$1"
+    local db_path
+    local any_addr
+
+    db_path="$(filter_rules_db "$family")"
+    any_addr="$(filter_any_addr "$family")"
+
+    sqlite_exec "$db_path" "
+        INSERT INTO filter_forward_rules (
+            iface_in, iface_out, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at)
+                SELECT
+                    'ANY', 'ANY', (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_forward_rules),
+                    0, 1, 1, 0, $(sql_quote "$any_addr"), NULL,
+                    $(sql_quote "$any_addr"), NULL,
+                    'all', NULL, NULL,
+                    'ACCEPT', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM filter_forward_rules
+                        WHERE iface_in = 'ANY'
+                            AND iface_out = 'ANY'
+                            AND protocol_name = 'all'
+                            AND ct_established = 1
+                            AND ct_related = 1
+                            AND action = 'ACCEPT'
+                            AND protected = 1
+                );"
+}
+
+# Record base conntrack INPUT and FORWARD return rules in SQLite.
+record_conntrack_base_rules() {
+    record_input_conntrack_return_rule ipv4
+    record_input_conntrack_return_rule ipv6
+    record_forward_conntrack_return_rule ipv4
+    record_forward_conntrack_return_rule ipv6
 }
 
 # Record one filter chain policy in the selected database.
@@ -115,6 +205,7 @@ record_filter_policy() {
 record_default_filter_policies() {
     record_filter_policy ipv4 INPUT DROP
     record_filter_policy ipv4 FORWARD DROP
+    
     record_filter_policy ipv6 INPUT DROP
     record_filter_policy ipv6 FORWARD DROP
 }
@@ -125,7 +216,7 @@ set_default_filter_policies() {
 
     iptables -t filter -P INPUT DROP
     iptables -t filter -P FORWARD DROP
-    
+
     ip6tables -t filter -P INPUT DROP
     ip6tables -t filter -P FORWARD DROP
 }
@@ -159,6 +250,8 @@ main() {
     [[ -n "${LAN_IFACE:-}" ]] || fatal "LAN_IFACE is not set."
 
     allow_lan_services "$LAN_IFACE"
+    record_conntrack_base_rules
+    apply_conntrack_base_rules
     record_default_filter_policies
     set_default_filter_policies
 }
