@@ -17,6 +17,13 @@ export ARMFIREWALL_LOG_CONTEXT="$(basename "$0")"
 export CONF_DIR="$ROOT_DIR/conf"
 export DB_DIR="$ROOT_DIR/db"
 export IFACE_DB="$DB_DIR/iface.db"
+export PROC_DB="${PROC_DB:-$DB_DIR/proc.db}"
+export LAN_IFACE="${LAN_IFACE:-}"
+export WAN_IFACE="${WAN_IFACE:-}"
+export ROUTER_MODE="${ROUTER_MODE:-0}"
+export IPV4_FILTER_RULES_DB="${IPV4_FILTER_RULES_DB:-$DB_DIR/ipv4-filter-rules.db}"
+export IPV6_FILTER_RULES_DB="${IPV6_FILTER_RULES_DB:-$DB_DIR/ipv6-filter-rules.db}"
+export IPV4_NAT_RULES_DB="${IPV4_NAT_RULES_DB:-$DB_DIR/ipv4-nat-rules.db}"
 export SUPERVISORD_CONF="$CONF_DIR/supervisord.conf"
 export PKG_MANAGER=""
 export ALLOW_LAN_TCP_PORTS=(22 8000 53)
@@ -52,6 +59,27 @@ sync_system_clock() {
         log "Enabling NTP before package transactions."
         timedatectl set-ntp true || true
     fi
+}
+
+# Return whether the given network interface is currently active.
+net_iface_active_flag() {
+    local iface="$1"
+
+    [[ "$(cat "/sys/class/net/${iface}/operstate" 2>/dev/null || true)" == "up" ]] && printf '1\n' || printf '0\n'
+}
+
+# Return the MTU configured for the given network interface.
+net_iface_mtu() {
+    local iface="$1"
+
+    cat "/sys/class/net/${iface}/mtu" 2>/dev/null || printf '0\n'
+}
+
+# Return the MAC address configured for the given network interface.
+net_iface_mac() {
+    local iface="$1"
+
+    cat "/sys/class/net/${iface}/address" 2>/dev/null || printf '\n'
 }
 
 # Return a SQL-safe quoted string.

@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-export LAN_IFACE=""
 
 # shellcheck source=scripts/globals.sh
 . "$ROOT_DIR/bin/scripts/globals.sh"
@@ -20,18 +19,20 @@ print_banner() {
 
         ./ ArmFirewall installer
         secure edge routing / firewall / monitoring
-        
 BANNER
 }
 
 # Print command install.sh usage
 usage() {
     cat <<USAGE
-Usage: $0 --lan-iface <iface>
+Usage: $0 --lan-iface <iface> [--wan-iface <iface>] [--router-mode]
 
 Options:
   --lan-iface <iface>  LAN network interface to persist in iface.db
+  --wan-iface <iface>  WAN network interface to persist in iface.db
+  --router-mode        Enable routing, forwarding, and NAT. Requires --wan-iface
   -h, --help           Show this help message
+  
 USAGE
 }
 
@@ -43,6 +44,17 @@ parse_args() {
                 [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-iface requires an interface name"
                 LAN_IFACE="$2"
                 shift 2
+                ;;
+
+            --wan-iface)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-iface requires an interface name"
+                WAN_IFACE="$2"
+                shift 2
+                ;;
+
+            --router-mode)
+                ROUTER_MODE=1
+                shift
                 ;;
 
             -h|--help)
@@ -57,6 +69,7 @@ parse_args() {
     done
 
     [[ -n "$LAN_IFACE" ]] || fatal "Missing required option: --lan-iface <iface>."
+    [[ "$ROUTER_MODE" -eq 0 || -n "$WAN_IFACE" ]] || fatal "--router-mode requires --wan-iface <iface>."
 }
 
 main() {
@@ -86,6 +99,9 @@ main() {
 
     # TODO: apply firewall rules
     "$ROOT_DIR/bin/scripts/fwrules.sh"
+
+    # Persist WAN and optionally enable router mode.
+    "$ROOT_DIR/bin/scripts/routermode.sh"
 
     # Ensures the default protected admin account exists in the users database
     "$ROOT_DIR/bin/scripts/adminusr.sh"

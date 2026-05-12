@@ -7,9 +7,6 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=scripts/globals.sh
 . "$ROOT_DIR/bin/scripts/globals.sh"
 
-IPV4_FILTER_RULES_DB="${IPV4_FILTER_RULES_DB:-$DB_DIR/ipv4-filter-rules.db}"
-IPV6_FILTER_RULES_DB="${IPV6_FILTER_RULES_DB:-$DB_DIR/ipv6-filter-rules.db}"
-
 # Return the SQLite database path for the selected IP family.
 filter_rules_db() {
     local family="$1"
