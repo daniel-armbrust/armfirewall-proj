@@ -36,19 +36,19 @@ main() {
     flush_firewall_rules
 
     # Reapply persisted filter firewall rules.
-    "$ROOT_DIR/bin/scripts/startpre/filterules.sh"
+    "$ROOT_DIR/bin/scripts/startpre/filterules.sh" || fatal "Could not apply persisted filter firewall rules."
 
     # Reapply persisted NAT firewall rules.
-    "$ROOT_DIR/bin/scripts/startpre/natrules.sh"
+    "$ROOT_DIR/bin/scripts/startpre/natrules.sh" || fatal "Could not apply persisted NAT firewall rules."
 
     # Reapply persisted mangle firewall rules.
-    "$ROOT_DIR/bin/scripts/startpre/manglerules.sh"
+    "$ROOT_DIR/bin/scripts/startpre/manglerules.sh" || fatal "Could not apply persisted mangle firewall rules."
 
     # Reapply persisted kernel parameters stored in proc.db.
-    "$ROOT_DIR/bin/scripts/startpre/proc.sh"
+    "$ROOT_DIR/bin/scripts/startpre/proc.sh" || fatal "Could not apply persisted kernel proc settings."
 
     # Reapply persisted policy routing tables, routes, and rules.
-    "$ROOT_DIR/bin/scripts/startpre/routetable.sh"
+    "$ROOT_DIR/bin/scripts/startpre/routetable.sh" || fatal "Could not apply persisted policy routing state."
 
     log "ArmFirewall pre-start completed successfully."
 }

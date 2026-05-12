@@ -56,7 +56,6 @@ print_banner() {
 
         ./ ArmFirewall ${mode}
         secure edge routing / firewall / monitoring
-        
 BANNER
 }
 
@@ -190,6 +189,7 @@ add_if_value() {
     local value="${3:-}"
 
     [[ -n "$value" ]] && command_ref+=("$flag" "$value")
+    return 0
 }
 
 # Append one address match when the value is not a wildcard.
@@ -245,6 +245,8 @@ add_protocol_match() {
         [[ -n "$protocol_code" ]] && icmp_value="${icmp_value}/${protocol_code}"
         [[ "$family" == "ipv6" ]] && command_ref+=("--icmpv6-type" "$icmp_value") || command_ref+=("--icmp-type" "$icmp_value")
     fi
+
+    return 0
 }
 
 # Append conntrack state matches for filter and mangle rules.
@@ -261,6 +263,7 @@ add_conntrack_match() {
     [[ "$ct_related" == "1" ]] && states+=("RELATED")
     [[ "$ct_invalid" == "1" ]] && states+=("INVALID")
     [[ "${#states[@]}" -gt 0 ]] && command_ref+=("-m" "conntrack" "--ctstate" "$(IFS=,; printf '%s' "${states[*]}")")
+    return 0
 }
 
 # Append input/output interface matches according to the selected chain.
@@ -280,6 +283,7 @@ add_interface_matches() {
             [[ -n "$iface_out" ]] && command_ref+=("-o" "$iface_out")
             ;;
     esac
+    return 0
 }
 
 # Apply one rule after checking whether it already exists.

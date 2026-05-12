@@ -17,6 +17,7 @@ Options:
   --wan-iface <iface>  WAN network interface to persist in iface.db
   --router-mode        Enable routing, forwarding, and NAT. Requires --wan-iface
   -h, --help           Show this help message
+
 USAGE
 }
 

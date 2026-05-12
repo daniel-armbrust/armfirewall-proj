@@ -32,6 +32,7 @@ add_nat_target_options() {
             is_real_port "$to_port" && command_ref+=("--to-ports" "$to_port")
             ;;
     esac
+    return 0
 }
 
 # Apply one NAT rule table from SQLite.

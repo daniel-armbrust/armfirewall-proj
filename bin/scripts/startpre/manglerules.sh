@@ -23,6 +23,7 @@ add_mangle_target_options() {
         TOS) [[ -n "$tos_value" ]] && command_ref+=("--set-tos" "$tos_value") ;;
         TTL) [[ -n "$ttl_value" ]] && command_ref+=("--ttl-set" "$ttl_value") ;;
     esac
+    return 0
 }
 
 # Apply one mangle rule table from SQLite.
