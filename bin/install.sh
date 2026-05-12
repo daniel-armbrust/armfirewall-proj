@@ -19,7 +19,6 @@ print_banner() {
 
         ./ ArmFirewall installer
         secure edge routing / firewall / monitoring
-        
 BANNER
 }
 
@@ -33,7 +32,6 @@ Options:
   --wan-iface <iface>  WAN network interface to persist in iface.db
   --router-mode        Enable routing, forwarding, and NAT. Requires --wan-iface
   -h, --help           Show this help message
-  
 USAGE
 }
 
@@ -103,6 +101,9 @@ main() {
 
     # Persist WAN and optionally enable router mode.
     "$ROOT_DIR/bin/scripts/routermode.sh"
+
+    # Import current Linux route tables into policy-routing.db
+    "$ROOT_DIR/bin/scripts/routetable.sh"
 
     # Ensures the default protected admin account exists in the users database
     "$ROOT_DIR/bin/scripts/adminusr.sh"

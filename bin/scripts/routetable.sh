@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
+set -Eeuo pipefail
 
-POLICY_ROUTING_DB="${POLICY_ROUTING_DB:-$ROOT_DIR/db/policy-routing.db}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# shellcheck source=globals.sh
+. "$ROOT_DIR/bin/scripts/globals.sh"
+
 RT_TABLES_PATH="${RT_TABLES_PATH:-/etc/iproute2/rt_tables}"
 
-# Return a SQL-safe quoted string or NULL for empty values.
+# Return a SQL-safe string or NULL when the value is empty.
 policy_sql_value() {
     local value="${1:-}"
 
-    if [[ -z "$value" ]]; then
+    [[ -n "$value" ]] || {
         printf 'NULL'
         return 0
-    fi
+    }
 
-    value="${value//\'/\'\'}"
-    printf "'%s'" "$value"
+    sql_quote "$value"
 }
 
-# Return a SQL-safe numeric value or NULL for empty values.
+# Return a SQL-safe positive integer or NULL when the value is empty.
 policy_sql_number() {
     local value="${1:-}"
 
@@ -27,167 +32,27 @@ policy_sql_number() {
     fi
 }
 
-# Ensure the iproute2 routing table registry exists with the built-in table names.
-ensure_rt_tables_file() {
-    local rt_dir
+# Execute SQL against policy-routing.db.
+policy_sqlite_exec() {
+    local sql="$1"
 
-    rt_dir="$(dirname "$RT_TABLES_PATH")"
-    mkdir -p "$rt_dir" || fatal "Could not create iproute2 configuration directory: ${rt_dir}."
-    touch "$RT_TABLES_PATH" || fatal "Could not create iproute2 routing table registry: ${RT_TABLES_PATH}."
-
-    ensure_rt_table_entry 255 local
-    ensure_rt_table_entry 254 main
-    ensure_rt_table_entry 253 default
+    sqlite_exec "$POLICY_ROUTING_DB" "$sql"
 }
 
-# Ensure one table id/name mapping exists in rt_tables.
-ensure_rt_table_entry() {
-    local table_id="$1"
-    local table_name="$2"
-    local temp_file
-
-    temp_file="$(mktemp "${RT_TABLES_PATH}.XXXXXX")" || fatal "Could not allocate temporary rt_tables file."
-    awk -v id="$table_id" -v name="$table_name" '
-        BEGIN { added = 0 }
-        /^[[:space:]]*#/ || NF < 2 {
-            print
-            next
-        }
-        $1 == id || $2 == name {
-            if (!added) {
-                printf "%s\t%s\n", id, name
-                added = 1
-            }
-            next
-        }
-        { print }
-        END {
-            if (!added) {
-                printf "%s\t%s\n", id, name
-            }
-        }
-    ' "$RT_TABLES_PATH" > "$temp_file" || {
-        rm -f "$temp_file"
-        fatal "Could not update iproute2 routing table registry: ${RT_TABLES_PATH}."
-    }
-    mv "$temp_file" "$RT_TABLES_PATH" || fatal "Could not replace iproute2 routing table registry: ${RT_TABLES_PATH}."
-}
-
-# Rewrite rt_tables with every enabled table currently persisted in SQLite.
-sync_rt_tables_from_db() {
-    local rt_dir
-    local temp_file
-
-    rt_dir="$(dirname "$RT_TABLES_PATH")"
-    mkdir -p "$rt_dir" || fatal "Could not create iproute2 configuration directory: ${rt_dir}."
-    temp_file="$(mktemp "${RT_TABLES_PATH}.XXXXXX")" || fatal "Could not allocate temporary rt_tables file."
-
-    {
-        printf '# ArmFirewall managed iproute2 routing tables.\n'
-        printf '255\tlocal\n'
-        printf '254\tmain\n'
-        printf '253\tdefault\n'
-        printf '0\tunspec\n'
-        sqlite3 -separator '|' "$POLICY_ROUTING_DB" "
-            SELECT table_id, table_name
-            FROM routing_tables
-            WHERE enabled = 1
-              AND pending_delete = 0
-              AND table_id NOT IN (0, 253, 254, 255)
-            ORDER BY
-                table_id;
-        " | awk -F'|' 'NF >= 2 { printf "%s\t%s\n", $1, $2 }'
-    } > "$temp_file" || {
-        rm -f "$temp_file"
-        fatal "Could not render iproute2 routing table registry from SQLite."
-    }
-
-    mv "$temp_file" "$RT_TABLES_PATH" || fatal "Could not replace iproute2 routing table registry: ${RT_TABLES_PATH}."
-}
-
-# Return the LAN interface persisted by armfw.sh.
-configured_lan_iface() {
-    local conf_file="${HF_CONF:-$ROOT_DIR/conf/armfw.conf}"
-
-    [[ -r "$conf_file" ]] || return 0
-    awk -F= '
-        $1 == "lan_iface" {
-            gsub(/^[ \t]+|[ \t\r]+$/, "", $2)
-            print $2
-            exit
-        }
-    ' "$conf_file"
-}
-
-# Return success when a route is the connected network for the configured LAN interface.
-route_is_configured_lan_network() {
-    local family="$1"
-    local destination="$2"
-    local dev="$3"
-    local lan_iface
-    local ip_family
-    local line
-    local prefix
-
-    lan_iface="$(configured_lan_iface)"
-    [[ -n "$lan_iface" && "$dev" == "$lan_iface" ]] || return 1
-    [[ -n "$destination" && "$destination" != "default" ]] || return 1
-
-    case "$family" in
-        ipv4)
-            ip_family="-4"
-            ;;
-        ipv6)
-            ip_family="-6"
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-
-    while IFS= read -r line; do
-        [[ -n "$line" ]] || continue
-        prefix="${line%% *}"
-        [[ "$prefix" == "$destination" ]] && return 0
-    done < <(ip "$ip_family" route show dev "$lan_iface" 2>/dev/null || true)
-
-    return 1
-}
-
-# Verify that execddl.sh already created the policy routing database.
+# Verify that policy-routing.db already exists with the expected schema.
 require_policy_routing_db() {
+    command -v ip >/dev/null 2>&1 || fatal "iproute2 command was not found."
     command -v sqlite3 >/dev/null 2>&1 || fatal "sqlite3 is required to store policy routing data."
-    [[ -f "$POLICY_ROUTING_DB" ]] || \
-        fatal "Policy routing database was not found: ${POLICY_ROUTING_DB}. Run bin/scripts/execddl.sh first."
+    [[ -f "$POLICY_ROUTING_DB" ]] || fatal "Policy routing database was not found: ${POLICY_ROUTING_DB}."
 
     sqlite3 "$POLICY_ROUTING_DB" "
         SELECT 1
         FROM sqlite_master
         WHERE type = 'table'
-          AND name IN ('routing_tables', 'routes', 'routing_rules')
+          AND name IN ('routing_tables', 'routes', 'route_nexthops', 'routing_rules')
         GROUP BY 1
-        HAVING COUNT(*) = 3;
+        HAVING COUNT(*) = 4;
     " | grep -qx '1' || fatal "Policy routing database schema is incomplete: ${POLICY_ROUTING_DB}."
-
-    ensure_policy_routing_apply_columns
-}
-
-# Execute SQL against the policy routing SQLite database.
-policy_sqlite_exec() {
-    local sql="$1"
-
-    sqlite3 "$POLICY_ROUTING_DB" "$sql" || fatal "Could not update policy routing database: ${POLICY_ROUTING_DB}."
-}
-
-# Add apply-state columns to policy routing databases created before this field existed.
-ensure_policy_routing_apply_columns() {
-    local table
-
-    for table in routing_tables routes routing_rules; do
-        if ! sqlite3 "$POLICY_ROUTING_DB" "PRAGMA table_info(${table});" | awk -F'|' '$2 == "applied" { found = 1 } END { exit found ? 0 : 1 }'; then
-            policy_sqlite_exec "ALTER TABLE ${table} ADD COLUMN applied INTEGER NOT NULL DEFAULT 0;"
-        fi
-    done
 }
 
 # Return the numeric id for a named Linux routing table.
@@ -251,7 +116,7 @@ route_table_name_for_id() {
     printf '%s\n' "$table_name"
 }
 
-# Store one routing table definition.
+# Store one routing table definition read from Linux.
 record_routing_table() {
     local table_id="$1"
     local table_name="$2"
@@ -275,9 +140,11 @@ record_routing_table() {
     "
 }
 
-# Import Linux routing table names from rt_tables.
+# Import Linux routing table names from /etc/iproute2/rt_tables when available.
 import_route_table_names() {
-    local table_id table_name protected
+    local table_id
+    local table_name
+    local protected
 
     record_routing_table 255 local 1
     record_routing_table 254 main 1
@@ -290,29 +157,14 @@ import_route_table_names() {
         [[ "$table_id" =~ ^# ]] && continue
         [[ "$table_id" =~ ^[0-9]+$ ]] || continue
         (( table_id > 0 )) || continue
+
         protected=0
         [[ "$table_id" =~ ^(255|254|253)$ ]] && protected=1
         record_routing_table "$table_id" "$table_name" "$protected"
     done < "$RT_TABLES_PATH"
 }
 
-# Reset imported route and rule rows before reading the current operating system state.
-clear_imported_policy_routing_state() {
-    policy_sqlite_exec "
-        PRAGMA foreign_keys = ON;
-        DELETE FROM route_nexthops;
-        DELETE FROM routes;
-        DELETE FROM routing_rules;
-        UPDATE routing_tables
-        SET enabled = 1,
-            applied = 1,
-            pending_delete = 0,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE protected = 1;
-    "
-}
-
-# Return a normalized route type.
+# Return a normalized route type accepted by the schema.
 normalize_route_type() {
     local value="$1"
 
@@ -326,7 +178,7 @@ normalize_route_type() {
     esac
 }
 
-# Return a protocol only when it is accepted by the policy routing schema.
+# Return a route protocol accepted by the schema.
 normalize_route_protocol() {
     local value="$1"
 
@@ -340,7 +192,7 @@ normalize_route_protocol() {
     esac
 }
 
-# Return a scope only when it is accepted by the policy routing schema.
+# Return a route scope accepted by the schema.
 normalize_route_scope() {
     local value="$1"
 
@@ -352,6 +204,19 @@ normalize_route_scope() {
             printf '\n'
             ;;
     esac
+}
+
+# Return whether a route should be treated as protected.
+route_protected_flag() {
+    local table_id="$1"
+    local route_type="$2"
+    local protocol="$3"
+
+    if [[ "$table_id" =~ ^(253|255)$ || "$protocol" == "kernel" || "$route_type" =~ ^(local|broadcast|multicast)$ ]]; then
+        printf '1\n'
+    else
+        printf '0\n'
+    fi
 }
 
 # Store one parsed route from ip route output.
@@ -369,15 +234,11 @@ record_route_row() {
     local protocol="${11}"
     local onlink="${12}"
     local table_name
-    local protected=0
+    local protected
 
     table_name="$(route_table_name_for_id "$table_id")"
+    protected="$(route_protected_flag "$table_id" "$route_type" "$protocol")"
     record_routing_table "$table_id" "$table_name" "$([[ "$table_id" =~ ^(255|254|253)$ ]] && printf 1 || printf 0)"
-
-    if [[ "$table_id" =~ ^(253|255)$ || "$protocol" == "kernel" || "$route_type" =~ ^(local|broadcast|multicast)$ ]] || \
-        route_is_configured_lan_network "$family" "$destination" "$dev"; then
-        protected=1
-    fi
 
     policy_sqlite_exec "
         INSERT INTO routes (
@@ -471,7 +332,7 @@ import_route_line() {
         "$gateway" "$dev" "$preferred_source" "$metric" "$scope" "$protocol" "$onlink"
 }
 
-# Import all IPv4 and IPv6 routes from the operating system.
+# Import all routes for one address family from Linux.
 import_routes_for_family() {
     local family="$1"
     local ip_family="$2"
@@ -505,9 +366,7 @@ record_rule_row() {
     local table_id="${16}"
     local protected=0
 
-    if [[ "$priority" =~ ^(0|32766|32767)$ ]]; then
-        protected=1
-    fi
+    [[ "$priority" =~ ^(0|32766|32767)$ ]] && protected=1
 
     policy_sqlite_exec "
         INSERT INTO routing_rules (
@@ -632,7 +491,7 @@ import_rule_line() {
         "$sport" "$dport" "$uid_range" "$action" "$table_id"
 }
 
-# Import all IPv4 and IPv6 policy routing rules from the operating system.
+# Import all rules for one address family from Linux.
 import_rules_for_family() {
     local family="$1"
     local ip_family="$2"
@@ -646,16 +505,28 @@ import_rules_for_family() {
     done < <(ip "$ip_family" rule show 2>/dev/null || true)
 }
 
-# Synchronize the policy routing SQLite database with the current Linux state.
-sync_policy_routing_db() {
-    log "Synchronizing Linux policy routing state into ${POLICY_ROUTING_DB}."
+main() {
+    log "Synchronizing Linux route tables into ${POLICY_ROUTING_DB}."
+
+    # Verify that policy-routing.db exists and has the required schema.
     require_policy_routing_db
-    sync_rt_tables_from_db
-    clear_imported_policy_routing_state
+
+    # Import routing table names from the Linux rt_tables registry.
     import_route_table_names
+
+    # Import all IPv4 routes from the Linux routing tables.
     import_routes_for_family ipv4 -4
+
+    # Import all IPv6 routes from the Linux routing tables.
     import_routes_for_family ipv6 -6
+
+    # Import all IPv4 policy routing rules from Linux.
     import_rules_for_family ipv4 -4
+
+    # Import all IPv6 policy routing rules from Linux.
     import_rules_for_family ipv6 -6
-    log "Policy routing database synchronization completed."
+    
+    log "Route table synchronization completed."
 }
+
+main "$@"
