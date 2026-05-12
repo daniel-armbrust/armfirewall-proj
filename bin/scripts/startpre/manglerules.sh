@@ -49,7 +49,7 @@ apply_mangle_table() {
         *) iface_in_expr="COALESCE(iface_in, '')"; iface_out_expr="COALESCE(iface_out, '')" ;;
     esac
 
-    while IFS=$'\t' read -r id rule_order iface_in iface_out ct_new ct_established ct_related ct_invalid src_addr src_port dst_addr dst_port protocol protocol_type protocol_code action mark_value dscp_value tos_value ttl_value; do
+    while IFS="$SQLITE_QUERY_SEPARATOR" read -r id rule_order iface_in iface_out ct_new ct_established ct_related ct_invalid src_addr src_port dst_addr dst_port protocol protocol_type protocol_code action mark_value dscp_value tos_value ttl_value; do
         [[ -n "${id:-}" ]] || continue
         spec=("$command" "-t" "mangle" "$chain")
         add_interface_matches spec "$chain" "$iface_in" "$iface_out"

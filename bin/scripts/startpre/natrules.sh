@@ -57,7 +57,7 @@ apply_nat_table() {
         *) iface_in_expr="COALESCE(iface_in, '')"; iface_out_expr="COALESCE(iface_out, '')" ;;
     esac
 
-    while IFS=$'\t' read -r id rule_order iface_in iface_out src_addr src_port dst_addr dst_port protocol protocol_type protocol_code action to_addr to_port; do
+    while IFS="$SQLITE_QUERY_SEPARATOR" read -r id rule_order iface_in iface_out src_addr src_port dst_addr dst_port protocol protocol_type protocol_code action to_addr to_port; do
         [[ -n "${id:-}" ]] || continue
         spec=("$command" "-t" "nat" "$chain")
         add_interface_matches spec "$chain" "$iface_in" "$iface_out"

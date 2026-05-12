@@ -21,42 +21,24 @@ apply_filter_table() {
     local -a spec
 
     [[ -f "$db_path" ]] || return 0
-
     sqlite_table_exists "$db_path" "$table_name" || return 0
-    
     ensure_pending_delete_column "$db_path" "$table_name"
 
     case "$chain" in
-        INPUT) 
-            iface_in_expr="COALESCE(iface_in, '')"
-            iface_out_expr="''" 
-            ;;
-
-        OUTPUT) 
-            iface_in_expr="''" 
-            iface_out_expr="COALESCE(iface_out, '')" 
-            ;;
-
-        *) 
-            iface_in_expr="COALESCE(iface_in, '')" 
-            iface_out_expr="COALESCE(iface_out, '')" 
-            ;;
+        INPUT) iface_in_expr="COALESCE(iface_in, '')"; iface_out_expr="''" ;;
+        OUTPUT) iface_in_expr="''"; iface_out_expr="COALESCE(iface_out, '')" ;;
+        *) iface_in_expr="COALESCE(iface_in, '')"; iface_out_expr="COALESCE(iface_out, '')" ;;
     esac
 
-    while IFS=$'\t' read -r id rule_order iface_in iface_out ct_new ct_established ct_related ct_invalid src_addr src_port dst_addr dst_port protocol protocol_type protocol_code action; do
-        
+    while IFS="$SQLITE_QUERY_SEPARATOR" read -r id rule_order iface_in iface_out ct_new ct_established ct_related ct_invalid src_addr src_port dst_addr dst_port protocol protocol_type protocol_code action; do
         [[ -n "${id:-}" ]] || continue
-        
         spec=("$command" "-t" "filter" "$chain")
-        
         add_interface_matches spec "$chain" "$iface_in" "$iface_out"
         add_address_match spec "-s" "$src_addr"
         add_address_match spec "-d" "$dst_addr"
         add_protocol_match spec "$family" "$protocol" "$protocol_type" "$protocol_code" "$src_port" "$dst_port"
         add_conntrack_match spec "$ct_new" "$ct_established" "$ct_related" "$ct_invalid"
-        
         spec+=("-j" "${action:-ACCEPT}")
-        
         apply_iptables_rule "${spec[@]}"
     done < <(
         sqlite_query "$db_path" "
@@ -79,18 +61,14 @@ apply_filter_policies() {
     local chain policy
 
     [[ -f "$db_path" ]] || return 0
-
     sqlite_table_exists "$db_path" "filter_chain_policies" || return 0
 
     for chain in INPUT FORWARD OUTPUT; do
         policy="$(sqlite_query "$db_path" "SELECT policy FROM filter_chain_policies WHERE chain_name=$(sql_quote "$chain") LIMIT 1;")"
-
         [[ -n "$policy" ]] || {
             [[ "$chain" == "OUTPUT" ]] && policy="ACCEPT" || policy="DROP"
         }
-
         [[ "$policy" == "ACCEPT" || "$policy" == "DROP" ]] || policy="DROP"
-        
         "$command" -t filter -P "$chain" "$policy"
     done
 }

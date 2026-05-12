@@ -41,6 +41,7 @@ export SUPERVISORD_CONF="$CONF_DIR/supervisord.conf"
 export PKG_MANAGER=""
 export ALLOW_LAN_TCP_PORTS=(22 8000 53)
 export ALLOW_LAN_UDP_PORTS=(67 53)
+export SQLITE_QUERY_SEPARATOR=$'\037'
 
 # Print the ArmFirewall execution banner.
 print_banner() {
@@ -137,7 +138,7 @@ sqlite_query() {
     local sql="$2"
 
     [[ -f "$db_path" ]] || return 0
-    sqlite3 -noheader -separator $'\t' "$db_path" "$sql"
+    sqlite3 -noheader -separator "$SQLITE_QUERY_SEPARATOR" "$db_path" "$sql"
 }
 
 # Return whether one table exists in a SQLite database.
@@ -158,7 +159,7 @@ ensure_pending_delete_column() {
     local found
 
     sqlite_table_exists "$db_path" "$table_name" || return 0
-    found="$(sqlite_query "$db_path" "PRAGMA table_info(${table_name});" | awk -F'\t' '$2 == "pending_delete" { print $2; exit }')"
+    found="$(sqlite_query "$db_path" "PRAGMA table_info(${table_name});" | awk -F"$SQLITE_QUERY_SEPARATOR" '$2 == "pending_delete" { print $2; exit }')"
     [[ "$found" == "pending_delete" ]] && return 0
 
     sqlite_exec "$db_path" "ALTER TABLE ${table_name} ADD COLUMN pending_delete INTEGER NOT NULL DEFAULT 0;"

@@ -17,18 +17,13 @@ apply_proc_settings() {
     }
 
     log "Applying persisted kernel proc settings."
-
-    while IFS=$'\t' read -r id proc_path desired_value; do
+    while IFS="$SQLITE_QUERY_SEPARATOR" read -r id proc_path desired_value; do
         [[ -n "${id:-}" && -n "$proc_path" && -n "$desired_value" ]] || continue
-        
         [[ -e "$proc_path" ]] || {
             log "Skipping missing proc path: ${proc_path}."
             continue
         }
-
-        # Change /proc filesystem
         printf '%s\n' "$desired_value" > "$proc_path"
-        
         sqlite_exec "$PROC_DB" "
             UPDATE proc
             SET current_value=$(sql_quote "$desired_value"),
