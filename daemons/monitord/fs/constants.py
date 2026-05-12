@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
 LOG_SOURCE = "monitord/fs/fs.py"
+
+COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_FS_INTERVAL", "300"))
+
 PROC_MOUNTINFO = Path("/proc/self/mountinfo")
+
 PROC_DISKSTATS = Path("/proc/diskstats")
+
 RRD_DATA_SOURCES = {"usage_pct", "inode_pct", "io_ops", "io_time_ms"}
+
 PSEUDO_FILESYSTEMS = {
     "autofs",
     "binfmt_misc",
@@ -33,6 +40,7 @@ PSEUDO_FILESYSTEMS = {
     "tmpfs",
     "tracefs",
 }
+
 MONITORIX_GRAPH_COLORS = [
     "--color=CANVAS#000000",
     "--color=BACK#101010",
@@ -45,6 +53,7 @@ MONITORIX_GRAPH_COLORS = [
     "--color=SHADEB#404040",
     "--color=AXIS#101010",
 ]
+
 MONITORIX_FS_LINE_COLORS = [
     "#FFA500",
     "#44EEEE",

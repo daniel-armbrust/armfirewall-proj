@@ -2,11 +2,27 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
 LOG_SOURCE = "monitord/iface/iface.py"
+
+COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_IFACE_INTERVAL", "10"))
+
 PROC_NET_DEV = Path("/proc/net/dev")
+
+INTERFACE_DS = {
+    "rx_bytes",
+    "tx_bytes",
+    "rx_packets",
+    "tx_packets",
+    "rx_errors",
+    "tx_errors",
+    "rx_dropped",
+    "tx_dropped",
+}
+
 MONITORIX_GRAPH_COLORS = [
     "--color=CANVAS#000000",
     "--color=BACK#101010",

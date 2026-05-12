@@ -3,31 +3,34 @@
 
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path
-
-from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..constants import RRD_DIR, RRD_IMG_DIR
 from ..periods import GRAPH_PERIODS, period_image_path
+from ..rrd import rrd_needs_creation
 from core import log as logger
+from core.process import run_command
 
-from .constants import LOADAVG_DS, LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_LOADAVG, RRD_PATH
+from .constants import COLLECT_INTERVAL_SECONDS, LOADAVG_DS, LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_LOADAVG, RRD_PATH
 from .models import LoadAvgCounters
 
 
-def run_command(command: list[str]) -> None:
-    """Run one external command and raise a useful error on failure."""
-    subprocess.run(command, check=True, text=True, capture_output=True)
+class LoadAvgMonitor:
+    """Collect Linux load average metrics and maintain their RRD graph."""
 
+    name = "loadavg"
+    interval_seconds = COLLECT_INTERVAL_SECONDS
 
-def rrd_data_sources(rrdtool: str, rrd_path: Path) -> set[str]:
-    """Return the data source names currently stored in an RRD file."""
-    result = subprocess.run([rrdtool, "info", str(rrd_path)], check=True, text=True, capture_output=True)
-    sources: set[str] = set()
-    for line in result.stdout.splitlines():
-        if not line.startswith("ds["):
-            continue
-        sources.add(line.split("[", 1)[1].split("]", 1)[0])
-    return sources
+    def __init__(self, rrdtool: str) -> None:
+        """Prepare the load average monitor dependencies."""
+        self.rrdtool = rrdtool
+
+    def collect(self) -> None:
+        """Run one load average monitoring cycle."""
+        counters = read_loadavg_counters()
+
+        update_rrd(self.rrdtool, counters)
+        graph_loadavg(self.rrdtool)
+        
+        logger.info(f"Monitored load average metrics into {RRD_DIR}.", source=LOG_SOURCE)
 
 
 def read_loadavg_counters() -> LoadAvgCounters:
@@ -41,13 +44,11 @@ def read_loadavg_counters() -> LoadAvgCounters:
 
 def ensure_rrd(rrdtool: str) -> None:
     """Create the load average RRD file when needed."""
-    if RRD_PATH.exists() and rrd_data_sources(rrdtool, RRD_PATH) != set(LOADAVG_DS):
-        RRD_PATH.unlink()
-
-    if RRD_PATH.exists():
+    if not rrd_needs_creation(rrdtool, RRD_PATH, set(LOADAVG_DS)):
         return
 
     heartbeat = max(COLLECT_INTERVAL_SECONDS * 3, 120)
+    
     run_command(
         [
             rrdtool,
@@ -72,24 +73,29 @@ def ensure_rrd(rrdtool: str) -> None:
             "RRA:LAST:0.5:30:1488",
         ]
     )
+
     logger.info(f"Created load average RRD file: {RRD_PATH}", source=LOG_SOURCE)
 
 
 def update_rrd(rrdtool: str, counters: LoadAvgCounters) -> None:
     """Update the load average RRD with the latest raw counters."""
     ensure_rrd(rrdtool)
+
     values = [
         counters.load1,
         counters.load5,
         counters.load15,
     ]
+
     update_value = "N:" + ":".join(str(value) for value in values)
+    
     run_command([rrdtool, "update", str(RRD_PATH), update_value])
 
 
 def graph_loadavg(rrdtool: str) -> None:
     """Generate system load average graphs for all standard periods."""
     base_path = RRD_IMG_DIR / "loadavg-load.png"
+    
     for period_name, period_label, period_start in GRAPH_PERIODS:
         run_command(
             [
@@ -130,20 +136,3 @@ def graph_loadavg(rrdtool: str) -> None:
                 "GPRINT:load15:MAX:   Max\\: %4.2lf\\n",
             ]
         )
-
-
-class LoadAvgMonitor:
-    """Collect Linux load average metrics and maintain their RRD graph."""
-
-    name = "loadavg"
-
-    def __init__(self, rrdtool: str) -> None:
-        """Prepare the load average monitor dependencies."""
-        self.rrdtool = rrdtool
-
-    def collect(self) -> None:
-        """Run one load average monitoring cycle."""
-        counters = read_loadavg_counters()
-        update_rrd(self.rrdtool, counters)
-        graph_loadavg(self.rrdtool)
-        logger.info(f"Monitored load average metrics into {RRD_DIR}.", source=LOG_SOURCE)

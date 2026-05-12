@@ -3,31 +3,34 @@
 
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path
-
-from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
-from ..periods import GRAPH_PERIODS, period_image_path
+from ..constants import RRD_DIR
+from ..rrd import rrd_needs_creation
 from core import log as logger
+from core.process import run_command
 
-from .constants import ENTROPY_DS, LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_ENTROPY, RRD_PATH
+from .constants import COLLECT_INTERVAL_SECONDS, ENTROPY_DS, LOG_SOURCE, PROC_ENTROPY, RRD_PATH
+from .graphs import graph_entropy
 from .models import EntropyCounters
 
 
-def run_command(command: list[str]) -> None:
-    """Run one external command and raise a useful error on failure."""
-    subprocess.run(command, check=True, text=True, capture_output=True)
+class EntropyMonitor:
+    """Collect kernel entropy metrics and maintain their RRD graph."""
 
+    name = "entropy"
+    interval_seconds = COLLECT_INTERVAL_SECONDS
 
-def rrd_data_sources(rrdtool: str, rrd_path: Path) -> set[str]:
-    """Return the data source names currently stored in an RRD file."""
-    result = subprocess.run([rrdtool, "info", str(rrd_path)], check=True, text=True, capture_output=True)
-    sources: set[str] = set()
-    for line in result.stdout.splitlines():
-        if not line.startswith("ds["):
-            continue
-        sources.add(line.split("[", 1)[1].split("]", 1)[0])
-    return sources
+    def __init__(self, rrdtool: str) -> None:
+        """Prepare the entropy monitor dependencies."""
+        self.rrdtool = rrdtool
+
+    def collect(self) -> None:
+        """Run one entropy monitoring cycle."""
+        counters = read_entropy_counters()
+        
+        update_rrd(self.rrdtool, counters)
+        graph_entropy(self.rrdtool)
+        
+        logger.info(f"Monitored entropy metrics into {RRD_DIR}.", source=LOG_SOURCE)
 
 
 def read_entropy_counters() -> EntropyCounters:
@@ -41,13 +44,11 @@ def read_entropy_counters() -> EntropyCounters:
 
 def ensure_rrd(rrdtool: str) -> None:
     """Create the entropy RRD file when needed."""
-    if RRD_PATH.exists() and rrd_data_sources(rrdtool, RRD_PATH) != set(ENTROPY_DS):
-        RRD_PATH.unlink()
-
-    if RRD_PATH.exists():
+    if not rrd_needs_creation(rrdtool, RRD_PATH, set(ENTROPY_DS)):
         return
 
     heartbeat = max(COLLECT_INTERVAL_SECONDS * 3, 120)
+
     run_command(
         [
             rrdtool,
@@ -70,6 +71,7 @@ def ensure_rrd(rrdtool: str) -> None:
             "RRA:LAST:0.5:30:1488",
         ]
     )
+    
     logger.info(f"Created entropy RRD file: {RRD_PATH}", source=LOG_SOURCE)
 
 
@@ -77,49 +79,3 @@ def update_rrd(rrdtool: str, counters: EntropyCounters) -> None:
     """Update the entropy RRD with the latest raw counter."""
     ensure_rrd(rrdtool)
     run_command([rrdtool, "update", str(RRD_PATH), f"N:{counters.available}"])
-
-
-def graph_entropy(rrdtool: str) -> None:
-    """Generate kernel entropy graphs for all standard periods."""
-    base_path = RRD_IMG_DIR / "entropy-entropy.png"
-    for period_name, period_label, period_start in GRAPH_PERIODS:
-        run_command(
-            [
-                rrdtool,
-                "graph",
-                str(period_image_path(base_path, period_name)),
-                "--imgformat",
-                "PNG",
-                "--start",
-                period_start,
-                "--width",
-                "800",
-                "--height",
-                "300",
-                "--title",
-                f"Kernel entropy - {period_label}",
-                "--vertical-label",
-                "Size",
-                *MONITORIX_GRAPH_COLORS,
-                f"DEF:entropy={RRD_PATH}:entropy_available:AVERAGE",
-                "LINE2:entropy#EEEE00:Entropy",
-                "GPRINT:entropy:LAST:              Current\\:%5.0lf\\n",
-            ]
-        )
-
-
-class EntropyMonitor:
-    """Collect kernel entropy metrics and maintain their RRD graph."""
-
-    name = "entropy"
-
-    def __init__(self, rrdtool: str) -> None:
-        """Prepare the entropy monitor dependencies."""
-        self.rrdtool = rrdtool
-
-    def collect(self) -> None:
-        """Run one entropy monitoring cycle."""
-        counters = read_entropy_counters()
-        update_rrd(self.rrdtool, counters)
-        graph_entropy(self.rrdtool)
-        logger.info(f"Monitored entropy metrics into {RRD_DIR}.", source=LOG_SOURCE)

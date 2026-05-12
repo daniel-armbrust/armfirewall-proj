@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import os
+
 from ..constants import DB_DIR
 
 
 LOG_SOURCE = "monitord/latency/latency.py"
+
+COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_LATENCY_INTERVAL", "30"))
+
 LATENCY_DB_PATH = DB_DIR / "latency.db"
+
 LATENCY_DS = {"min", "avg", "max", "loss"}
+
 MONITORIX_GRAPH_COLORS = [
     "--color=CANVAS#000000",
     "--color=BACK#101010",

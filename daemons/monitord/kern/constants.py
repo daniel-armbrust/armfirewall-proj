@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from ..constants import RRD_DIR
 
 
 LOG_SOURCE = "monitord/kern/kern.py"
+
+COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_KERN_INTERVAL", "10"))
+
 RRD_PATH = RRD_DIR / "kern.rrd"
+
 PROC_STAT = Path("/proc/stat")
+
 PROC_DENTRY = Path("/proc/sys/fs/dentry-state")
+
 PROC_FILE_NR = Path("/proc/sys/fs/file-nr")
+
 PROC_INODE_NR = Path("/proc/sys/fs/inode-nr")
+
 KERN_DS = [
     "kern_user",
     "kern_nice",
@@ -33,6 +42,7 @@ KERN_DS = [
     "kern_val04",
     "kern_val05",
 ]
+
 MONITORIX_GRAPH_COLORS = [
     "--color=CANVAS#000000",
     "--color=BACK#101010",

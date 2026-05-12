@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from ..constants import RRD_DIR
 
 
 LOG_SOURCE = "monitord/netstat/netstat.py"
+
+COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_NETSTAT_INTERVAL", "15"))
+
 RRD_PATH = RRD_DIR / "netstat.rrd"
+
 PROC_TCP4 = Path("/proc/net/tcp")
+
 PROC_TCP6 = Path("/proc/net/tcp6")
+
 PROC_UDP4 = Path("/proc/net/udp")
+
 PROC_UDP6 = Path("/proc/net/udp6")
+
 TCP_STATES = [
     "closed",
     "listen",
@@ -27,8 +36,11 @@ TCP_STATES = [
     "lastack",
     "unknown",
 ]
+
 EXTRA_VALUES = ["val1", "val2", "val3", "val4", "val5"]
+
 NETSTAT_DS = [f"nstat{family}_{state}" for family in ("4", "6") for state in [*TCP_STATES, "udp", *EXTRA_VALUES]]
+
 SS_TCP_STATE_MAP = {
     "UNCONN": "closed",
     "LISTEN": "listen",
@@ -44,6 +56,7 @@ SS_TCP_STATE_MAP = {
     "LAST-ACK": "lastack",
     "UNKNOWN": "unknown",
 }
+
 PROC_TCP_STATE_MAP = {
     "01": "estblshd",
     "02": "synsent",
@@ -57,6 +70,7 @@ PROC_TCP_STATE_MAP = {
     "0A": "listen",
     "0B": "closing",
 }
+
 MONITORIX_GRAPH_COLORS = [
     "--color=CANVAS#000000",
     "--color=BACK#101010",

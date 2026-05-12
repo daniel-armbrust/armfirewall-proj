@@ -3,31 +3,34 @@
 
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path
-
-from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..constants import RRD_DIR, RRD_IMG_DIR
 from ..periods import GRAPH_PERIODS, period_image_path
+from ..rrd import rrd_needs_creation
 from core import log as logger
+from core.process import run_command
 
-from .constants import LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_DIR, PROCSTATUS_DS, RRD_PATH
+from .constants import COLLECT_INTERVAL_SECONDS, LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_DIR, PROCSTATUS_DS, RRD_PATH
 from .models import ProcessCounters
 
 
-def run_command(command: list[str]) -> None:
-    """Run one external command and raise a useful error on failure."""
-    subprocess.run(command, check=True, text=True, capture_output=True)
+class ProcStatusMonitor:
+    """Collect Linux process states and maintain their RRD graph."""
 
+    name = "procstatus"
+    interval_seconds = COLLECT_INTERVAL_SECONDS
 
-def rrd_data_sources(rrdtool: str, rrd_path: Path) -> set[str]:
-    """Return the data source names currently stored in an RRD file."""
-    result = subprocess.run([rrdtool, "info", str(rrd_path)], check=True, text=True, capture_output=True)
-    sources: set[str] = set()
-    for line in result.stdout.splitlines():
-        if not line.startswith("ds["):
-            continue
-        sources.add(line.split("[", 1)[1].split("]", 1)[0])
-    return sources
+    def __init__(self, rrdtool: str) -> None:
+        """Prepare the process status monitor dependencies."""
+        self.rrdtool = rrdtool
+
+    def collect(self) -> None:
+        """Run one process status monitoring cycle."""
+        counters = read_process_counters()
+
+        update_rrd(self.rrdtool, counters)
+        graph_processes(self.rrdtool)
+        
+        logger.info(f"Monitored process status metrics into {RRD_DIR}.", source=LOG_SOURCE)
 
 
 def read_process_counters() -> ProcessCounters:
@@ -46,7 +49,9 @@ def read_process_counters() -> ProcessCounters:
             for line in status_path.read_text(encoding="utf-8", errors="ignore").splitlines():
                 if not line.startswith("State:"):
                     continue
+
                 parts = line.split()
+                
                 if len(parts) >= 2 and parts[1] in states:
                     states[parts[1]] += 1
                 break
@@ -54,6 +59,7 @@ def read_process_counters() -> ProcessCounters:
             continue
 
     total = sum(states.values())
+
     return ProcessCounters(
         total=total,
         sleeping=states["S"],
@@ -67,13 +73,11 @@ def read_process_counters() -> ProcessCounters:
 
 def ensure_rrd(rrdtool: str) -> None:
     """Create the process status RRD file when needed."""
-    if RRD_PATH.exists() and rrd_data_sources(rrdtool, RRD_PATH) != set(PROCSTATUS_DS):
-        RRD_PATH.unlink()
-
-    if RRD_PATH.exists():
+    if not rrd_needs_creation(rrdtool, RRD_PATH, set(PROCSTATUS_DS)):
         return
 
     heartbeat = max(COLLECT_INTERVAL_SECONDS * 3, 120)
+
     run_command(
         [
             rrdtool,
@@ -102,12 +106,14 @@ def ensure_rrd(rrdtool: str) -> None:
             "RRA:LAST:0.5:30:1488",
         ]
     )
+
     logger.info(f"Created process status RRD file: {RRD_PATH}", source=LOG_SOURCE)
 
 
 def update_rrd(rrdtool: str, counters: ProcessCounters) -> None:
     """Update the process status RRD with the latest raw counters."""
     ensure_rrd(rrdtool)
+    
     values = [
         counters.total,
         counters.sleeping,
@@ -117,13 +123,16 @@ def update_rrd(rrdtool: str, counters: ProcessCounters) -> None:
         counters.stopped,
         counters.paging,
     ]
+
     update_value = "N:" + ":".join(str(value) for value in values)
+    
     run_command([rrdtool, "update", str(RRD_PATH), update_value])
 
 
 def graph_processes(rrdtool: str) -> None:
     """Generate Linux process state graphs for all standard periods."""
     base_path = RRD_IMG_DIR / "procstatus-processes.png"
+    
     for period_name, period_label, period_start in GRAPH_PERIODS:
         run_command(
             [
@@ -160,20 +169,3 @@ def graph_processes(rrdtool: str) -> None:
                 "LINE2:nproc#888888:Total Processes",
             ]
         )
-
-
-class ProcStatusMonitor:
-    """Collect Linux process states and maintain their RRD graph."""
-
-    name = "procstatus"
-
-    def __init__(self, rrdtool: str) -> None:
-        """Prepare the process status monitor dependencies."""
-        self.rrdtool = rrdtool
-
-    def collect(self) -> None:
-        """Run one process status monitoring cycle."""
-        counters = read_process_counters()
-        update_rrd(self.rrdtool, counters)
-        graph_processes(self.rrdtool)
-        logger.info(f"Monitored process status metrics into {RRD_DIR}.", source=LOG_SOURCE)

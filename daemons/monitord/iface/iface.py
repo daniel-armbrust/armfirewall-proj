@@ -3,28 +3,33 @@
 
 from __future__ import annotations
 
-import re
-import subprocess
 import time
 from pathlib import Path
 
-from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
-from ..periods import GRAPH_PERIODS, period_image_path
+from ..constants import RRD_DIR
+from ..rrd import rrd_needs_creation
 from core import db
 from core import log as logger
+from core.process import run_command
 
-from .constants import LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_NET_DEV
+from .constants import COLLECT_INTERVAL_SECONDS, INTERFACE_DS, LOG_SOURCE, PROC_NET_DEV
+from .graphs import generate_graphs, rrd_path_for_iface
 from .models import CounterSnapshot, InterfaceCounters
 
+class InterfaceMonitor:
+    """Collect interface counters and maintain their RRD graphs."""
 
-def sanitize_iface_name(iface_name: str) -> str:
-    """Return a filesystem-safe interface name."""
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", iface_name)
+    name = "iface"
+    interval_seconds = COLLECT_INTERVAL_SECONDS
 
+    def __init__(self, rrdtool: str) -> None:
+        """Prepare the interface monitor dependencies."""
+        self.rrdtool = rrdtool
+        self.previous: dict[str, CounterSnapshot] = {}
 
-def run_command(command: list[str]) -> None:
-    """Run one external command and raise a useful error on failure."""
-    subprocess.run(command, check=True, text=True, capture_output=True)
+    def collect(self) -> None:
+        """Run one interface monitoring cycle."""
+        self.previous = collect_once(self.rrdtool, self.previous)
 
 
 def monitored_interfaces() -> list[str]:
@@ -42,6 +47,7 @@ def monitored_interfaces() -> list[str]:
             name
         """
     )
+    
     return [str(row["name"]) for row in rows if row.get("name")]
 
 
@@ -55,6 +61,7 @@ def parse_proc_net_dev() -> dict[str, InterfaceCounters]:
 
         iface_name, raw_values = line.split(":", 1)
         values = raw_values.split()
+        
         if len(values) < 16:
             continue
 
@@ -72,23 +79,15 @@ def parse_proc_net_dev() -> dict[str, InterfaceCounters]:
     return counters
 
 
-def rrd_path_for_iface(iface_name: str) -> Path:
-    """Return the RRD path for one interface."""
-    return RRD_DIR / f"{sanitize_iface_name(iface_name)}.rrd"
-
-
-def image_path_for_iface(iface_name: str, suffix: str) -> Path:
-    """Return one graph image path for an interface."""
-    return RRD_IMG_DIR / f"{sanitize_iface_name(iface_name)}-{suffix}.png"
-
-
 def ensure_rrd(rrdtool: str, iface_name: str) -> Path:
     """Create the interface RRD file when it does not exist."""
     rrd_path = rrd_path_for_iface(iface_name)
-    if rrd_path.exists():
+    
+    if not rrd_needs_creation(rrdtool, rrd_path, INTERFACE_DS):
         return rrd_path
 
     heartbeat = max(COLLECT_INTERVAL_SECONDS * 3, 120)
+    
     run_command(
         [
             rrdtool,
@@ -115,7 +114,9 @@ def ensure_rrd(rrdtool: str, iface_name: str) -> Path:
             "RRA:LAST:0.5:30:1488",
         ]
     )
+
     logger.info(f"Created RRD file for interface {iface_name}: {rrd_path}", source=LOG_SOURCE)
+    
     return rrd_path
 
 
@@ -123,6 +124,7 @@ def positive_rate(current: int, previous: int, elapsed: float) -> float:
     """Calculate a non-negative per-second counter rate."""
     if elapsed <= 0 or current < previous:
         return 0.0
+    
     return (current - previous) / elapsed
 
 
@@ -134,6 +136,7 @@ def rates_from_snapshots(current: CounterSnapshot, previous: CounterSnapshot | N
     elapsed = current.timestamp - previous.timestamp
     now = current.counters
     old = previous.counters
+    
     return [
         positive_rate(now.rx_bytes, old.rx_bytes, elapsed),
         positive_rate(now.tx_bytes, old.tx_bytes, elapsed),
@@ -154,132 +157,6 @@ def update_rrd(rrdtool: str, iface_name: str, snapshot: CounterSnapshot, previou
     run_command([rrdtool, "update", str(rrd_path), update_value])
 
 
-def graph_traffic(rrdtool: str, iface_name: str, rrd_path: Path) -> None:
-    """Generate traffic bandwidth graphs for all standard periods."""
-    base_path = image_path_for_iface(iface_name, "traffic")
-    for period_name, period_label, period_start in GRAPH_PERIODS:
-        run_command(
-            [
-                rrdtool,
-                "graph",
-                str(period_image_path(base_path, period_name)),
-                "--imgformat",
-                "PNG",
-                "--start",
-                period_start,
-                "--width",
-                "800",
-                "--height",
-                "300",
-                "--title",
-                f"{iface_name} traffic - {period_label}",
-                "--vertical-label",
-                "bytes/s",
-                *MONITORIX_GRAPH_COLORS,
-                f"DEF:rx={rrd_path}:rx_bytes:AVERAGE",
-                f"DEF:tx={rrd_path}:tx_bytes:AVERAGE",
-                "CDEF:B_in=rx",
-                "CDEF:B_out=tx",
-                "CDEF:K_in=B_in,1024,/",
-                "CDEF:K_out=B_out,1024,/",
-                "AREA:B_in#44EE44:KB/s Input",
-                "GPRINT:K_in:LAST:     Current\\: %5.0lf",
-                "GPRINT:K_in:AVERAGE: Average\\: %5.0lf",
-                "GPRINT:K_in:MIN:    Min\\: %5.0lf",
-                "GPRINT:K_in:MAX:    Max\\: %5.0lf\\n",
-                "AREA:B_out#4444EE:KB/s Output",
-                "GPRINT:K_out:LAST:    Current\\: %5.0lf",
-                "GPRINT:K_out:AVERAGE: Average\\: %5.0lf",
-                "GPRINT:K_out:MIN:    Min\\: %5.0lf",
-                "GPRINT:K_out:MAX:    Max\\: %5.0lf\\n",
-                "AREA:B_out#4444EE:",
-                "AREA:B_in#44EE44:",
-                "LINE1:B_out#0000EE",
-                "LINE1:B_in#00EE00",
-            ]
-        )
-
-
-def graph_packets(rrdtool: str, iface_name: str, rrd_path: Path) -> None:
-    """Generate packets-per-second graphs for all standard periods."""
-    base_path = image_path_for_iface(iface_name, "packets")
-    for period_name, period_label, period_start in GRAPH_PERIODS:
-        run_command(
-            [
-                rrdtool,
-                "graph",
-                str(period_image_path(base_path, period_name)),
-                "--imgformat",
-                "PNG",
-                "--start",
-                period_start,
-                "--width",
-                "800",
-                "--height",
-                "300",
-                "--title",
-                f"{iface_name} packets - {period_label}",
-                "--vertical-label",
-                "Packets/s",
-                *MONITORIX_GRAPH_COLORS,
-                f"DEF:rx={rrd_path}:rx_packets:AVERAGE",
-                f"DEF:tx={rrd_path}:tx_packets:AVERAGE",
-                "CDEF:p_in=rx",
-                "CDEF:p_out=tx",
-                "AREA:p_in#44EE44:Input",
-                "AREA:p_out#4444EE:Output",
-                "AREA:p_out#4444EE:",
-                "AREA:p_in#44EE44:",
-                "LINE1:p_out#0000EE",
-                "LINE1:p_in#00EE00",
-            ]
-        )
-
-
-def graph_errors(rrdtool: str, iface_name: str, rrd_path: Path) -> None:
-    """Generate errors and drops graphs for all standard periods."""
-    base_path = image_path_for_iface(iface_name, "errors")
-    for period_name, period_label, period_start in GRAPH_PERIODS:
-        run_command(
-            [
-                rrdtool,
-                "graph",
-                str(period_image_path(base_path, period_name)),
-                "--imgformat",
-                "PNG",
-                "--start",
-                period_start,
-                "--width",
-                "800",
-                "--height",
-                "300",
-                "--title",
-                f"{iface_name} errors - {period_label}",
-                "--vertical-label",
-                "Errors/s",
-                *MONITORIX_GRAPH_COLORS,
-                f"DEF:rxe={rrd_path}:rx_errors:AVERAGE",
-                f"DEF:txe={rrd_path}:tx_errors:AVERAGE",
-                "CDEF:e_in=rxe",
-                "CDEF:e_out=txe",
-                "AREA:e_in#44EE44:Input",
-                "AREA:e_out#4444EE:Output",
-                "AREA:e_out#4444EE:",
-                "AREA:e_in#44EE44:",
-                "LINE1:e_out#0000EE",
-                "LINE1:e_in#00EE00",
-            ]
-        )
-
-
-def generate_graphs(rrdtool: str, iface_name: str) -> None:
-    """Generate all graph images for one interface RRD."""
-    rrd_path = rrd_path_for_iface(iface_name)
-    graph_traffic(rrdtool, iface_name, rrd_path)
-    graph_packets(rrdtool, iface_name, rrd_path)
-    graph_errors(rrdtool, iface_name, rrd_path)
-
-
 def collect_once(rrdtool: str, previous: dict[str, CounterSnapshot]) -> dict[str, CounterSnapshot]:
     """Collect one monitoring cycle and return the latest snapshots."""
     interfaces = monitored_interfaces()
@@ -289,6 +166,7 @@ def collect_once(rrdtool: str, previous: dict[str, CounterSnapshot]) -> dict[str
 
     for iface_name in interfaces:
         counters = proc_counters.get(iface_name)
+        
         if counters is None:
             logger.warning(f"Interface {iface_name} is in iface.db but not in /proc/net/dev.", source=LOG_SOURCE)
             continue
@@ -300,19 +178,5 @@ def collect_once(rrdtool: str, previous: dict[str, CounterSnapshot]) -> dict[str
         monitored_count += 1
 
     logger.info(f"Monitored {monitored_count} interfaces into {RRD_DIR}.", source=LOG_SOURCE)
+
     return current
-
-
-class InterfaceMonitor:
-    """Collect interface counters and maintain their RRD graphs."""
-
-    name = "iface"
-
-    def __init__(self, rrdtool: str) -> None:
-        """Prepare the interface monitor dependencies."""
-        self.rrdtool = rrdtool
-        self.previous: dict[str, CounterSnapshot] = {}
-
-    def collect(self) -> None:
-        """Run one interface monitoring cycle."""
-        self.previous = collect_once(self.rrdtool, self.previous)

@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from ..constants import RRD_DIR
 
 
 LOG_SOURCE = "monitord/entropy/entropy.py"
+
+COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_ENTROPY_INTERVAL", "60"))
+
 RRD_PATH = RRD_DIR / "entropy.rrd"
+
 PROC_ENTROPY = Path("/proc/sys/kernel/random/entropy_avail")
+
 ENTROPY_DS = [
     "entropy_available",
 ]
+
 MONITORIX_GRAPH_COLORS = [
     "--color=CANVAS#000000",
     "--color=BACK#101010",

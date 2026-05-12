@@ -10,21 +10,26 @@ The daemon is started by supervisord as a Python package:
 
     python -m daemons.monitord
 
-Shared monitoring paths and timing live in constants.py. Runtime setup helpers,
-such as RRD directory creation and rrdtool discovery, live in runtime.py.
+Shared monitoring paths and scheduler settings live in constants.py. Runtime
+setup helpers, such as RRD directory creation and rrdtool discovery, live in
+runtime.py.
 
 Each monitoring collector lives in its own directory and follows the same
 layout:
 
     <collector>/<collector>.py
-        Collector logic, procfs parsing, RRD updates and graph generation.
+        Collector logic, procfs parsing and RRD updates.
 
     <collector>/constants.py
-        Collector-specific paths, data source names, log source and graph
-        color settings.
+        Collector-specific interval, paths, data source names, log source and
+        graph color settings.
 
     <collector>/models.py
         Collector-specific dataclasses used by the parser and RRD updater.
+
+    <collector>/graphs.py
+        Optional graph generation helpers when one collector produces multiple
+        graph families.
 
 Files
 -----
@@ -40,8 +45,8 @@ monitord.py
     isolation between monitoring modules.
 
 constants.py
-    Shared paths, timing settings and main daemon log source used by the
-    monitoring collectors.
+    Shared paths, scheduler tick setting and main daemon log source used by the
+    monitoring daemon.
 
 models.py
     Shared typing contracts used by the daemon, including the collector
@@ -55,9 +60,16 @@ periods.py
     Shared graph period definitions for Daily, Weekly, Monthly and Yearly
     images.
 
+rrd.py
+    Shared RRD helper functions for schema inspection, stale file replacement,
+    label escaping and filesystem-safe RRD names.
+
 iface/iface.py
     Collects network interface counters from /proc/net/dev for interfaces
     stored in iface.db.
+
+iface/graphs.py
+    Generates traffic, packet and error graphs for monitored interfaces.
 
 iface/constants.py
     Interface collector constants.
@@ -69,6 +81,9 @@ latency/latency.py
     Collects latency, packet loss and response-time data from configured ping
     targets stored in latency.db.
 
+latency/graphs.py
+    Generates latency and packet loss graphs for configured ping targets.
+
 latency/constants.py
     Latency collector constants.
 
@@ -77,6 +92,9 @@ latency/models.py
 
 kern/kern.py
     Collects kernel and CPU metrics from /proc and related kernel counters.
+
+kern/graphs.py
+    Generates CPU, context switch and kernel usage graphs.
 
 kern/constants.py
     Kernel collector constants.
@@ -132,6 +150,9 @@ procstatus/models.py
 fs/fs.py
     Collects filesystem usage, inode usage and disk activity metrics.
 
+fs/graphs.py
+    Generates filesystem usage, inode, I/O operation and I/O time graphs.
+
 fs/constants.py
     Filesystem collector constants.
 
@@ -140,6 +161,9 @@ fs/models.py
 
 netstat/netstat.py
     Collects socket state metrics from /proc/net TCP and UDP tables.
+
+netstat/graphs.py
+    Generates socket state graphs grouped by TCP and UDP families.
 
 netstat/constants.py
     Socket state collector constants.

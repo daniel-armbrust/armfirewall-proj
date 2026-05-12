@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from ..constants import RRD_DIR
 
 
 LOG_SOURCE = "monitord/procstatus/procstatus.py"
+
+COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFW_MONITORD_PROCSTATUS_INTERVAL", "30"))
+
 RRD_PATH = RRD_DIR / "procstatus.rrd"
+
 PROC_DIR = Path("/proc")
+
 PROCSTATUS_DS = [
     "proc_nproc",
     "proc_npslp",
@@ -19,6 +25,7 @@ PROCSTATUS_DS = [
     "proc_npstp",
     "proc_npswp",
 ]
+
 MONITORIX_GRAPH_COLORS = [
     "--color=CANVAS#000000",
     "--color=BACK#101010",

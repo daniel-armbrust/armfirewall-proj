@@ -9,6 +9,7 @@ class MonitorCollector(Protocol):
     """Describe a monitoring collector invoked by the daemon loop."""
 
     name: str
+    interval_seconds: int
 
     def collect(self) -> None:
         """Run one collection cycle."""

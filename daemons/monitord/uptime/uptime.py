@@ -3,31 +3,34 @@
 
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path
-
-from ..constants import COLLECT_INTERVAL_SECONDS, RRD_DIR, RRD_IMG_DIR
+from ..constants import RRD_DIR, RRD_IMG_DIR
 from ..periods import GRAPH_PERIODS, period_image_path
+from ..rrd import rrd_needs_creation
 from core import log as logger
+from core.process import run_command
 
-from .constants import LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_UPTIME, RRD_PATH, UPTIME_DS
+from .constants import COLLECT_INTERVAL_SECONDS, LOG_SOURCE, MONITORIX_GRAPH_COLORS, PROC_UPTIME, RRD_PATH, UPTIME_DS
 from .models import UptimeCounters
 
 
-def run_command(command: list[str]) -> None:
-    """Run one external command and raise a useful error on failure."""
-    subprocess.run(command, check=True, text=True, capture_output=True)
+class UptimeMonitor:
+    """Collect Linux uptime metrics and maintain their RRD graph."""
 
+    name = "uptime"
+    interval_seconds = COLLECT_INTERVAL_SECONDS
 
-def rrd_data_sources(rrdtool: str, rrd_path: Path) -> set[str]:
-    """Return the data source names currently stored in an RRD file."""
-    result = subprocess.run([rrdtool, "info", str(rrd_path)], check=True, text=True, capture_output=True)
-    sources: set[str] = set()
-    for line in result.stdout.splitlines():
-        if not line.startswith("ds["):
-            continue
-        sources.add(line.split("[", 1)[1].split("]", 1)[0])
-    return sources
+    def __init__(self, rrdtool: str) -> None:
+        """Prepare the uptime monitor dependencies."""
+        self.rrdtool = rrdtool
+
+    def collect(self) -> None:
+        """Run one uptime monitoring cycle."""
+        counters = read_uptime_counters()
+        
+        update_rrd(self.rrdtool, counters)
+        graph_uptime(self.rrdtool)
+        
+        logger.info(f"Monitored uptime metrics into {RRD_DIR}.", source=LOG_SOURCE)
 
 
 def read_uptime_counters() -> UptimeCounters:
@@ -41,13 +44,11 @@ def read_uptime_counters() -> UptimeCounters:
 
 def ensure_rrd(rrdtool: str) -> None:
     """Create the uptime RRD file when needed."""
-    if RRD_PATH.exists() and rrd_data_sources(rrdtool, RRD_PATH) != set(UPTIME_DS):
-        RRD_PATH.unlink()
-
-    if RRD_PATH.exists():
+    if not rrd_needs_creation(rrdtool, RRD_PATH, set(UPTIME_DS)):
         return
 
     heartbeat = max(COLLECT_INTERVAL_SECONDS * 3, 120)
+    
     run_command(
         [
             rrdtool,
@@ -70,6 +71,7 @@ def ensure_rrd(rrdtool: str) -> None:
             "RRA:LAST:0.5:30:1488",
         ]
     )
+
     logger.info(f"Created uptime RRD file: {RRD_PATH}", source=LOG_SOURCE)
 
 
@@ -82,6 +84,7 @@ def update_rrd(rrdtool: str, counters: UptimeCounters) -> None:
 def graph_uptime(rrdtool: str) -> None:
     """Generate system uptime graphs for all standard periods."""
     base_path = RRD_IMG_DIR / "uptime-uptime.png"
+    
     for period_name, period_label, period_start in GRAPH_PERIODS:
         run_command(
             [
@@ -107,20 +110,3 @@ def graph_uptime(rrdtool: str) -> None:
                 "GPRINT:uptime_days:LAST:               Current\\:%5.1lf\\n",
             ]
         )
-
-
-class UptimeMonitor:
-    """Collect Linux uptime metrics and maintain their RRD graph."""
-
-    name = "uptime"
-
-    def __init__(self, rrdtool: str) -> None:
-        """Prepare the uptime monitor dependencies."""
-        self.rrdtool = rrdtool
-
-    def collect(self) -> None:
-        """Run one uptime monitoring cycle."""
-        counters = read_uptime_counters()
-        update_rrd(self.rrdtool, counters)
-        graph_uptime(self.rrdtool)
-        logger.info(f"Monitored uptime metrics into {RRD_DIR}.", source=LOG_SOURCE)
