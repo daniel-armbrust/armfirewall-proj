@@ -167,6 +167,44 @@ run_apt_transaction() {
     }
 }
 
+# Install APT packages without allowing package post-install scripts to start services.
+run_apt_transaction_without_service_start() {
+    local policy_path="/usr/sbin/policy-rc.d"
+    local backup_path=""
+    local status
+
+    if [[ -e "$policy_path" ]]; then
+        backup_path="${policy_path}.armfirewall.bak"
+        cp -a "$policy_path" "$backup_path"
+    fi
+
+    printf '#!/bin/sh\nexit 101\n' > "$policy_path"
+    chmod 0755 "$policy_path"
+
+    set +e
+    run_apt_transaction "$@"
+    status=$?
+    set -e
+
+    if [[ -n "$backup_path" ]]; then
+        mv "$backup_path" "$policy_path"
+    else
+        rm -f "$policy_path"
+    fi
+
+    return "$status"
+}
+
+# Stop and disable OS-managed services that ArmFirewall controls through supervisord.
+disable_packaged_armfirewall_services() {
+    command -v systemctl >/dev/null 2>&1 || return 0
+
+    if systemctl list-unit-files dnsmasq.service >/dev/null 2>&1; then
+        log "Disabling OS-managed dnsmasq service; ArmFirewall manages dnsmasq through supervisord."
+        systemctl disable --now dnsmasq.service >/dev/null 2>&1 || true
+    fi
+}
+
 # Install a Python runtime supported by ArmFirewall.
 install_python_runtime() {
     case "$PKG_MANAGER" in
@@ -195,10 +233,11 @@ install_system_deps() {
             ;;
         apt)
             apt-get update
-            run_apt_transaction upgrade
-            run_apt_transaction install ethtool net-tools \
-                                supervisor sqlite3 tar perl curl openssl \
-                                rrdtool traceroute mtr tcpdump dnsmasq
+            run_apt_transaction_without_service_start upgrade
+            run_apt_transaction_without_service_start install ethtool net-tools iproute2 iptables \
+                                                  supervisor sqlite3 tar perl curl openssl \
+                                                  rrdtool traceroute mtr tcpdump dnsmasq
+            disable_packaged_armfirewall_services
             install_python_runtime
             ;;
     esac
