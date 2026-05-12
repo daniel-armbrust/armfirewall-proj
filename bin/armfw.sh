@@ -27,14 +27,14 @@ need_root() {
     [[ ${EUID:-$(id -u)} -eq 0 ]] || fatal "This script must be run as root."; 
 }
 
-# Run repository, dependency, and database bootstrap scripts.
-run_bootstrap_scripts() { 
-    "$ROOT_DIR/bin/scripts/addpkgmirrors.sh"; 
-    "$ROOT_DIR/bin/scripts/osdeps.sh"; 
-    "$ROOT_DIR/bin/scripts/execddl.sh"; 
-    "$ROOT_DIR/bin/scripts/adminusr.sh";
-    "$ROOT_DIR/bin/scripts/sslcert.sh";
-}
+# # Run repository, dependency, and database bootstrap scripts.
+# run_bootstrap_scripts() { 
+#     "$ROOT_DIR/bin/scripts/addpkgmirrors.sh"; 
+#     "$ROOT_DIR/bin/scripts/osdeps.sh"; 
+#     "$ROOT_DIR/bin/scripts/execddl.sh"; 
+#     "$ROOT_DIR/bin/scripts/adminusr.sh";
+#     "$ROOT_DIR/bin/scripts/sslcert.sh";
+# }
 
 # Detect the Linux distribution family from os-release metadata.
 os_family() {
@@ -767,10 +767,11 @@ main() {
     local wan_iface
 
     need_root 
-    run_bootstrap_scripts 
+    #run_bootstrap_scripts 
 
     lan_iface="$(read_lan_iface)"
     wan_iface="$(read_wan_iface "$lan_iface")"
+
     ensure_default_latency_targets "$wan_iface"
     ensure_ssh_session_uses_lan "$lan_iface"
 
