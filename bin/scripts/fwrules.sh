@@ -101,7 +101,7 @@ apply_conntrack_base_rules() {
     ip6tables -t filter -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 }
 
-# Record one protected INPUT conntrack return rule in SQLite.
+# Record one INPUT conntrack return rule in SQLite.
 record_input_conntrack_return_rule() {
     local family="$1"
     local db_path
@@ -121,7 +121,7 @@ record_input_conntrack_return_rule() {
                     0, 1, 1, 0, $(sql_quote "$any_addr"), NULL,
                     $(sql_quote "$any_addr"), NULL,
                     'all', NULL, NULL,
-                    'ACCEPT', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    'ACCEPT', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                 WHERE NOT EXISTS (
                     SELECT 1 FROM filter_input_rules
                         WHERE iface_in = 'ANY'
@@ -129,11 +129,11 @@ record_input_conntrack_return_rule() {
                             AND ct_established = 1
                             AND ct_related = 1
                             AND action = 'ACCEPT'
-                            AND protected = 1
+                            AND enabled = 1
                 );"
 }
 
-# Record one protected FORWARD conntrack return rule in SQLite.
+# Record one FORWARD conntrack return rule in SQLite.
 record_forward_conntrack_return_rule() {
     local family="$1"
     local db_path
@@ -153,7 +153,7 @@ record_forward_conntrack_return_rule() {
                     0, 1, 1, 0, $(sql_quote "$any_addr"), NULL,
                     $(sql_quote "$any_addr"), NULL,
                     'all', NULL, NULL,
-                    'ACCEPT', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    'ACCEPT', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                 WHERE NOT EXISTS (
                     SELECT 1 FROM filter_forward_rules
                         WHERE iface_in = 'ANY'
@@ -162,7 +162,7 @@ record_forward_conntrack_return_rule() {
                             AND ct_established = 1
                             AND ct_related = 1
                             AND action = 'ACCEPT'
-                            AND protected = 1
+                            AND enabled = 1
                 );"
 }
 
@@ -172,6 +172,119 @@ record_conntrack_base_rules() {
     record_input_conntrack_return_rule ipv6
     record_forward_conntrack_return_rule ipv4
     record_forward_conntrack_return_rule ipv6
+}
+
+# Apply one ICMPv6 INPUT rule.
+apply_icmpv6_input_rule() {
+    local src_addr="$1"
+    local icmp_type="$2"
+    local icmp_code="$3"
+
+    ip6tables -t filter -C INPUT -s "$src_addr" -p ipv6-icmp --icmpv6-type "${icmp_type}/${icmp_code}" -j ACCEPT 2>/dev/null || \
+    ip6tables -t filter -A INPUT -s "$src_addr" -p ipv6-icmp --icmpv6-type "${icmp_type}/${icmp_code}" -j ACCEPT
+}
+
+# Apply one ICMPv6 FORWARD rule.
+apply_icmpv6_forward_rule() {
+    local icmp_type="$1"
+    local icmp_code="$2"
+
+    ip6tables -t filter -C FORWARD -p ipv6-icmp --icmpv6-type "${icmp_type}/${icmp_code}" -j ACCEPT 2>/dev/null || \
+    ip6tables -t filter -A FORWARD -p ipv6-icmp --icmpv6-type "${icmp_type}/${icmp_code}" -j ACCEPT
+}
+
+# Record one ICMPv6 INPUT rule in SQLite.
+record_icmpv6_input_rule() {
+    local src_addr="$1"
+    local icmp_type="$2"
+    local icmp_code="$3"
+
+    sqlite_exec "$IPV6_FILTER_RULES_DB" "
+        INSERT INTO filter_input_rules (
+            iface_in, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at)
+                SELECT
+                    'ANY', (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
+                    1, 0, 0, 0, $(sql_quote "$src_addr"), NULL,
+                    '::/0', NULL,
+                    'icmpv6', ${icmp_type}, ${icmp_code},
+                    'ACCEPT', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM filter_input_rules
+                        WHERE iface_in = 'ANY'
+                            AND src_addr = $(sql_quote "$src_addr")
+                            AND protocol_name = 'icmpv6'
+                            AND protocol_type = ${icmp_type}
+                            AND protocol_code = ${icmp_code}
+                            AND action = 'ACCEPT'
+                            AND enabled = 1
+                );"
+}
+
+# Record one ICMPv6 FORWARD rule in SQLite.
+record_icmpv6_forward_rule() {
+    local icmp_type="$1"
+    local icmp_code="$2"
+
+    sqlite_exec "$IPV6_FILTER_RULES_DB" "
+        INSERT INTO filter_forward_rules (
+            iface_in, iface_out, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at)
+                SELECT
+                    'ANY', 'ANY', (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_forward_rules),
+                    1, 0, 0, 0, '::/0', NULL,
+                    '::/0', NULL,
+                    'icmpv6', ${icmp_type}, ${icmp_code},
+                    'ACCEPT', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM filter_forward_rules
+                        WHERE iface_in = 'ANY'
+                            AND iface_out = 'ANY'
+                            AND protocol_name = 'icmpv6'
+                            AND protocol_type = ${icmp_type}
+                            AND protocol_code = ${icmp_code}
+                            AND action = 'ACCEPT'
+                            AND enabled = 1
+                );"
+}
+
+# Record and apply one ICMPv6 INPUT rule.
+allow_icmpv6_input_rule() {
+    local src_addr="$1"
+    local icmp_type="$2"
+    local icmp_code="$3"
+
+    record_icmpv6_input_rule "$src_addr" "$icmp_type" "$icmp_code"
+    apply_icmpv6_input_rule "$src_addr" "$icmp_type" "$icmp_code"
+}
+
+# Record and apply one ICMPv6 FORWARD rule.
+allow_icmpv6_forward_rule() {
+    local icmp_type="$1"
+    local icmp_code="$2"
+
+    record_icmpv6_forward_rule "$icmp_type" "$icmp_code"
+    apply_icmpv6_forward_rule "$icmp_type" "$icmp_code"
+}
+
+# Register and apply ICMPv6 rules required for IPv6 to operate correctly.
+allow_required_icmpv6() {
+    log "Registering and applying required ICMPv6 rules."
+
+    # Destination Unreachable, Packet Too Big, Time Exceeded, Parameter Problem.
+    for rule in 1/0 1/1 1/2 1/3 1/4 1/5 1/6 1/7 2/0 3/0 3/1 4/0 4/1 4/2; do
+        allow_icmpv6_input_rule "::/0" "${rule%/*}" "${rule#*/}"
+        allow_icmpv6_forward_rule "${rule%/*}" "${rule#*/}"
+    done
+
+    # Router Solicitation, Router Advertisement, Neighbor Solicitation, Neighbor Advertisement.
+    for rule in 133/0 134/0 135/0 136/0; do
+        allow_icmpv6_input_rule "fe80::/10" "${rule%/*}" "${rule#*/}"
+    done
 }
 
 # Record one filter chain policy in the selected database.
@@ -205,7 +318,7 @@ record_filter_policy() {
 record_default_filter_policies() {
     record_filter_policy ipv4 INPUT DROP
     record_filter_policy ipv4 FORWARD DROP
-    
+
     record_filter_policy ipv6 INPUT DROP
     record_filter_policy ipv6 FORWARD DROP
 }
@@ -216,7 +329,7 @@ set_default_filter_policies() {
 
     iptables -t filter -P INPUT DROP
     iptables -t filter -P FORWARD DROP
-
+    
     ip6tables -t filter -P INPUT DROP
     ip6tables -t filter -P FORWARD DROP
 }
@@ -252,6 +365,7 @@ main() {
     allow_lan_services "$LAN_IFACE"
     record_conntrack_base_rules
     apply_conntrack_base_rules
+    allow_required_icmpv6
     record_default_filter_policies
     set_default_filter_policies
 }
