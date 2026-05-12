@@ -20,6 +20,7 @@ print_banner() {
 
         ./ ArmFirewall installer
         secure edge routing / firewall / monitoring
+        
 BANNER
 }
 

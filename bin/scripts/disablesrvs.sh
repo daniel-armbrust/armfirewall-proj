@@ -7,6 +7,9 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=globals.sh
 . "$ROOT_DIR/bin/scripts/globals.sh"
 
+# shellcheck source=log.sh
+declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/log.sh"
+
 OS_ID=""
 OS_ID_LIKE=""
 
@@ -57,8 +60,9 @@ stop_disable_systemd_service() {
         systemctl stop "$service" || fatal "Could not stop OS firewall service: ${service}."
     fi
 
-    systemctl is-active --quiet "$service" && \
+    if systemctl is-active --quiet "$service"; then
         fatal "OS firewall service is still active after stop attempt: ${service}."
+    fi
 
     if systemctl is-enabled --quiet "$service" 2>/dev/null; then
         log "Disabling OS firewall service: ${service}."
@@ -66,8 +70,11 @@ stop_disable_systemd_service() {
             fatal "Could not disable OS firewall service: ${service}."
     fi
 
-    systemctl is-enabled --quiet "$service" 2>/dev/null && \
+    if systemctl is-enabled --quiet "$service" 2>/dev/null; then
         fatal "OS firewall service is still enabled after disable attempt: ${service}."
+    fi
+
+    return 0
 }
 
 # Disable firewalld on Oracle Linux and Red Hat-like systems.
@@ -108,6 +115,7 @@ disable_os_firewall_services() {
 
 # Disable operating system firewall services before ArmFirewall rules are applied.
 main() {
+    need_root
     disable_os_firewall_services
 }
 
