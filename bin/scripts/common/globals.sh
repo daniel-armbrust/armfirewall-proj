@@ -56,6 +56,7 @@ print_banner() {
 
         ./ ArmFirewall ${mode}
         secure edge routing / firewall / monitoring
+        
 BANNER
 }
 
@@ -270,10 +271,14 @@ add_interface_matches() {
     local iface_out="$4"
 
     case "$chain" in
-        INPUT|FORWARD|PREROUTING) add_if_value command_ref "-i" "$iface_in" ;;
+        INPUT|FORWARD|PREROUTING)
+            [[ -n "$iface_in" ]] && command_ref+=("-i" "$iface_in")
+            ;;
     esac
     case "$chain" in
-        OUTPUT|FORWARD|POSTROUTING) add_if_value command_ref "-o" "$iface_out" ;;
+        OUTPUT|FORWARD|POSTROUTING)
+            [[ -n "$iface_out" ]] && command_ref+=("-o" "$iface_out")
+            ;;
     esac
 }
 

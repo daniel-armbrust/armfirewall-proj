@@ -13,6 +13,32 @@ declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/common/log.sh"
 SYSTEMD_UNIT_FILE="/etc/systemd/system/armfirewall-supervisord.service"
 SYSTEMD_SERVICE_NAME="armfirewall-supervisord.service"
 
+# Stop any existing ArmFirewall supervisord process before systemd owns it.
+stop_existing_supervisord() {
+    local supervisorctl_bin
+    local pid
+    local wait_count=0
+
+    supervisorctl_bin="$(command -v supervisorctl || true)"
+
+    if [[ -n "$supervisorctl_bin" && -S "$ROOT_DIR/logs/supervisor.sock" ]]; then
+        "$supervisorctl_bin" -c "$SUPERVISORD_CONF" shutdown >/dev/null 2>&1 || true
+    fi
+
+    if [[ -f "$ROOT_DIR/logs/supervisord.pid" ]]; then
+        pid="$(cat "$ROOT_DIR/logs/supervisord.pid" 2>/dev/null || true)"
+        if [[ -n "$pid" && -d "/proc/$pid" ]]; then
+            while [[ -d "/proc/$pid" && "$wait_count" -lt 15 ]]; do
+                sleep 1
+                wait_count=$((wait_count + 1))
+            done
+            [[ ! -d "/proc/$pid" ]] || fatal "Could not stop existing ArmFirewall supervisord process: ${pid}."
+        fi
+    fi
+
+    rm -f "$ROOT_DIR/logs/supervisor.sock" "$ROOT_DIR/logs/supervisord.pid"
+}
+
 # Create the systemd unit responsible for running ArmFirewall supervisord.
 create_systemd_unit() {
     local supervisord_bin
@@ -170,6 +196,7 @@ SUPERVISOR
 main() {
     create_supervisord_conf
     create_systemd_unit
+    stop_existing_supervisord
     enable_and_start_systemd_unit
 }
 
