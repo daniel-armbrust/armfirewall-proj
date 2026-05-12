@@ -84,6 +84,52 @@ apply_lan_input_rule() {
     "$binary" -t filter -A INPUT -i "$iface" -p "$protocol" --dport "$port" -j ACCEPT
 }
 
+# Record one filter chain policy in the selected database.
+record_filter_policy() {
+    local family="$1"
+    local chain_name="$2"
+    local policy="$3"
+    local db_path
+
+    db_path="$(filter_rules_db "$family")"
+
+    sqlite_exec "$db_path" "
+        INSERT INTO filter_chain_policies (
+            chain_name,
+            policy,
+            created_at,
+            updated_at
+        ) VALUES (
+            $(sql_quote "$chain_name"),
+            $(sql_quote "$policy"),
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        )
+        ON CONFLICT(chain_name) DO UPDATE SET
+            policy = excluded.policy,
+            updated_at = CURRENT_TIMESTAMP;
+    "
+}
+
+# Record the default INPUT and FORWARD policies in IPv4 and IPv6 databases.
+record_default_filter_policies() {
+    record_filter_policy ipv4 INPUT DROP
+    record_filter_policy ipv4 FORWARD DROP
+    record_filter_policy ipv6 INPUT DROP
+    record_filter_policy ipv6 FORWARD DROP
+}
+
+# Set restrictive default policies for IPv4 and IPv6 filter chains.
+set_default_filter_policies() {
+    log "Setting INPUT and FORWARD default policies to DROP."
+
+    iptables -t filter -P INPUT DROP
+    iptables -t filter -P FORWARD DROP
+    
+    ip6tables -t filter -P INPUT DROP
+    ip6tables -t filter -P FORWARD DROP
+}
+
 # Register and apply LAN INPUT rules from ALLOW_LAN_TCP_PORTS 
 # and ALLOW_LAN_UDP_PORTS
 allow_lan_services() {
@@ -113,6 +159,8 @@ main() {
     [[ -n "${LAN_IFACE:-}" ]] || fatal "LAN_IFACE is not set."
 
     allow_lan_services "$LAN_IFACE"
+    record_default_filter_policies
+    set_default_filter_policies
 }
 
 main "$@"
