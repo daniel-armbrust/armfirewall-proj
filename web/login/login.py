@@ -8,7 +8,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from core import auth
+from web import auth
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]

@@ -14,15 +14,16 @@ from pathlib import Path
 from typing import Any
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from core import db
+from core.constants import DB_DIR
 from core import log as logger
 
 
-LINKFAILOVER_DB_PATH = ROOT_DIR / "db" / "linkfailover.db"
+LINKFAILOVER_DB_PATH = DB_DIR / "linkfailover.db"
 LOG_SOURCE = "linkfailover.py"
 PING_TIME_RE = re.compile(r"time[=<]([0-9.]+)\s*ms")
 

@@ -8,6 +8,7 @@ from typing import Any
 
 from core import db
 from core import iface as iface_module
+from core.constants import IFACE_DB_PATH
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -24,7 +25,8 @@ def read_conf() -> dict[str, str]:
             FROM ifaces
             WHERE role IN ('LAN', 'WAN')
             ORDER BY CASE role WHEN 'LAN' THEN 0 WHEN 'WAN' THEN 1 ELSE 2 END, id
-            """
+            """,
+            db_path=IFACE_DB_PATH,
         )
     except (FileNotFoundError, db.DatabaseError):
         return values

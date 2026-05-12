@@ -7,9 +7,9 @@ from datetime import datetime
 from pathlib import Path
 
 from core import db
+from core.constants import LOG_DB_PATH
 
 
-LOG_DB_PATH = db.DB_DIR / "logs.db"
 ERROR_LEVELS = {"ERROR", "FATAL"}
 
 

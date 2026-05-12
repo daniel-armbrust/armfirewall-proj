@@ -4,21 +4,21 @@
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from core import db
+from core.constants import DB_DIR
 from core import log as logger
+from core.workrequest import decode_payload
 
-DB_DIR = ROOT_DIR / "db"
 LOG_SOURCE = "fwrulesd.py"
 
 
@@ -228,17 +228,6 @@ def ensure_filter_chain_policies(conn: db.Connection) -> None:
             "INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy) VALUES (?, ?)",
             (chain, policy),
         )
-
-
-def payload_from_args(args: argparse.Namespace) -> dict[str, Any]:
-    """Decode the work request JSON payload."""
-    try:
-        payload = json.loads(args.payload_json or "{}")
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid payload JSON: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError("Payload JSON must decode to an object.")
-    return payload
 
 
 def table_from_request(args: argparse.Namespace, payload: dict[str, Any]) -> str:
@@ -654,7 +643,7 @@ def run_action(args: argparse.Namespace) -> int:
     )
 
     try:
-        payload = payload_from_args(args)
+        payload = decode_payload(args.payload_json)
         applied, removed = execute_work_request(args, payload)
     except Exception as exc:  # noqa: BLE001 - message is returned to workreqd.
         logger.error(f"Firewall rule execution failed: {exc}", source=LOG_SOURCE)

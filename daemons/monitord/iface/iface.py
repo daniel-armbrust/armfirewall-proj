@@ -10,11 +10,13 @@ from ..constants import RRD_DIR
 from ..rrd import rrd_needs_creation
 from core import db
 from core import log as logger
+from core.constants import IFACE_DB_PATH
 from core.process import run_command
 
 from .constants import COLLECT_INTERVAL_SECONDS, INTERFACE_DS, LOG_SOURCE, PROC_NET_DEV
 from .graphs import generate_graphs, rrd_path_for_iface
 from .models import CounterSnapshot, InterfaceCounters
+
 
 class InterfaceMonitor:
     """Collect interface counters and maintain their RRD graphs."""
@@ -45,7 +47,8 @@ def monitored_interfaces() -> list[str]:
                 ELSE 3
             END,
             name
-        """
+        """,
+        db_path=IFACE_DB_PATH,
     )
     
     return [str(row["name"]) for row in rows if row.get("name")]

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from core import auth
+from web import auth
 from web.routes.dashboard import routes as dashboard_routes
 from web.routes.firewall import routes as firewall_routes
 from web.routes.interfaces import routes as interface_routes

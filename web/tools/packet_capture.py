@@ -15,11 +15,12 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from core import auth, db
+from web import auth
+from core import db
+from core.constants import IFACE_DB_PATH
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-IFACE_DB_PATH = ROOT_DIR / "db" / "iface.db"
 PACKET_CAPTURE_LOCK_PATH = Path("/tmp/armfirewall-packet-capture.lock")
 templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
 HOST_RE = re.compile(r"^[A-Za-z0-9.-]{1,253}$")

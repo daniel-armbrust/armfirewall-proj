@@ -6,8 +6,6 @@ import base64
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -15,41 +13,21 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from core import db
-
-
-ROOT_DIR = Path(__file__).resolve().parents[1]
-USERS_DB_PATH = ROOT_DIR / "db" / "users.db"
-SESSION_COOKIE = "armfw_session"
-SESSION_TTL = timedelta(hours=8)
-LOGIN_PATH = "/login"
-CHANGE_PASSWORD_PATH = "/login/change-password"
-LOGOUT_PATH = "/logout"
-PUBLIC_PREFIXES = ("/static/",)
-AUTH_FLOW_PATHS = {LOGIN_PATH, CHANGE_PASSWORD_PATH}
-
-
-def utc_now() -> datetime:
-    """Return the current UTC datetime without relying on local timezone."""
-    return datetime.now(timezone.utc)
-
-
-def sqlite_timestamp(value: datetime | None = None) -> str:
-    """Format a datetime for storage in SQLite text columns."""
-    return (value or utc_now()).strftime("%Y-%m-%d %H:%M:%S")
-
-
-def parse_sqlite_timestamp(value: str | None) -> datetime | None:
-    """Parse a SQLite timestamp as UTC."""
-    if not value:
-        return None
-    try:
-        return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-    except ValueError:
-        return None
+from core.constants import (
+    AUTH_FLOW_PATHS,
+    CHANGE_PASSWORD_PATH,
+    LOGIN_PATH,
+    LOGOUT_PATH,
+    PUBLIC_PREFIXES,
+    SESSION_COOKIE,
+    SESSION_TTL,
+    USERS_DB_PATH,
+)
 
 
 def hash_session_token(token: str) -> str:
     """Hash a browser session token before database lookup or storage."""
+
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
@@ -70,6 +48,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return False
 
     actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), rounds)
+
     return hmac.compare_digest(actual, expected)
 
 
@@ -78,12 +57,14 @@ def hash_password(password: str) -> str:
     iterations = 260000
     salt = secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations)
+
     return f"pbkdf2_sha256${iterations}${salt}${base64.b64encode(digest).decode('ascii')}"
 
 
 def wants_json(request: Request) -> bool:
     """Return whether an unauthenticated request should receive JSON."""
     accept = request.headers.get("accept", "")
+
     return request.url.path.startswith("/api/") or "application/json" in accept
 
 
@@ -95,8 +76,10 @@ def is_public_path(path: str) -> bool:
 def login_redirect(request: Request) -> RedirectResponse:
     """Redirect a browser request to the login page preserving the next URL."""
     next_path = request.url.path
+
     if request.url.query:
         next_path = f"{next_path}?{request.url.query}"
+
     return RedirectResponse(f"{LOGIN_PATH}?next={quote(next_path)}", status_code=303)
 
 
@@ -104,6 +87,7 @@ def unauthorized_response(request: Request) -> Response:
     """Return a redirect or JSON response for unauthenticated requests."""
     if wants_json(request):
         return JSONResponse({"detail": "Authentication required."}, status_code=401)
+    
     return login_redirect(request)
 
 
@@ -136,8 +120,9 @@ def get_user_from_session_token(token: str | None) -> dict[str, Any] | None:
     if not token:
         return None
 
-    now = sqlite_timestamp()
+    now = db.sqlite_timestamp()
     token_hash = hash_session_token(token)
+
     with db.transaction(USERS_DB_PATH) as conn:
         row = db.fetch_one_on(
             conn,
@@ -152,6 +137,7 @@ def get_user_from_session_token(token: str | None) -> dict[str, Any] | None:
             """,
             (token_hash, now),
         )
+
         if row is None:
             return None
 
@@ -165,14 +151,17 @@ def get_user_from_session_token(token: str | None) -> dict[str, Any] | None:
             """,
             (token_hash,),
         )
+
         return db.row_to_dict(row)
 
 
 def get_current_user(request: Request) -> dict[str, Any] | None:
     """Return the authenticated user attached to a request, if any."""
     user = getattr(request.state, "current_user", None)
+
     if user:
         return user
+    
     return get_user_from_session_token(request.cookies.get(SESSION_COOKIE))
 
 
@@ -187,6 +176,7 @@ def record_login_event(
     """Store an authentication event for audit purposes."""
     remote_addr = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
+
     with db.transaction(USERS_DB_PATH) as conn:
         db.execute_on(
             conn,
@@ -218,6 +208,7 @@ def register_failed_login(username: str, request: Request, user: dict[str, Any] 
                 """,
                 (user["id"],),
             )
+
         db.execute_on(
             conn,
             """
@@ -243,9 +234,10 @@ def register_failed_login(username: str, request: Request, user: dict[str, Any] 
 def create_session(user: dict[str, Any], request: Request, response: Response) -> None:
     """Create a browser session and attach it to the response cookie."""
     token = secrets.token_urlsafe(48)
-    expires_at = sqlite_timestamp(utc_now() + SESSION_TTL)
+    expires_at = db.sqlite_timestamp(db.utc_now() + SESSION_TTL)
     remote_addr = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
+    
     with db.transaction(USERS_DB_PATH) as conn:
         db.execute_on(
             conn,
@@ -261,6 +253,7 @@ def create_session(user: dict[str, Any], request: Request, response: Response) -
             """,
             (user["id"], hash_session_token(token), remote_addr, user_agent, expires_at),
         )
+
         db.execute_on(
             conn,
             """
@@ -273,6 +266,7 @@ def create_session(user: dict[str, Any], request: Request, response: Response) -
             """,
             (remote_addr, user["id"]),
         )
+
         db.execute_on(
             conn,
             """
@@ -294,6 +288,7 @@ def create_session(user: dict[str, Any], request: Request, response: Response) -
 def revoke_session(request: Request) -> None:
     """Revoke the current browser session when a token exists."""
     token = request.cookies.get(SESSION_COOKIE)
+   
     if not token:
         return
 
@@ -318,12 +313,14 @@ def clear_session_cookie(response: Response) -> None:
 def authenticate(username: str, password: str, request: Request) -> tuple[dict[str, Any] | None, str | None]:
     """Validate submitted credentials and return a user or an error message."""
     user = get_user_by_username(username)
+    
     if not user or int(user["enabled"]) != 1:
         register_failed_login(username, request, user)
         return None, "Invalid username or password."
 
-    locked_until = parse_sqlite_timestamp(user.get("locked_until"))
-    if locked_until and locked_until > utc_now():
+    locked_until = db.parse_sqlite_timestamp(user.get("locked_until"))
+
+    if locked_until and locked_until > db.utc_now():
         record_login_event(username, "locked", request, user_id=user["id"], message="User is locked.")
         return None, "User is temporarily locked."
 
@@ -359,12 +356,14 @@ async def enforce_authentication(request: Request, call_next: Any) -> Response:
 
     user = get_user_from_session_token(request.cookies.get(SESSION_COOKIE))
     request.state.current_user = user
+
     if not user:
         return unauthorized_response(request)
 
     if int(user.get("must_change_password") or 0) == 1 and path != LOGOUT_PATH:
         if wants_json(request):
             return JSONResponse({"detail": "Password change required."}, status_code=403)
+        
         return RedirectResponse(CHANGE_PASSWORD_PATH, status_code=303)
 
     return await call_next(request)

@@ -14,8 +14,8 @@ from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from core import iface as iface_module
 from core import db
+from core import iface as iface_module
 from web.services import status as service_status
 
 
@@ -573,7 +573,7 @@ def list_interfaces() -> list[dict[str, Any]]:
     """Return available interfaces for dnsmasq binding."""
     try:
         return iface_module.get_interfaces().get("interfaces", [])
-    except HTTPException:
+    except (FileNotFoundError, db.DatabaseError):
         return []
 
 

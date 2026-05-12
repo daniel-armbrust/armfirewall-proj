@@ -91,7 +91,7 @@ def iface_names() -> set[str]:
     """Return known interface names from iface.db."""
     try:
         return {str(item["name"]) for item in iface_module.get_interfaces().get("interfaces", [])}
-    except HTTPException:
+    except (FileNotFoundError, db.DatabaseError):
         return set()
 
 

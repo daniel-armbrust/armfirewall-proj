@@ -10,12 +10,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core import db
+from core.constants import IFACE_DB_PATH
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 RRD_IMG_DIR = ROOT_DIR / "rrd" / "img"
 LATENCY_DB_PATH = ROOT_DIR / "db" / "latency.db"
-IFACE_DB_PATH = ROOT_DIR / "db" / "iface.db"
 templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
 
 CPU_MEM_GRAPHS = [
@@ -277,7 +277,8 @@ def read_monitored_interfaces() -> list[dict[str, Any]]:
                 ELSE 3
             END,
             name
-        """
+        """,
+        db_path=IFACE_DB_PATH,
     )
     return [db.row_to_dict(row) for row in rows if row.get("name")]
 

@@ -4,44 +4,38 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from pathlib import Path
-from typing import Any
 
-
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+from .constants import DNSMASQ_CONF, DNSMASQ_DB_PATH, LOG_SOURCE, WORK_REQUEST_DB_PATH
+from .models import DnsmasqWorkRequest
 
 from core import db
 from core import log as logger
+from core.workrequest import decode_payload
 from web.services.dnsmasq import dnsmasq as dnsmasq_config
 
 
-DNSMASQ_DB_PATH = ROOT_DIR / "db" / "dnsmasq.db"
-WORK_REQUEST_DB_PATH = ROOT_DIR / "db" / "work-requests.db"
-DNSMASQ_CONF = ROOT_DIR / "conf" / "dnsmasq.conf"
-LOG_SOURCE = "dnsmasq.py"
+def request_from_args(args: argparse.Namespace) -> DnsmasqWorkRequest:
+    """Return a normalized Dnsmasq work request from CLI arguments."""
+    return DnsmasqWorkRequest(
+        work_request_id=str(args.work_request_id),
+        request_uid=str(args.request_uid),
+        category_name=str(args.category_name),
+        category=str(args.category),
+        family=str(args.family or ""),
+        target_name=str(args.target_name),
+        action_name=str(args.action_name),
+        target_rule_id=str(args.target_rule_id or ""),
+        payload=decode_payload(args.payload_json),
+    )
 
 
-def verify_databases() -> None:
-    """Verify that required SQLite databases are available."""
-    with db.connection(DNSMASQ_DB_PATH) as conn:
-        db.fetch_one_on(conn, "SELECT 1")
-    with db.connection(WORK_REQUEST_DB_PATH) as conn:
-        db.fetch_one_on(conn, "SELECT 1")
-
-
-def payload_from_args(args: argparse.Namespace) -> dict[str, Any]:
-    """Decode the work request JSON payload."""
-    try:
-        payload = json.loads(args.payload_json or "{}")
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid payload JSON: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError("Payload JSON must decode to an object.")
-    return payload
+def validate_request(request: DnsmasqWorkRequest) -> None:
+    """Ensure this executor supports the requested Dnsmasq action."""
+    if request.category != "SERVICE_MANAGEMENT" or request.target_name != "dnsmasq_config":
+        raise RuntimeError(f"Unsupported category for dnsmasq.py: {request.category}/{request.target_name}")
+    if request.action_name != "apply":
+        raise RuntimeError(f"Unsupported Dnsmasq action: {request.action_name}")
 
 
 def write_dnsmasq_conf(config_text: str) -> None:
@@ -99,13 +93,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     """Execute one Dnsmasq work request."""
     args = build_parser().parse_args()
-    if args.category != "SERVICE_MANAGEMENT" or args.target_name != "dnsmasq_config":
-        raise RuntimeError(f"Unsupported category for dnsmasq.py: {args.category}/{args.target_name}")
-    if args.action_name != "apply":
-        raise RuntimeError(f"Unsupported Dnsmasq action: {args.action_name}")
-
-    payload_from_args(args)
-    verify_databases()
+    request = request_from_args(args)
+    validate_request(request)
+    db.verify_databases(DNSMASQ_DB_PATH, WORK_REQUEST_DB_PATH)
     apply_config()
     return 0
 

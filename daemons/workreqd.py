@@ -11,14 +11,14 @@ from pathlib import Path
 from typing import Any
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from core import db
+from core.constants import DB_DIR, ROOT_DIR
 from core import log as logger
 
-DB_DIR = ROOT_DIR / "db"
 WORK_REQUEST_DB_PATH = DB_DIR / "work-requests.db"
 CHECK_INTERVAL_SECONDS = int(os.environ.get("ARMFIREWALL_ARMFWORKREQD_INTERVAL", "5"))
 BATCH_SIZE = int(os.environ.get("ARMFIREWALL_ARMFWORKREQD_BATCH_SIZE", "10"))
@@ -100,21 +100,21 @@ def queued_requests(conn: db.Connection) -> list[Any]:
 def command_for_request(request: Any) -> list[str]:
     """Build the action command for a work request."""
     if str(request["category_name"]) == "SERVICE_MANAGEMENT.DNSMASQ_CONFIG":
-        script_name = "dnsmasq.py"
+        command = [sys.executable, "-m", "daemons.dnsmasq.dnsmasq"]
     else:
         script_name = str(request["script_name"])
 
-    if "/" in script_name or ".." in script_name or not script_name.endswith(".py"):
-        raise RuntimeError(f"Invalid action script name configured: {script_name}")
+        if "/" in script_name or ".." in script_name or not script_name.endswith(".py"):
+            raise RuntimeError(f"Invalid action script name configured: {script_name}")
 
-    script_path = ROOT_DIR / "daemons" / script_name
-    
-    if not script_path.exists():
-        raise FileNotFoundError(f"Action script not found: {script_path}")
+        script_path = ROOT_DIR / "daemons" / script_name
+
+        if not script_path.exists():
+            raise FileNotFoundError(f"Action script not found: {script_path}")
+        command = [sys.executable, str(script_path)]
 
     return [
-        sys.executable,
-        str(script_path),
+        *command,
         "--work-request-id",
         str(request["id"]),
         "--request-uid",

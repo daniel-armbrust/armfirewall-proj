@@ -4,21 +4,21 @@
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from core import db
+from core.constants import DB_DIR
 from core import log as logger
+from core.workrequest import decode_payload
 
-DB_DIR = ROOT_DIR / "db"
 POLICY_DB_PATH = DB_DIR / "policy-routing.db"
 RT_TABLES_PATH = Path("/etc/iproute2/rt_tables")
 LOG_SOURCE = "proutes.py"
@@ -37,17 +37,6 @@ def verify_policy_database() -> None:
     """Verify that the policy routing database can be opened."""
     with db.connection(POLICY_DB_PATH) as conn:
         db.fetch_one_on(conn, "SELECT 1")
-
-
-def payload_from_args(args: argparse.Namespace) -> dict[str, Any]:
-    """Decode the work request JSON payload."""
-    try:
-        payload = json.loads(args.payload_json or "{}")
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid payload JSON: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError("Payload JSON must decode to an object.")
-    return payload
 
 
 def ip_family_arg(family: str) -> str:
@@ -551,7 +540,7 @@ def run_action(args: argparse.Namespace) -> int:
     try:
         if args.action_name != "apply":
             raise RuntimeError(f"Unsupported policy routing action: {args.action_name}")
-        payload = payload_from_args(args)
+        payload = decode_payload(args.payload_json)
         applied, removed = execute_work_request(payload)
     except Exception as exc:  # noqa: BLE001 - message is returned to workreqd.
         logger.error(f"Policy routing execution failed: {exc}", source=LOG_SOURCE)

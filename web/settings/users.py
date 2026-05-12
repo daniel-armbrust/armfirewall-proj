@@ -7,12 +7,13 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from core import auth, db
+from web import auth
+from core import db
+from core.constants import USERS_DB_PATH
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
-USERS_DB_PATH = ROOT_DIR / "db" / "users.db"
 VALID_ROLES = {"admin", "operator", "viewer"}
 
 

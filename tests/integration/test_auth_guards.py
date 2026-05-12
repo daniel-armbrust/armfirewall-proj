@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from types import SimpleNamespace
 
-from core import auth
+from web import auth
 
 
 class AuthenticationGuardTests(unittest.TestCase):

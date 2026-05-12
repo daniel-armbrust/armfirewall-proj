@@ -11,9 +11,10 @@ from pathlib import Path
 
 from core import db
 from core import log as logger
+from core.constants import DB_DIR
 from core.process import run_command_stdout
 
-from .constants import COLLECT_INTERVAL_SECONDS, LOG_SOURCE, PROC_ITEMS
+from .constants import COLLECT_INTERVAL_SECONDS, IFACE_DB_PATH, LOG_SOURCE, PROC_ITEMS
 from .models import InterfaceAddress, InterfaceInfo, InterfaceStats
 
 
@@ -372,10 +373,10 @@ def collect_once(conn: db.Connection) -> None:
 
 def main() -> None:
     """Run the interface collection loop forever."""
-    db.DB_DIR.mkdir(parents=True, exist_ok=True)
+    DB_DIR.mkdir(parents=True, exist_ok=True)
     logger.log(f"Starting network interface daemon with {COLLECT_INTERVAL_SECONDS}s interval.", source=LOG_SOURCE)
 
-    conn = db.connect()
+    conn = db.connect(IFACE_DB_PATH)
     
     try:
         while True:

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import shutil
 import subprocess
 import sys
@@ -12,14 +11,16 @@ from pathlib import Path
 from typing import Any, Optional
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
+from core.constants import CONF_DIR, ROOT_DIR
 from core import log as logger
+from core.workrequest import decode_payload
 
 
-SUPERVISOR_CONF = ROOT_DIR / "conf" / "supervisord.conf"
+SUPERVISOR_CONF = CONF_DIR / "supervisord.conf"
 LOG_SOURCE = "servicemgmt.py"
 ALLOWED_SERVICES = {
     "armfirewall-squid": {
@@ -80,17 +81,6 @@ def package_installed(package: str) -> bool:
         completed = run_command(["dpkg-query", "-W", "-f=${Status}", package], timeout=30, check=False)
         return completed.returncode == 0 and "install ok installed" in completed.stdout
     return False
-
-
-def payload_from_args(args: argparse.Namespace) -> dict[str, Any]:
-    """Decode the work request JSON payload."""
-    try:
-        payload = json.loads(args.payload_json or "{}")
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid payload JSON: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError("Payload JSON must decode to an object.")
-    return payload
 
 
 def validate_service(payload: dict[str, Any]) -> dict[str, Any]:
@@ -256,7 +246,7 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.category != "SERVICE_MANAGEMENT":
         raise RuntimeError(f"Unsupported category for servicemgmt.py: {args.category}")
-    payload = payload_from_args(args)
+    payload = decode_payload(args.payload_json)
 
     if args.action_name == "install":
         service = validate_service(payload)
