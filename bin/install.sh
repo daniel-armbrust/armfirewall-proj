@@ -18,9 +18,8 @@ print_banner() {
  | | | || |   | | | | | | | |   | | | |  __/\ V  V / (_| | | |
  \_| |_/\_|   |_| |_| |_| \_|   |_|_|  \___| \_/\_/ \__,_|_|_|
 
-        ./ArmFirewall (by Daniel Armbrust)
+        ./ ArmFirewall installer
         secure edge routing / firewall / monitoring
-        
 BANNER
 }
 
@@ -74,6 +73,9 @@ main() {
 
     # Installs operating system dependencies and prepares the Python runtime
     "$ROOT_DIR/bin/scripts/osdeps.sh"
+
+    # Disables native OS firewall services before ArmFirewall owns rules
+    "$ROOT_DIR/bin/scripts/disablesrvs.sh"
 
     # Creates SQLite DB files from DDLs files
     "$ROOT_DIR/bin/scripts/createdb.sh"
