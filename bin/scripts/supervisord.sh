@@ -11,6 +11,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/log.sh"
 
 SYSTEMD_UNIT_FILE="/etc/systemd/system/armfirewall-supervisord.service"
+SYSTEMD_SERVICE_NAME="armfirewall-supervisord.service"
 
 # Create the systemd unit responsible for running ArmFirewall supervisord.
 create_systemd_unit() {
@@ -50,6 +51,19 @@ UNIT
     fi
 
     log "Created systemd unit: ${SYSTEMD_UNIT_FILE}."
+}
+
+# Enable and start the ArmFirewall supervisord systemd service.
+enable_and_start_systemd_unit() {
+    command -v systemctl >/dev/null 2>&1 || fatal "systemctl was not found."
+
+    systemctl enable "$SYSTEMD_SERVICE_NAME" >/dev/null || \
+        fatal "Could not enable ${SYSTEMD_SERVICE_NAME}."
+
+    systemctl restart "$SYSTEMD_SERVICE_NAME" || \
+        fatal "Could not start ${SYSTEMD_SERVICE_NAME}."
+
+    log "Enabled and started systemd service: ${SYSTEMD_SERVICE_NAME}."
 }
 
 # Create the supervisord configuration used by ArmFirewall services.
@@ -146,41 +160,6 @@ stderr_logfile=$ROOT_DIR/logs/armfirewall-workreqd.err.log
 stderr_logfile_maxbytes=5MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
-
-[program:armfirewall-dnsmasq]
-directory=$ROOT_DIR
-command=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=$ROOT_DIR/conf/dnsmasq.conf --pid-file=$ROOT_DIR/logs/dnsmasq.pid
-user=armfw
-autostart=false
-autorestart=true
-startsecs=3
-stopsignal=TERM
-stopasgroup=true
-killasgroup=true
-stdout_logfile=$ROOT_DIR/logs/armfirewall-dnsmasq.out.log
-stdout_logfile_maxbytes=5MB
-stdout_logfile_backups=5
-stderr_logfile=$ROOT_DIR/logs/armfirewall-dnsmasq.err.log
-stderr_logfile_maxbytes=5MB
-stderr_logfile_backups=5
-
-[program:armfirewall-linkfailover]
-directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/python $ROOT_DIR/daemons/linkfailover.py
-user=armfw
-autostart=false
-autorestart=true
-startsecs=3
-stopsignal=TERM
-stopasgroup=true
-killasgroup=true
-stdout_logfile=$ROOT_DIR/logs/armfirewall-linkfailover.out.log
-stdout_logfile_maxbytes=5MB
-stdout_logfile_backups=5
-stderr_logfile=$ROOT_DIR/logs/armfirewall-linkfailover.err.log
-stderr_logfile_maxbytes=5MB
-stderr_logfile_backups=5
-environment=PYTHONUNBUFFERED="1"
 SUPERVISOR
 
     log "Created supervisord configuration: ${SUPERVISORD_CONF}."
@@ -190,6 +169,7 @@ SUPERVISOR
 main() {
     create_supervisord_conf
     create_systemd_unit
+    enable_and_start_systemd_unit
 }
 
 main "$@"
