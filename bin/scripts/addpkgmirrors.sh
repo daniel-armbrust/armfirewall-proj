@@ -4,10 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# shellcheck source=scripts/globals.sh
 . "$ROOT_DIR/bin/scripts/globals.sh"
-. "$ROOT_DIR/bin/scripts/log.sh"
-
-ARMFIREWALL_LOG_CONTEXT="$(basename "$0")"
 
 OS_ID="" 
 OS_VERSION_ID="" 

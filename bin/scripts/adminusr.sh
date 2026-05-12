@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# shellcheck source=scripts/globals.sh
+. "$ROOT_DIR/bin/scripts/globals.sh"
+
 USER_DB="$ROOT_DIR/db/users.db"
 
 # Return a PBKDF2-SHA256 hash in a self-describing format
@@ -32,7 +38,7 @@ ensure_users_schema() {
     
     table_count="$(sqlite3 "$USER_DB" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'users';")"
     
-    [[ "$table_count" == "1" ]] || fatal "Users table was not found in ${USER_DB}; run execddl.sh first."
+    [[ "$table_count" == "1" ]] || fatal "Users table was not found in ${USER_DB}; run createdb.sh first."
 }
 
 # Create the default protected admin user when it does not already exist
@@ -46,12 +52,10 @@ ensure_admin_user() {
         log "Default admin user already exists; preserving current password."
 
         sqlite3 "$USER_DB" <<'SQL'
-UPDATE users
-   SET role = 'admin',
-       enabled = 1,
-       protected = 1,
-       updated_at = CURRENT_TIMESTAMP
- WHERE username = 'admin';
+            UPDATE users SET 
+                    role = 'admin', enabled = 1, 
+                    protected = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE username = 'admin';
 SQL
 
         return 0
@@ -60,25 +64,13 @@ SQL
     password_hash="$(generate_admin_password_hash)"
 
     sqlite3 "$USER_DB" <<SQL
-INSERT INTO users (
-     username,
-     display_name,
-     password_hash,
-     password_changed_at,
-     must_change_password,
-     role,
-     enabled,
-     protected
-) VALUES (
-     'admin',
-     'ArmFirewall Administrator',
-     '${password_hash}',
-     CURRENT_TIMESTAMP,
-     1,
-     'admin',
-     1,
-     1
-);
+        INSERT INTO users (
+            username, display_name, password_hash, password_changed_at,
+            must_change_password, role, enabled, protected
+        ) VALUES (
+            'admin', 'ArmFirewall Administrator', '${password_hash}',
+            CURRENT_TIMESTAMP, 1, 'admin', 1, 1
+        );
 SQL
 
     log "Default admin user was created and must change password on first login."

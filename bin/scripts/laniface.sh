@@ -49,46 +49,25 @@ persist_lan_iface_db() {
     description_sql="$(sql_quote "LAN interface configured during ArmFirewall install: ${LAN_IFACE}")"
 
     sqlite_exec "$IFACE_DB" "
-UPDATE ifaces
-   SET role = 'UNKNOWN',
-       protected = 0,
-       collected_at = CURRENT_TIMESTAMP
- WHERE role = 'LAN'
-   AND name <> ${iface_sql};
+        UPDATE ifaces SET role = 'UNKNOWN', protected = 0, collected_at = CURRENT_TIMESTAMP
+            WHERE role = 'LAN' AND name <> ${iface_sql};
 
-INSERT INTO ifaces (
-    name,
-    is_actived,
-    description,
-    mtu,
-    mac_address,
-    role,
-    type,
-    speed_mbps,
-    duplex,
-    protected,
-    collected_at
-) VALUES (
-    ${iface_sql},
-    ${active},
-    ${description_sql},
-    ${mtu},
-    ${mac_sql},
-    'LAN',
-    'Ethernet',
-    0,
-    'unknown',
-    1,
-    CURRENT_TIMESTAMP
-)
-ON CONFLICT(name) DO UPDATE SET
-    is_actived = excluded.is_actived,
-    description = excluded.description,
-    mtu = excluded.mtu,
-    mac_address = excluded.mac_address,
-    role = 'LAN',
-    protected = 1,
-    collected_at = CURRENT_TIMESTAMP;
+        INSERT INTO ifaces (
+            name, is_actived, description, mtu, mac_address, role, type,
+            speed_mbps, duplex, protected, collected_at
+        ) VALUES (
+            ${iface_sql}, ${active}, ${description_sql}, ${mtu},
+            ${mac_sql}, 'LAN', 'Ethernet', 0, 'unknown', 1,
+            CURRENT_TIMESTAMP
+        )
+        ON CONFLICT(name) DO UPDATE SET
+            is_actived = excluded.is_actived,
+            description = excluded.description,
+            mtu = excluded.mtu,
+            mac_address = excluded.mac_address,
+            role = 'LAN',
+            protected = 1,
+            collected_at = CURRENT_TIMESTAMP;
 "
 
     log "LAN interface saved to ${IFACE_DB}: ${LAN_IFACE}."

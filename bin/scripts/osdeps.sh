@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# shellcheck source=scripts/globals.sh
+. "$ROOT_DIR/bin/scripts/globals.sh"
+
 VENV_DIR="$ROOT_DIR/.venv"
 LAST_LOG=""
 
@@ -179,7 +185,7 @@ disable_selinux() {
 main() { 
     # Disables SELinux enforcement at runtime and persistently in the 
     # system configuration
-    disable_selinux; 
+    disable_selinux 
     
     # Synchronizes the system clock before package transactions to avoid 
     # signature validation errors
@@ -187,13 +193,13 @@ main() {
 
     # Installs required operating system packages using the detected 
     # package manager
-    install_system_deps; 
+    install_system_deps
     
     # Creates the Python virtual environment and installs ArmFirewall Python 
     # dependencies
-    create_python_env; 
+    create_python_env
     
-    log "ArmFirewall dependencies were installed successfully."; 
+    log "ArmFirewall dependencies were installed successfully."
 }
 
 main "$@"

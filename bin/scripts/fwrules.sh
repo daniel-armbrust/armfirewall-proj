@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# shellcheck source=scripts/globals.sh
+. "$ROOT_DIR/bin/scripts/globals.sh"
+
 IPV4_FILTER_RULES_DB="${IPV4_FILTER_RULES_DB:-$DB_DIR/ipv4-filter-rules.db}"
 IPV6_FILTER_RULES_DB="${IPV6_FILTER_RULES_DB:-$DB_DIR/ipv6-filter-rules.db}"
 
@@ -9,8 +15,13 @@ filter_rules_db() {
     local family="$1"
 
     case "$family" in
-        ipv4) printf '%s\n' "$IPV4_FILTER_RULES_DB" ;;
-        ipv6) printf '%s\n' "$IPV6_FILTER_RULES_DB" ;;
+        ipv4) 
+            printf '%s\n' "$IPV4_FILTER_RULES_DB" 
+            ;;
+
+        ipv6) 
+            printf '%s\n' "$IPV6_FILTER_RULES_DB" 
+            ;;
     esac
 }
 
@@ -19,8 +30,13 @@ filter_any_addr() {
     local family="$1"
 
     case "$family" in
-        ipv4) printf '0.0.0.0/0\n' ;;
-        ipv6) printf '::/0\n' ;;
+        ipv4) 
+            printf '0.0.0.0/0\n' 
+            ;;
+
+        ipv6) 
+            printf '::/0\n' 
+            ;;
     esac
 }
 
@@ -37,54 +53,24 @@ record_lan_input_rule() {
     any_addr="$(filter_any_addr "$family")"
 
     sqlite_exec "$db_path" "
-INSERT INTO filter_input_rules (
-    iface_in,
-    rule_order,
-    ct_new,
-    ct_established,
-    ct_related,
-    ct_invalid,
-    src_addr,
-    src_port,
-    dst_addr,
-    dst_port,
-    protocol_name,
-    protocol_type,
-    protocol_code,
-    action,
-    protected,
-    enabled,
-    created_at,
-    updated_at
-)
-SELECT
-    $(sql_quote "$iface"),
-    (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
-    0,
-    0,
-    0,
-    0,
-    $(sql_quote "$any_addr"),
-    0,
-    $(sql_quote "$any_addr"),
-    ${port},
-    $(sql_quote "$protocol"),
-    NULL,
-    NULL,
-    'ACCEPT',
-    1,
-    1,
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
-WHERE NOT EXISTS (
-    SELECT 1
-      FROM filter_input_rules
-     WHERE iface_in = $(sql_quote "$iface")
-       AND protocol_name = $(sql_quote "$protocol")
-       AND dst_port = ${port}
-       AND action = 'ACCEPT'
-);
-"
+        INSERT INTO filter_input_rules (
+            iface_in, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at)
+                SELECT
+                    $(sql_quote "$iface"), (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
+                    0, 0, 0, 0, $(sql_quote "$any_addr"), 0,
+                    $(sql_quote "$any_addr"), ${port},
+                    $(sql_quote "$protocol"), NULL, NULL,
+                    'ACCEPT', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM filter_input_rules 
+                        WHERE iface_in = $(sql_quote "$iface")
+                            AND protocol_name = $(sql_quote "$protocol")
+                            AND dst_port = ${port}
+                            AND action = 'ACCEPT'
+        );"
 }
 
 # Apply one LAN INPUT allow rule using iptables or ip6tables.
@@ -95,7 +81,7 @@ apply_lan_input_rule() {
     local port="$4"
 
     "$binary" -t filter -C INPUT -i "$iface" -p "$protocol" --dport "$port" -j ACCEPT 2>/dev/null || \
-        "$binary" -t filter -A INPUT -i "$iface" -p "$protocol" --dport "$port" -j ACCEPT
+    "$binary" -t filter -A INPUT -i "$iface" -p "$protocol" --dport "$port" -j ACCEPT
 }
 
 # Register and apply LAN INPUT rules from ALLOW_LAN_TCP_PORTS 

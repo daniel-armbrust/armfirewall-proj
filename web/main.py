@@ -19,7 +19,7 @@ from web.routes.services import routes as service_routes
 from web.routes.tools import routes as tools_routes
 
 
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parent.parent
 SUPERVISOR_CONF = ROOT_DIR / "conf" / "supervisord.conf"
 
 

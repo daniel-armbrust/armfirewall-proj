@@ -9,6 +9,10 @@ resolve_root_dir() {
 
 # Global Variables
 export ROOT_DIR="$(resolve_root_dir)"
+
+# shellcheck source=log.sh
+. "$ROOT_DIR/bin/scripts/log.sh"
+
 export ARMFIREWALL_LOG_CONTEXT="$(basename "$0")"
 export CONF_DIR="$ROOT_DIR/conf"
 export DB_DIR="$ROOT_DIR/db"

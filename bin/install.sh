@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-export LAN_IFACE=""
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+export LAN_IFACE=""
 
 # shellcheck source=scripts/globals.sh
 . "$ROOT_DIR/bin/scripts/globals.sh"
@@ -73,7 +72,11 @@ main() {
     # ArmFirewall web API
     "$ROOT_DIR/bin/scripts/sslcert.sh"
 
-    # TODO: create systemd for supervisord.
+    # Creates the operating system user used by supervisord-managed services
+    "$ROOT_DIR/bin/scripts/osuser.sh"
+
+    # Creates supervisord and systemd service manager files
+    "$ROOT_DIR/bin/scripts/supervisord.sh"
 }
 
 main "$@"
