@@ -15,7 +15,7 @@ latency_sql_quote() {
 # Verify that execddl.sh already created the latency database.
 require_latency_db() {
     command -v sqlite3 >/dev/null 2>&1 || fatal "sqlite3 is required to store latency targets."
-    [[ -f "$LATENCY_DB" ]] || fatal "Latency database was not found: ${LATENCY_DB}. Run bin/scripts/execddl.sh first."
+    [[ -f "$LATENCY_DB" ]] || fatal "Latency database was not found: ${LATENCY_DB}. Run bin/scripts/install/execddl.sh first."
 
     sqlite3 "$LATENCY_DB" "
         SELECT 1

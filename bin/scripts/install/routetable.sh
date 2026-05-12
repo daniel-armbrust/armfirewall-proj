@@ -2,10 +2,10 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# shellcheck source=globals.sh
-. "$ROOT_DIR/bin/scripts/globals.sh"
+# shellcheck source=../common/globals.sh
+. "$ROOT_DIR/bin/scripts/common/globals.sh"
 
 RT_TABLES_PATH="${RT_TABLES_PATH:-/etc/iproute2/rt_tables}"
 
@@ -505,28 +505,20 @@ import_rules_for_family() {
     done < <(ip "$ip_family" rule show 2>/dev/null || true)
 }
 
-main() {
+# Synchronize policy-routing.db with the current Linux route tables.
+sync_route_tables_db() {
     log "Synchronizing Linux route tables into ${POLICY_ROUTING_DB}."
-
-    # Verify that policy-routing.db exists and has the required schema.
     require_policy_routing_db
-
-    # Import routing table names from the Linux rt_tables registry.
     import_route_table_names
-
-    # Import all IPv4 routes from the Linux routing tables.
     import_routes_for_family ipv4 -4
-
-    # Import all IPv6 routes from the Linux routing tables.
     import_routes_for_family ipv6 -6
-
-    # Import all IPv4 policy routing rules from Linux.
     import_rules_for_family ipv4 -4
-
-    # Import all IPv6 policy routing rules from Linux.
     import_rules_for_family ipv6 -6
-    
     log "Route table synchronization completed."
+}
+
+main() {
+    sync_route_tables_db
 }
 
 main "$@"

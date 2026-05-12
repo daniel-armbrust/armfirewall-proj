@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# shellcheck source=globals.sh
-. "$ROOT_DIR/bin/scripts/globals.sh"
+# shellcheck source=../common/globals.sh
+. "$ROOT_DIR/bin/scripts/common/globals.sh"
 
-# shellcheck source=log.sh
-declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/log.sh"
+# shellcheck source=../common/log.sh
+declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/common/log.sh"
 
 ARMFW_USER="armfw"
 ARMFW_GROUP="armfw"
@@ -26,7 +26,6 @@ ensure_armfw_group() {
     fi
 
     groupadd "$ARMFW_GROUP" || fatal "Could not create operating system group: ${ARMFW_GROUP}."
-    
     log "Created operating system group: ${ARMFW_GROUP}."
 }
 
@@ -83,11 +82,30 @@ prepare_runtime_permissions() {
     log "Prepared ArmFirewall runtime permissions for ${ARMFW_USER}:${ARMFW_GROUP}."
 }
 
+# Prepare ownership and permissions for scripts executed by root or supervisord.
+prepare_script_permissions() {
+    chown root:"$ARMFW_GROUP" \
+        "$ROOT_DIR/bin/install.sh" \
+        "$ROOT_DIR/bin/armfwinit.sh"
+
+    chown -R root:"$ARMFW_GROUP" "$ROOT_DIR/bin/scripts"
+
+    chmod 0755 "$ROOT_DIR/bin" "$ROOT_DIR/bin/scripts"
+    find "$ROOT_DIR/bin/scripts" -type d -exec chmod 0755 {} +
+    find "$ROOT_DIR/bin/scripts" -type f -name '*.sh' -exec chmod 0755 {} +
+    find "$ROOT_DIR/bin/scripts" -type f ! -name '*.sh' -exec chmod 0644 {} +
+    chmod 0755 "$ROOT_DIR/bin/install.sh" "$ROOT_DIR/bin/armfwinit.sh"
+
+    log "Prepared ArmFirewall script permissions with root:${ARMFW_GROUP} ownership."
+}
+
 # Create the ArmFirewall operating system identity and runtime permissions.
 main() {
+    need_root
     ensure_armfw_group
     ensure_armfw_user
     prepare_runtime_permissions
+    prepare_script_permissions
 }
 
 main "$@"

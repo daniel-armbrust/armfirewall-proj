@@ -1,5 +1,3 @@
-![ArmFirewall Logo](./armfirewall.png)
-
 # ArmFirewall
 
 ArmFirewall is a Linux firewall management platform designed to turn a small server or virtual machine into a controlled network security appliance. The project combines operating system automation, persistent configuration in SQLite, background daemons, RRD-based monitoring, and a responsive FastAPI web interface.
@@ -24,8 +22,9 @@ ArmFirewall is organized around clear responsibility boundaries:
 - `main.py` initializes the FastAPI application, middleware, static files, and route modules.
 - `web/` contains the web GUI, templates, static assets, views, APIs, and HTTP route composition.
 - `core/` contains shared helpers such as SQLite access, interface helpers, and logging.
-- `bin/armfw.sh` is the main bootstrap/startup script.
-- `bin/scripts/` contains operating system automation for dependencies, DDL execution, firewall rules, policy routing, latency defaults, and shell logging.
+- `bin/install.sh` prepares the host during installation.
+- `bin/armfwinit.sh` applies persisted runtime state before supervisord starts ArmFirewall services.
+- `bin/scripts/` contains separated common, install, and start-pre shell helpers.
 - `daemons/` contains background and task-execution processes.
 - `daemons/monitord/` contains the monitoring collectors responsible for RRD updates and graph generation.
 - `db/ddl/` contains the versioned SQLite schemas.
@@ -36,10 +35,10 @@ ArmFirewall is organized around clear responsibility boundaries:
 
 The project uses `supervisord` to keep long-running services under control:
 
-- `armfirewall-api`: runs the FastAPI web application.
-- `armfirewall-ifaced`: collects network interface inventory and counters into SQLite.
-- `armfirewall-monitord`: runs monitoring collectors and generates RRD graphs.
-- `armfirewall-workreqd`: processes queued work requests and dispatches operating system actions.
+- `homefirewall-api`: runs the FastAPI web application.
+- `homefirewall-ifaced`: collects network interface inventory and counters into SQLite.
+- `homefirewall-monitord`: runs monitoring collectors and generates RRD graphs.
+- `homefirewall-workreqd`: processes queued work requests and dispatches operating system actions.
 
 Supervisor log rotation is configured for each managed process.
 
@@ -86,13 +85,13 @@ Important schemas include:
 
 ## Startup
 
-Run the main bootstrap script as root:
+Run the installer as root:
 
 ```bash
-bin/armfw.sh
+bin/install.sh --lan-iface <iface>
 ```
 
-The script installs dependencies, applies DDLs, collects interface choices, configures routing, applies baseline firewall rules, ensures default latency targets, and starts services through supervisord.
+The installer prepares dependencies, applies DDLs, persists selected interfaces, applies baseline firewall rules, imports route tables, creates the service user, generates TLS files, and configures supervisord/systemd. Runtime firewall, proc, and policy routing state is reapplied by `bin/armfwinit.sh` through systemd `ExecStartPre`.
 
 ## Development Notes
 

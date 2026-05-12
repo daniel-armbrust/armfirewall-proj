@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# shellcheck source=globals.sh
-. "$ROOT_DIR/bin/scripts/globals.sh"
+# shellcheck source=../common/globals.sh
+. "$ROOT_DIR/bin/scripts/common/globals.sh"
 
-# shellcheck source=log.sh
-declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/log.sh"
+# shellcheck source=../common/log.sh
+declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/common/log.sh"
 
 OS_ID=""
 OS_ID_LIKE=""

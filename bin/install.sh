@@ -4,23 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# shellcheck source=scripts/globals.sh
-. "$ROOT_DIR/bin/scripts/globals.sh"
-
-# Print the ArmFirewall installer banner.
-print_banner() {
-    cat <<'BANNER'
-   ___                    ______ _                        _ _
-  / _ \                   |  ___(_)                      | | |
- / /_\ \ _ __  _ __ ___   | |_   _ _ __ _____      ____ _| | |
- |  _  || '__|| '_ ` _ \  |  _| | | '__/ _ \ \ /\ / / _` | | |
- | | | || |   | | | | | | | |   | | | |  __/\ V  V / (_| | | |
- \_| |_/\_|   |_| |_| |_| \_|   |_|_|  \___| \_/\_/ \__,_|_|_|
-
-        ./ ArmFirewall installer
-        secure edge routing / firewall / monitoring
-BANNER
-}
+# shellcheck source=scripts/common/globals.sh
+. "$ROOT_DIR/bin/scripts/common/globals.sh"
 
 # Print command install.sh usage
 usage() {
@@ -73,7 +58,7 @@ parse_args() {
 
 main() {
     # Print installer banner
-    print_banner
+    print_banner "installer"
 
     # Parse install command line arguments
     parse_args "$@"
@@ -82,41 +67,41 @@ main() {
     need_root
 
     # Configures the operating system package repositories used by ArmFirewall
-    "$ROOT_DIR/bin/scripts/addpkgmirrors.sh"
+    "$ROOT_DIR/bin/scripts/install/addpkgmirrors.sh"
 
     # Installs operating system dependencies and prepares the Python runtime
-    "$ROOT_DIR/bin/scripts/osdeps.sh"
+    "$ROOT_DIR/bin/scripts/install/osdeps.sh"
 
     # Disables native OS firewall services before ArmFirewall owns rules
-    "$ROOT_DIR/bin/scripts/disablesrvs.sh"
+    "$ROOT_DIR/bin/scripts/install/disablesrvs.sh"
 
     # Creates SQLite DB files from DDLs files
-    "$ROOT_DIR/bin/scripts/createdb.sh"
+    "$ROOT_DIR/bin/scripts/install/execddl.sh"
 
     # Validate and persist the selected LAN interface in iface.db
-    "$ROOT_DIR/bin/scripts/laniface.sh"
+    "$ROOT_DIR/bin/scripts/install/laniface.sh"
 
     # TODO: apply firewall rules
-    "$ROOT_DIR/bin/scripts/fwrules.sh"
+    "$ROOT_DIR/bin/scripts/install/fwrules.sh"
 
     # Persist WAN and optionally enable router mode.
-    "$ROOT_DIR/bin/scripts/routermode.sh"
+    "$ROOT_DIR/bin/scripts/install/routermode.sh"
 
     # Import current Linux route tables into policy-routing.db
-    "$ROOT_DIR/bin/scripts/routetable.sh"
+    "$ROOT_DIR/bin/scripts/install/routetable.sh"
 
     # Ensures the default protected admin account exists in the users database
-    "$ROOT_DIR/bin/scripts/adminusr.sh"
+    "$ROOT_DIR/bin/scripts/install/adminusr.sh"
 
     # Generates and secures the self-signed TLS certificate used by the 
     # ArmFirewall web API
-    "$ROOT_DIR/bin/scripts/sslcert.sh"
+    "$ROOT_DIR/bin/scripts/install/sslcert.sh"
 
     # Creates the operating system user used by supervisord-managed services
-    "$ROOT_DIR/bin/scripts/osuser.sh"
+    "$ROOT_DIR/bin/scripts/install/osuser.sh"
 
     # Creates supervisord and systemd service manager files
-    "$ROOT_DIR/bin/scripts/supervisord.sh"
+    "$ROOT_DIR/bin/scripts/install/supervisord.sh"
 }
 
 main "$@"

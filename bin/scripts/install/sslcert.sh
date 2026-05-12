@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-# shellcheck source=scripts/globals.sh
-. "$ROOT_DIR/bin/scripts/globals.sh"
-
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CONF_DIR="$ROOT_DIR/conf"
 CERT_FILE="$CONF_DIR/armfirewall.crt"
 KEY_FILE="$CONF_DIR/armfirewall.key"
+ARMFIREWALL_LOG_CONTEXT="$(basename "$0")"
 
-# Return a DNS-safe hostname for the certificate subject
+# shellcheck source=../common/log.sh
+. "$ROOT_DIR/bin/scripts/common/log.sh"
+
+# Return a DNS-safe hostname for the certificate subject.
 cert_hostname() {
     hostname -f 2>/dev/null || hostname 2>/dev/null || printf 'armfirewall'
 }
 
-# Write the OpenSSL configuration used to include SAN entries
+# Write the OpenSSL configuration used to include SAN entries.
 write_openssl_config() {
     local config_file="$1"
     local hostname_value="$2"
@@ -84,16 +84,14 @@ generate_certificate() {
 
     hostname_value="$(cert_hostname)"
     config_file="$(mktemp)"
-
     write_openssl_config "$config_file" "$hostname_value"
 
     log "Generating ArmFirewall self-signed TLS certificate in ${CONF_DIR}."
-
     openssl req \
         -x509 \
         -nodes \
         -newkey rsa:2048 \
-        -days 9999 \
+        -days 3650 \
         -keyout "$KEY_FILE" \
         -out "$CERT_FILE" \
         -config "$config_file" >/dev/null 2>&1 || {
@@ -102,12 +100,11 @@ generate_certificate() {
         }
 
     rm -f "$config_file"
-
     set_tls_permissions
-    
     log "TLS certificate generated: ${CERT_FILE}."
 }
 
+# Run the TLS certificate bootstrap flow.
 main() {
     generate_certificate
 }

@@ -2,10 +2,10 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# shellcheck source=globals.sh
-. "$ROOT_DIR/bin/scripts/globals.sh"
+# shellcheck source=../common/globals.sh
+. "$ROOT_DIR/bin/scripts/common/globals.sh"
 
 # Validate the selected LAN interface before persisting it.
 validate_lan_iface() {

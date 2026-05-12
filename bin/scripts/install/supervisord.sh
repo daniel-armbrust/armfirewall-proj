@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# shellcheck source=globals.sh
-. "$ROOT_DIR/bin/scripts/globals.sh"
+# shellcheck source=../common/globals.sh
+. "$ROOT_DIR/bin/scripts/common/globals.sh"
 
-# shellcheck source=log.sh
-declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/log.sh"
+# shellcheck source=../common/log.sh
+declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/common/log.sh"
 
 SYSTEMD_UNIT_FILE="/etc/systemd/system/armfirewall-supervisord.service"
 SYSTEMD_SERVICE_NAME="armfirewall-supervisord.service"
@@ -160,6 +160,7 @@ stderr_logfile=$ROOT_DIR/logs/armfirewall-workreqd.err.log
 stderr_logfile_maxbytes=5MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
+
 SUPERVISOR
 
     log "Created supervisord configuration: ${SUPERVISORD_CONF}."

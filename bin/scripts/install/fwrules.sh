@@ -2,10 +2,10 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# shellcheck source=scripts/globals.sh
-. "$ROOT_DIR/bin/scripts/globals.sh"
+# shellcheck source=scripts/common/globals.sh
+. "$ROOT_DIR/bin/scripts/common/globals.sh"
 
 # Return the SQLite database path for the selected IP family.
 filter_rules_db() {
@@ -315,7 +315,6 @@ record_filter_policy() {
 record_default_filter_policies() {
     record_filter_policy ipv4 INPUT DROP
     record_filter_policy ipv4 FORWARD DROP
-
     record_filter_policy ipv6 INPUT DROP
     record_filter_policy ipv6 FORWARD DROP
 }
@@ -326,7 +325,6 @@ set_default_filter_policies() {
 
     iptables -t filter -P INPUT DROP
     iptables -t filter -P FORWARD DROP
-    
     ip6tables -t filter -P INPUT DROP
     ip6tables -t filter -P FORWARD DROP
 }
