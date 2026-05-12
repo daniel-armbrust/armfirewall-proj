@@ -276,12 +276,12 @@ add_interface_matches() {
 
     case "$chain" in
         INPUT|FORWARD|PREROUTING)
-            [[ -n "$iface_in" ]] && command_ref+=("-i" "$iface_in")
+            [[ -n "$iface_in" && "$iface_in" != "ANY" ]] && command_ref+=("-i" "$iface_in")
             ;;
     esac
     case "$chain" in
         OUTPUT|FORWARD|POSTROUTING)
-            [[ -n "$iface_out" ]] && command_ref+=("-o" "$iface_out")
+            [[ -n "$iface_out" && "$iface_out" != "ANY" ]] && command_ref+=("-o" "$iface_out")
             ;;
     esac
     return 0
