@@ -20,6 +20,7 @@ print_banner() {
 
         ./ArmFirewall (by Daniel Armbrust)
         secure edge routing / firewall / monitoring
+        
 BANNER
 }
 

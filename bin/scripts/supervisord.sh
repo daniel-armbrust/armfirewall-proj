@@ -31,7 +31,7 @@ Wants=network-online.target
 
 [Service]
 Type=forking
-ExecStartPre=${$ROOT_DIR/bin/armfwinit.sh}
+ExecStartPre=${ROOT_DIR}/bin/armfwinit.sh
 ExecStart=${supervisord_bin} -c ${SUPERVISORD_CONF}
 ExecReload=${supervisorctl_bin} -c ${SUPERVISORD_CONF} reload
 ExecStop=${supervisorctl_bin} -c ${SUPERVISORD_CONF} shutdown
