@@ -6,7 +6,7 @@ import base64
 import hashlib
 import hmac
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -30,7 +30,7 @@ AUTH_FLOW_PATHS = {LOGIN_PATH, CHANGE_PASSWORD_PATH}
 
 def utc_now() -> datetime:
     """Return the current UTC datetime without relying on local timezone."""
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def sqlite_timestamp(value: datetime | None = None) -> str:
@@ -43,7 +43,7 @@ def parse_sqlite_timestamp(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
+        return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
     except ValueError:
         return None
 
