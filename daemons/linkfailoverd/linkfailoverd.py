@@ -13,7 +13,7 @@ from core import db
 from core import log as logger
 from core.process import run_command
 
-from .common import parse_latency
+from .commons import parse_latency
 from .constants import LINKFAILOVER_DB_PATH, LOG_SOURCE
 from .models import CheckResult, Link
 

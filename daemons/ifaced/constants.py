@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import os
 
-from core.constants import IFACE_DB_PATH
-
 
 COLLECT_INTERVAL_SECONDS = int(os.environ.get("ARMFIREWALL_IFACED_INTERVAL", "10"))
 LOG_SOURCE = "ifaced.py"

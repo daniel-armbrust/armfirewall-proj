@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .linkfailover import main
+from .linkfailoverd import main
 
 
 if __name__ == "__main__":

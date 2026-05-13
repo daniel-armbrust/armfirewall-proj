@@ -18,12 +18,12 @@ Files
 -----
 
 __init__.py
-    Marks this directory as the daemons.linkfailover Python package.
+    Marks this directory as the daemons.linkfailoverd Python package.
 
 __main__.py
-    Package entry point used by "python -m daemons.linkfailover".
+    Package entry point used by "python -m daemons.linkfailoverd".
 
-linkfailover.py
+linkfailoverd.py
     Main daemon process, SQLite reads and writes, ping health checks, event
     persistence, route selection and default route updates.
 
@@ -34,5 +34,5 @@ constants.py
 models.py
     Data classes used to represent configured links and health check results.
 
-common.py
+commons.py
     Shared helper used to parse ping latency output.

@@ -7,5 +7,5 @@ import re
 from core.constants import DB_DIR
 
 LINKFAILOVER_DB_PATH = DB_DIR / "linkfailover.db"
-LOG_SOURCE = "linkfailover.py"
+LOG_SOURCE = "linkfailoverd.py"
 PING_TIME_RE = re.compile(r"time[=<]([0-9.]+)\s*ms")

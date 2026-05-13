@@ -16,7 +16,7 @@ from core.workrequest import decode_payload
 from . import filter as filter_table
 from . import mangle as mangle_table
 from . import nat as nat_table
-from .common import command_name
+from .commons import command_name
 from .constants import (
     LOG_SOURCE,
     PROTECTED_RULE_TABLES,

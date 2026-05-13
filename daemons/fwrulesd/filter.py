@@ -7,7 +7,7 @@ from typing import Any
 from core import db
 from core.process import run_command
 
-from .common import command_name
+from .commons import command_name
 from .constants import (
     DEFAULT_FILTER_POLICIES,
     FILTER_BUILTIN_CHAINS,
