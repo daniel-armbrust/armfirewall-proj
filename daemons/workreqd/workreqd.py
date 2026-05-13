@@ -3,27 +3,22 @@
 
 from __future__ import annotations
 
-import os
-import subprocess
 import sys
 import time
-from pathlib import Path
-from typing import Any
-
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from core import db
-from core.constants import DB_DIR, ROOT_DIR
 from core import log as logger
+from core.constants import ROOT_DIR
+from core.process import run_command
 
-WORK_REQUEST_DB_PATH = DB_DIR / "work-requests.db"
-CHECK_INTERVAL_SECONDS = int(os.environ.get("ARMFIREWALL_ARMFWORKREQD_INTERVAL", "5"))
-BATCH_SIZE = int(os.environ.get("ARMFIREWALL_ARMFWORKREQD_BATCH_SIZE", "10"))
-ACTION_TIMEOUT_SECONDS = int(os.environ.get("ARMFIREWALL_ARMFWORKREQD_ACTION_TIMEOUT", "300"))
-LOG_SOURCE = "workreqd.py"
+from .constants import (
+    ACTION_TIMEOUT_SECONDS,
+    BATCH_SIZE,
+    CHECK_INTERVAL_SECONDS,
+    LOG_SOURCE,
+    WORK_REQUEST_DB_PATH,
+)
+from .models import QueuedWorkRequest
 
 
 def connect() -> db.Connection:
@@ -33,8 +28,7 @@ def connect() -> db.Connection:
 
 def verify_work_request_database() -> None:
     """Verify that the work request database can be opened."""
-    with connect() as conn:
-        db.fetch_one_on(conn, "SELECT 1")
+    db.verify_database(WORK_REQUEST_DB_PATH)
 
 
 def add_event(conn: db.Connection, request_id: int, event_type: str, message: str | None = None) -> None:
@@ -66,12 +60,13 @@ def set_status(
         """,
         (status, error_message, request_id),
     )
+
     add_event(conn, request_id, status, error_message)
 
 
-def queued_requests(conn: db.Connection) -> list[Any]:
+def queued_requests(conn: db.Connection) -> list[QueuedWorkRequest]:
     """Return queued work requests in execution order."""
-    return db.execute_on(
+    rows = db.execute_on(
         conn,
         """
         SELECT
@@ -96,59 +91,66 @@ def queued_requests(conn: db.Connection) -> list[Any]:
         (BATCH_SIZE,),
     ).fetchall()
 
+    return [QueuedWorkRequest.from_row(row) for row in rows]
 
-def command_for_request(request: Any) -> list[str]:
+
+def command_for_request(request: QueuedWorkRequest) -> list[str]:
     """Build the action command for a work request."""
-    if str(request["category_name"]) == "SERVICE_MANAGEMENT.DNSMASQ_CONFIG":
+    if request.category_name == "SERVICE_MANAGEMENT.DNSMASQ_CONFIG":
         command = [sys.executable, "-m", "daemons.dnsmasq.dnsmasq"]
     else:
-        script_name = str(request["script_name"])
+        script_name = request.script_name
 
         if "/" in script_name or ".." in script_name or not script_name.endswith(".py"):
             raise RuntimeError(f"Invalid action script name configured: {script_name}")
 
-        script_path = ROOT_DIR / "daemons" / script_name
+        if script_name == "fwrulesd.py":
+            command = [sys.executable, "-m", "daemons.fwrulesd.fwrulesd"]
+        elif script_name == "proutes.py":
+            command = [sys.executable, "-m", "daemons.proutes.proutes"]
+        elif script_name == "servicemgmt.py":
+            command = [sys.executable, "-m", "daemons.servicemgmt.servicemgmt"]
+        else:
+            script_path = ROOT_DIR / "daemons" / script_name
 
-        if not script_path.exists():
-            raise FileNotFoundError(f"Action script not found: {script_path}")
-        command = [sys.executable, str(script_path)]
+            if not script_path.exists():
+                raise FileNotFoundError(f"Action script not found: {script_path}")
+            command = [sys.executable, str(script_path)]
 
     return [
         *command,
         "--work-request-id",
-        str(request["id"]),
+        str(request.id),
         "--request-uid",
-        str(request["request_uid"]),
+        request.request_uid,
         "--category-name",
-        str(request["category_name"]),
+        request.category_name,
         "--category",
-        str(request["category"]),
+        request.category,
         "--family",
-        str(request["family"]),
+        request.family,
         "--target-name",
-        str(request["target_name"]),
+        request.target_name,
         "--action-name",
-        str(request["action_name"]),
+        request.action_name,
         "--target-rule-id",
-        "" if request["target_rule_id"] is None else str(request["target_rule_id"]),
+        "" if request.target_rule_id is None else request.target_rule_id,
         "--payload-json",
-        str(request["payload_json"]),
+        request.payload_json,
     ]
 
 
-def process_request(conn: db.Connection, request: Any) -> None:
+def process_request(conn: db.Connection, request: QueuedWorkRequest) -> None:
     """Execute one queued work request and persist the final dispatch result."""
-    request_id = int(request["id"])
+    request_id = request.id
 
     try:
         set_status(conn, request_id, "running")
         conn.commit()
 
-        completed = subprocess.run(
+        completed = run_command(
             command_for_request(request),
             check=False,
-            text=True,
-            capture_output=True,
             timeout=ACTION_TIMEOUT_SECONDS,
         )
 
@@ -170,8 +172,10 @@ def process_request(conn: db.Connection, request: Any) -> None:
         logger.error(f"Work request {request_id} failed: {message}", source=LOG_SOURCE)
     except Exception as exc:  # noqa: BLE001 - daemon must record failures.
         conn.rollback()
+
         with conn:
             set_status(conn, request_id, "failed", error_message=str(exc))
+
         logger.error(f"Work request {request_id} failed: {exc}", source=LOG_SOURCE)
 
 
@@ -181,7 +185,7 @@ def process_once(conn: db.Connection) -> int:
 
     for request in requests:
         process_request(conn, request)
-        
+
     return len(requests)
 
 
@@ -193,8 +197,10 @@ def main() -> None:
     with connect() as conn:
         while True:
             processed = process_once(conn)
+
             if processed:
                 logger.log(f"Processed {processed} queued work request(s).", source=LOG_SOURCE)
+                
             time.sleep(CHECK_INTERVAL_SECONDS)
 
 

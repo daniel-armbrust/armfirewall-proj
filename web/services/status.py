@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import uuid
 from datetime import datetime
@@ -13,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core import db
+from core.process import command_exists
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -98,11 +98,6 @@ def page_context(request: Request, title: str) -> dict[str, Any]:
         "user_name": "admin",
         "current_path": request.url.path,
     }
-
-
-def command_exists(command: str) -> bool:
-    """Return whether one command exists in PATH."""
-    return shutil.which(command) is not None
 
 
 def run_command(command: list[str], timeout: int = 8) -> subprocess.CompletedProcess[str]:

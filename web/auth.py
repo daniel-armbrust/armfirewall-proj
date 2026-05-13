@@ -13,7 +13,8 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from core import db
-from core.constants import (
+from core.constants import USERS_DB_PATH
+from web.constants import (
     AUTH_FLOW_PATHS,
     CHANGE_PASSWORD_PATH,
     LOGIN_PATH,
@@ -21,7 +22,6 @@ from core.constants import (
     PUBLIC_PREFIXES,
     SESSION_COOKIE,
     SESSION_TTL,
-    USERS_DB_PATH,
 )
 
 

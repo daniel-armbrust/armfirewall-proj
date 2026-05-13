@@ -171,7 +171,7 @@ environment=PYTHONUNBUFFERED="1"
 
 [program:armfirewall-workreqd]
 directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/python $ROOT_DIR/daemons/workreqd.py
+command=$ROOT_DIR/.venv/bin/python -m daemons.workreqd.workreqd
 user=armfw
 autostart=true
 autorestart=true
