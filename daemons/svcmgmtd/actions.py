@@ -15,6 +15,7 @@ from .supervisor import (
     register_supervisor_program,
     remove_supervisor_program,
     reread_and_update,
+    sync_supervisor_statuses,
     supervisor_command,
     supervisor_program_exists,
     supervisor_status,
@@ -55,6 +56,7 @@ def install_service(service: OptionalService) -> None:
     install_package(service.package)
     register_supervisor_program(service)
     reread_and_update()
+    sync_supervisor_statuses()
     logger.log(f"Installed optional service {service.name}.", source=LOG_SOURCE)
 
 
@@ -66,6 +68,7 @@ def uninstall_service(service: OptionalService) -> None:
         reread_and_update()
     
     uninstall_package(service.package)
+    sync_supervisor_statuses()
     
     logger.log(f"Uninstalled optional service {service.name}.", source=LOG_SOURCE)
 
@@ -99,4 +102,5 @@ def control_service(service: ControllableService, action: str) -> None:
     else:
         raise RuntimeError(f"Unsupported service control action: {action}")
 
+    sync_supervisor_statuses()
     logger.log(f"Service {service_name} {action} completed.", source=LOG_SOURCE)

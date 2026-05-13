@@ -3,44 +3,16 @@
 from __future__ import annotations
 
 from core.constants import ROOT_DIR
-from core.process import command_exists
+from core.supervisord import (
+    supervisor_command,
+    supervisor_program_exists,
+    supervisor_programs,
+    supervisor_status,
+)
 
-from .commons import run_bounded_command
+from .catalog import persist_supervisor_statuses
 from .constants import SUPERVISOR_CONF
 from .models import OptionalService
-
-
-def supervisor_program_exists(program_name: str) -> bool:
-    """Return whether a supervisor program section exists."""
-    if not SUPERVISOR_CONF.exists():
-        return False
-
-    return f"[program:{program_name}]" in SUPERVISOR_CONF.read_text(encoding="utf-8")
-
-
-def supervisor_command(*args: str, timeout: int = 60, check: bool = True):
-    """Run supervisorctl against the ArmFirewall supervisor configuration."""
-    if not command_exists("supervisorctl"):
-        raise RuntimeError("supervisorctl was not found.")
-    
-    return run_bounded_command(["supervisorctl", "-c", str(SUPERVISOR_CONF), *args], timeout=timeout, check=check)
-
-
-def supervisor_status(service_name: str) -> str:
-    """Return a supervisord program state, tolerating stopped return codes."""
-    result = supervisor_command("status", service_name, check=False)
-    output = (result.stdout + result.stderr).strip()
-    
-    if "no such process" in output.lower():
-        raise RuntimeError(f"Supervisor program is not registered: {service_name}")
-    
-    states = {"RUNNING", "STOPPED", "STARTING", "BACKOFF", "STOPPING", "EXITED", "FATAL", "UNKNOWN"}
-    state = next((item for item in states if item in output), "")
-    
-    if not state:
-        raise RuntimeError(output or f"Could not read supervisor status for {service_name}.")
-    
-    return state
 
 
 def register_supervisor_program(service: OptionalService) -> None:
@@ -93,3 +65,9 @@ def reread_and_update() -> None:
     """Refresh supervisord program definitions."""
     supervisor_command("reread", check=False)
     supervisor_command("update", check=False)
+    sync_supervisor_statuses()
+
+
+def sync_supervisor_statuses() -> None:
+    """Persist current supervisord statuses into services.db."""
+    persist_supervisor_statuses(supervisor_programs())

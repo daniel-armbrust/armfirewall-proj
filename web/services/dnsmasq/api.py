@@ -14,8 +14,8 @@ from fastapi import HTTPException
 from core import db
 from core import iface as iface_module
 from core.constants import DNSMASQ_DB_PATH, ROOT_DIR, WORK_REQUEST_DB_PATH
-from core.workrequest import list_work_requests
-from web.services.api import supervisor_programs
+from web.workrequests.api import list_work_requests
+from web.services.api import service_status_by_name
 
 
 DNSMASQ_CONF = ROOT_DIR / "conf" / "dnsmasq.conf"
@@ -576,17 +576,10 @@ def dnsmasq_version() -> str:
 
 
 def dnsmasq_status() -> dict[str, Any]:
-    """Return supervisor status for dnsmasq."""
-    rows = supervisor_programs()
-    row = next((item for item in rows if item["name"] == "dnsmasq"), None)
-    return {
-        "installed": row is not None,
-        "state": row["state"] if row else "NOT INSTALLED",
-        "version": dnsmasq_version(),
-        "pid": row["pid"] if row else "-",
-        "uptime": row["uptime"] if row else "-",
-        "details": row["details"] if row else "Missing from supervisord.conf",
-    }
+    """Return persisted dnsmasq service status."""
+    status = service_status_by_name("dnsmasq")
+    status["version"] = dnsmasq_version()
+    return status
 
 
 def get_dnsmasq_work_requests(limit: int = 50) -> dict[str, Any]:

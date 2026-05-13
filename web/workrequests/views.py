@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from web.constants import TEMPLATE_DIR
+from web.context import menu_context
 
 
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
@@ -19,6 +20,7 @@ def page_context(request: Request, title: str) -> dict[str, Any]:
         "title": title,
         "user_name": "admin",
         "current_path": request.url.path,
+        "menu": menu_context(),
     }
 
 

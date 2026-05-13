@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from core import supervisord
 from web.routes.services import routes as services_routes
 from web.services import api as services_status
 from web.workrequests import api as workrequests_api
@@ -14,7 +15,7 @@ class SupervisorStatusParserTests(unittest.TestCase):
 
     def test_parse_running_program(self) -> None:
         """Parse a running supervisor program line."""
-        row = services_status.parse_supervisor_status_line(
+        row = supervisord.parse_supervisor_status_line(
             "armfirewall-api                  RUNNING   pid 955689, uptime 0:01:21"
         )
 
@@ -27,7 +28,7 @@ class SupervisorStatusParserTests(unittest.TestCase):
 
     def test_parse_stopped_program(self) -> None:
         """Parse a stopped supervisor program line."""
-        row = services_status.parse_supervisor_status_line("armfirewall-workreqd STOPPED Not started")
+        row = supervisord.parse_supervisor_status_line("armfirewall-workreqd STOPPED Not started")
 
         self.assertIsNotNone(row)
         assert row is not None
@@ -38,25 +39,14 @@ class SupervisorStatusParserTests(unittest.TestCase):
 
     def test_parse_blank_line(self) -> None:
         """Ignore blank supervisorctl output lines."""
-        self.assertIsNone(services_status.parse_supervisor_status_line(""))
+        self.assertIsNone(supervisord.parse_supervisor_status_line(""))
 
     def test_expected_service_statuses_marks_missing_services(self) -> None:
         """Mark expected ArmFirewall services that are missing from supervisord."""
-        rows = [
-            {
-                "name": "armfirewall-api",
-                "state": "RUNNING",
-                "pid": "955689",
-                "uptime": "0:01:21",
-                "details": "pid 955689, uptime 0:01:21",
-            }
-        ]
-
-        services = services_status.expected_service_statuses(rows)
+        services = services_status.expected_service_statuses()
         by_name = {service["name"]: service for service in services}
 
-        self.assertTrue(by_name["armfirewall-api"]["installed"])
-        self.assertEqual(by_name["armfirewall-api"]["state"], "RUNNING")
+        self.assertIn("armfirewall-api", by_name)
         self.assertTrue(by_name["armfirewall-api"]["protected"])
         self.assertNotIn("dnsmasq", by_name)
 
@@ -72,15 +62,13 @@ class SupervisorStatusParserTests(unittest.TestCase):
 
     def test_optional_service_statuses_include_squid_proxy(self) -> None:
         """Expose Squid as an optional ArmFirewall service."""
-        services = services_status.optional_service_statuses([])
+        services = services_status.optional_service_statuses()
         by_name = {service["name"]: service for service in services}
         self.assertIn("dnsmasq", by_name)
         self.assertIn("squid", by_name)
         self.assertIn("bird", by_name)
         self.assertEqual(by_name["dnsmasq"]["display_name"], "Dnsmasq")
-        self.assertEqual(by_name["dnsmasq"]["state"], "NOT INSTALLED")
         self.assertEqual(by_name["squid"]["display_name"], "SQUID Proxy")
-        self.assertEqual(by_name["squid"]["state"], "NOT INSTALLED")
 
     def test_unknown_optional_service_cannot_be_installed(self) -> None:
         """Block install requests for unknown optional services."""

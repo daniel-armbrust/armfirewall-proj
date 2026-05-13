@@ -7,7 +7,7 @@ import argparse
 
 from core import db
 from core import log as logger
-from core.workrequest import decode_payload
+from core.payload import decode_json_payload
 
 from .constants import LOG_SOURCE, POLICY_DB_PATH
 from .executor import execute_work_request
@@ -40,7 +40,7 @@ def run_action(args: argparse.Namespace) -> int:
         if args.action_name != "apply":
             raise RuntimeError(f"Unsupported policy routing action: {args.action_name}")
         
-        payload = decode_payload(args.payload_json)
+        payload = decode_json_payload(args.payload_json)
         applied, removed = execute_work_request(payload)
     except Exception as exc:  # noqa: BLE001 - message is returned to workreqd.
         logger.error(f"Policy routing execution failed: {exc}", source=LOG_SOURCE)

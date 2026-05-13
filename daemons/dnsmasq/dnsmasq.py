@@ -11,8 +11,8 @@ from .models import DnsmasqWorkRequest
 
 from core import db
 from core import log as logger
-from core.workrequest import decode_payload
-from web.services.dnsmasq import dnsmasq as dnsmasq_config
+from core.payload import decode_json_payload
+from web.services.dnsmasq import api as dnsmasq_config
 
 
 def request_from_args(args: argparse.Namespace) -> DnsmasqWorkRequest:
@@ -26,7 +26,7 @@ def request_from_args(args: argparse.Namespace) -> DnsmasqWorkRequest:
         target_name=str(args.target_name),
         action_name=str(args.action_name),
         target_rule_id=str(args.target_rule_id or ""),
-        payload=decode_payload(args.payload_json),
+        payload=decode_json_payload(args.payload_json),
     )
 
 

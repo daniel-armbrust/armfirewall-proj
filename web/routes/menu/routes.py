@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from web.dashboard import views as dashboard_views
+from web.services.routingprotocols import views as routingprotocols_views
 
 
 router = APIRouter()
@@ -32,6 +33,12 @@ PAGES = {
     "/services/status": "Status",
     "/services/link-failover": "Link Failover",
 }
+
+
+@router.get("/routing", response_class=HTMLResponse)
+def routing_protocols(request: Request) -> HTMLResponse:
+    """Render the Network / Routing Protocols page."""
+    return routingprotocols_views.render_routing_protocols(request)
 
 
 @router.get("/{section}/{page_name}", response_class=HTMLResponse)

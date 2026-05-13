@@ -7,7 +7,7 @@ import argparse
 import sys
 
 from core import log as logger
-from core.workrequest import decode_payload
+from core.payload import decode_json_payload
 
 from .actions import control_service, install_service, uninstall_service
 from .constants import LOG_SOURCE
@@ -37,7 +37,7 @@ def main() -> int:
     if args.category != "SERVICE_MANAGEMENT":
         raise RuntimeError(f"Unsupported category for svcmgmtd.py: {args.category}")
     
-    payload = decode_payload(args.payload_json)
+    payload = decode_json_payload(args.payload_json)
 
     if args.action_name == "install":
         service = validate_service(payload)

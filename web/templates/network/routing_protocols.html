@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">network</p>
+        <h1>Routing Protocols</h1>
+    </div>
+    <div class="refresh-state">Ready</div>
+</section>
+
+<section class="panel module-panel">
+    <div class="panel-head">
+        <h2>BIRD Routing Daemon</h2>
+        <span>service=bird</span>
+    </div>
+    {% if bird_installed %}
+    <div class="terminal-empty">
+        <span class="prompt">$</span>
+        <span>BIRD is installed. Protocol configuration will be available here.</span>
+    </div>
+    {% else %}
+    <div class="terminal-empty">
+        <span class="prompt">$</span>
+        <span>BIRD is not installed. Install it from Services / Status to enable routing protocols.</span>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from core import db
 from core import iface as iface_module
 from core.constants import LINKFAILOVER_DB_PATH
-from core.workrequest import list_work_requests
+from web.workrequests.api import list_work_requests
 
 
 TARGET_RE = re.compile(r"^[A-Za-z0-9._:-]+$")

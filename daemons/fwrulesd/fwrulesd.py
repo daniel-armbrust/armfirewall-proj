@@ -7,7 +7,7 @@ import argparse
 
 
 from core import log as logger
-from core.workrequest import decode_payload
+from core.payload import decode_json_payload
 
 from .actions import run_action
 from .constants import LOG_SOURCE
@@ -25,7 +25,7 @@ def request_from_args(args: argparse.Namespace) -> FirewallWorkRequest:
         target_name=str(args.target_name or ""),
         action_name=str(args.action_name or ""),
         target_rule_id=str(args.target_rule_id or ""),
-        payload=decode_payload(args.payload_json),
+        payload=decode_json_payload(args.payload_json),
     )
 
 

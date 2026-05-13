@@ -17,6 +17,7 @@ from web import auth
 from core import db
 from core.constants import IFACE_DB_PATH
 from web.constants import TEMPLATE_DIR
+from web.context import menu_context
 
 
 TRACEROUTE_LOCK_PATH = Path("/tmp/armfirewall-traceroute.lock")
@@ -32,6 +33,7 @@ def page_context(request: Request, title: str) -> dict[str, Any]:
         "title": title,
         "user_name": current_user.get("username", "admin"),
         "current_path": request.url.path,
+        "menu": menu_context(),
     }
 
 

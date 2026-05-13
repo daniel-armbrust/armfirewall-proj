@@ -10,6 +10,7 @@ from web import auth
 from core import db
 from core.constants import USERS_DB_PATH
 from web.constants import TEMPLATE_DIR
+from web.context import menu_context
 
 
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
@@ -24,6 +25,7 @@ def page_context(request: Request, title: str) -> dict[str, Any]:
         "title": title,
         "user_name": current_user.get("username", "admin"),
         "current_path": request.url.path,
+        "menu": menu_context(),
     }
 
 

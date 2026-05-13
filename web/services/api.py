@@ -1,139 +1,62 @@
 from __future__ import annotations
 
-import subprocess
 from datetime import datetime
 from typing import Any
 
-from core.constants import SUPERVISOR_CONF
-from core.process import command_exists, run_command
-from core.service_catalog import main_service_public_catalog, optional_service_public_catalog
 from web.constants import SERVICES_STATUS_ACTIONS
+from web.services.catalog import main_service_public_catalog, optional_service_public_catalog, service_by_name
 
 
-def supervisor_command(
-    *args: str,
-    timeout: int = 8,
-    check: bool = False,
-) -> subprocess.CompletedProcess[str]:
-    """Run supervisorctl against the ArmFirewall supervisor configuration."""
-    return run_command(
-        ["supervisorctl", "-c", str(SUPERVISOR_CONF), *args],
-        timeout=timeout,
-        check=check,
-    )
+def service_status_payload(service: dict[str, Any], *, optional: bool = False) -> dict[str, Any]:
+    """Return one service status payload from persisted runtime fields."""
+    installed = bool(service.get("runtime_installed"))
 
-
-def parse_supervisor_status_line(line: str) -> dict[str, str] | None:
-    """Parse one supervisorctl status line."""
-    parts = line.split(None, 2)
-    if len(parts) < 2:
-        return None
-
-    name = parts[0]
-    state = parts[1]
-    details = parts[2] if len(parts) > 2 else ""
-    pid = "-"
-    uptime = "-"
-
-    if "pid " in details:
-        after_pid = details.split("pid ", 1)[1]
-        pid = after_pid.split(",", 1)[0].strip()
-
-    if "uptime " in details:
-        uptime = details.split("uptime ", 1)[1].strip()
-
-    return {
-        "name": name,
-        "state": state,
-        "pid": pid,
-        "uptime": uptime,
-        "details": details or "-",
+    payload = {
+        "name": service["name"],
+        "kind": service["kind"],
+        "description": service["description"],
+        "installed": installed,
+        "state": service.get("runtime_state") if installed else "NOT INSTALLED",
+        "pid": service.get("runtime_pid") if installed else "-",
+        "uptime": service.get("runtime_uptime") if installed else "-",
+        "details": service.get("runtime_details") if installed else "Missing from supervisord.conf",
+        "runtime_updated_at": service.get("runtime_updated_at"),
     }
 
+    if optional:
+        payload["display_name"] = service["display_name"]
+        payload["can_install"] = not installed
+    else:
+        payload["protected"] = bool(service["protected"])
+        payload["restart_allowed"] = bool(service.get("restart_allowed"))
 
-def supervisor_programs() -> list[dict[str, str]]:
-    """Return supervisor managed program status entries for the Web API."""
-    if not SUPERVISOR_CONF.exists() or not command_exists("supervisorctl"):
-        return []
-
-    result = supervisor_command("status")
-    rows: list[dict[str, str]] = []
-
-    for line in result.stdout.splitlines():
-        row = parse_supervisor_status_line(line)
-        if row:
-            rows.append(row)
-
-    return rows
+    return payload
 
 
-def supervisor_program_exists(program_name: str) -> bool:
-    """Return whether a supervisor program section exists."""
-    if not SUPERVISOR_CONF.exists():
-        return False
-
-    return f"[program:{program_name}]" in SUPERVISOR_CONF.read_text(encoding="utf-8")
-
-
-def expected_service_statuses(supervisor_rows: list[dict[str, str]]) -> list[dict[str, Any]]:
-    """Merge expected ArmFirewall services with current supervisor state."""
-    by_name = {row["name"]: row for row in supervisor_rows}
+def expected_service_statuses() -> list[dict[str, Any]]:
+    """Return main ArmFirewall services using persisted runtime state."""
     services: list[dict[str, Any]] = []
 
     for service in main_service_public_catalog():
-        row = by_name.get(service["name"])
-        installed = row is not None
-
-        services.append(
-            {
-                "name": service["name"],
-                "kind": service["kind"],
-                "description": service["description"],
-                "protected": bool(service["protected"]),
-                "restart_allowed": bool(service.get("restart_allowed")),
-                "installed": installed,
-                "state": row["state"] if row else "NOT INSTALLED",
-                "pid": row["pid"] if row else "-",
-                "uptime": row["uptime"] if row else "-",
-                "details": row["details"] if row else "Missing from supervisord.conf",
-            }
-        )
+        services.append(service_status_payload(service))
 
     return services
 
 
-def optional_service_statuses(supervisor_rows: list[dict[str, str]]) -> list[dict[str, Any]]:
-    """Merge optional ArmFirewall services with current supervisor state."""
-    by_name = {row["name"]: row for row in supervisor_rows}
+def optional_service_statuses() -> list[dict[str, Any]]:
+    """Return optional ArmFirewall services using persisted runtime state."""
     services: list[dict[str, Any]] = []
     
     for service in optional_service_public_catalog():
-        row = by_name.get(service["name"])
-        installed = row is not None
-
-        services.append(
-            {
-                "name": service["name"],
-                "display_name": service["display_name"],
-                "kind": service["kind"],
-                "description": service["description"],
-                "installed": installed,
-                "state": row["state"] if row else "NOT INSTALLED",
-                "pid": row["pid"] if row else "-",
-                "uptime": row["uptime"] if row else "-",
-                "details": row["details"] if row else "Missing from supervisord.conf",
-                "can_install": not installed,
-            }
-        )
+        services.append(service_status_payload(service, optional=True))
 
     return services
 
 
 def services_status() -> dict[str, Any]:
-    """Return ArmFirewall service status data managed by supervisord."""
-    supervisor_rows = supervisor_programs()
-    services = expected_service_statuses(supervisor_rows)
-    optional_services = optional_service_statuses(supervisor_rows)
+    """Return persisted ArmFirewall service status data."""
+    services = expected_service_statuses()
+    optional_services = optional_service_statuses()
     running = sum(1 for service in services if service["state"] == "RUNNING")
     installed = sum(1 for service in services if service["installed"])
 
@@ -150,11 +73,26 @@ def services_status() -> dict[str, Any]:
     }
 
 
+def service_status_by_name(name: str) -> dict[str, Any]:
+    """Return one persisted service status by name."""
+    service = service_by_name(name)
+    if service is None:
+        raise ValueError("Unknown ArmFirewall service.")
+
+    return service_status_payload(service, optional=service.get("service_group") == "optional")
+
+
+def service_installed(name: str) -> bool:
+    """Return whether one service is installed according to persisted runtime state."""
+    service = service_by_name(name)
+    return bool(service and service.get("runtime_installed"))
+
+
 def get_expected_service(name: str) -> dict[str, Any]:
     """Return expected service metadata by name."""
-    service = next((item for item in main_service_public_catalog() if item["name"] == name), None)
+    service = service_by_name(name)
 
-    if service is None:
+    if service is None or service.get("service_group") != "main":
         raise ValueError("Unknown ArmFirewall service.")
     
     return service
@@ -162,9 +100,9 @@ def get_expected_service(name: str) -> dict[str, Any]:
 
 def get_optional_service(name: str) -> dict[str, Any]:
     """Return optional service metadata by name."""
-    service = next((item for item in optional_service_public_catalog() if item["name"] == name), None)
+    service = service_by_name(name)
 
-    if service is None:
+    if service is None or service.get("service_group") != "optional":
         raise ValueError("Unknown optional ArmFirewall service.")
     
     return service
@@ -172,12 +110,12 @@ def get_optional_service(name: str) -> dict[str, Any]:
 
 def control_service(name: str, action: str) -> dict[str, Any]:
     """Validate service control and return the work request payload."""
-    expected_names = {service["name"] for service in main_service_public_catalog()}
-    optional_names = {service["name"] for service in optional_service_public_catalog()}
+    service = service_by_name(name)
 
-    if name in expected_names:
-        service = get_expected_service(name)
+    if service is None:
+        raise ValueError("Unknown ArmFirewall service.")
 
+    if service.get("service_group") == "main":
         if service["protected"] and not (action == "restart" and service.get("restart_allowed")):
             raise ValueError("Protected services cannot be controlled from the GUI.")
         
@@ -186,11 +124,7 @@ def control_service(name: str, action: str) -> dict[str, Any]:
             "display_name": service["name"],
             "kind": service["kind"],
         }
-    elif name not in optional_names:
-        raise ValueError("Unknown ArmFirewall service.")
     else:
-        service = get_optional_service(name)
-
         payload = {
             "service_name": service["name"],
             "display_name": service["display_name"],
