@@ -5,7 +5,7 @@ from __future__ import annotations
 from core.constants import CONF_DIR
 
 SUPERVISOR_CONF = CONF_DIR / "supervisord.conf"
-LOG_SOURCE = "servicemgmt.py"
+LOG_SOURCE = "svcmgmtd.py"
 
 ALLOWED_SERVICES = {
     "armfirewall-squid": {

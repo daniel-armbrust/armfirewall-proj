@@ -35,7 +35,7 @@ def main() -> int:
     args = build_parser().parse_args()
     
     if args.category != "SERVICE_MANAGEMENT":
-        raise RuntimeError(f"Unsupported category for servicemgmt.py: {args.category}")
+        raise RuntimeError(f"Unsupported category for svcmgmtd.py: {args.category}")
     
     payload = decode_payload(args.payload_json)
 

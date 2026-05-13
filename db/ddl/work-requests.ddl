@@ -72,8 +72,8 @@ INSERT OR IGNORE INTO work_request_handlers (category, script_name, enabled, des
      ('FIREWALL_RULES', 'fwrulesd.py', 1, 'Applies filter table firewall rules.'),
      ('NAT_RULES', 'fwrulesd.py', 1, 'Applies NAT table firewall rules.'),
      ('MANGLE_RULES', 'fwrulesd.py', 1, 'Applies mangle table firewall rules.'),
-     ('POLICY_ROUTING', 'proutes.py', 1, 'Applies policy routing changes.'),
-     ('SERVICE_MANAGEMENT', 'servicemgmt.py', 1, 'Installs and removes optional ArmFirewall service packages and service configuration changes.');
+     ('POLICY_ROUTING', 'proutesd.py', 1, 'Applies policy routing changes.'),
+     ('SERVICE_MANAGEMENT', 'svcmgmtd.py', 1, 'Installs and removes optional ArmFirewall service packages and service configuration changes.');
 
 -- Stores allowed operations accepted by the work queue.
 CREATE TABLE IF NOT EXISTS work_request_actions (

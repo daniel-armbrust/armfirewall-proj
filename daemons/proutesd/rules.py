@@ -132,7 +132,6 @@ def mark_rules_applied(conn: db.Connection, rule_ids: list[int], enabled: int) -
         return
     
     placeholders = ",".join("?" for _ in rule_ids)
-    
     db.execute_on(
         conn,
         f"""

@@ -1,8 +1,8 @@
-"""Module entry point for the service management executor."""
+"""Module entry point for the policy routing executor."""
 
 from __future__ import annotations
 
-from .servicemgmt import main
+from .proutesd import main
 
 
 if __name__ == "__main__":

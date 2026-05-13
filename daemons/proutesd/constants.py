@@ -8,7 +8,7 @@ from core.constants import DB_DIR
 
 POLICY_DB_PATH = DB_DIR / "policy-routing.db"
 RT_TABLES_PATH = Path("/etc/iproute2/rt_tables")
-LOG_SOURCE = "proutes.py"
+LOG_SOURCE = "proutesd.py"
 PROTECTED_ROUTE_TABLE_IDS = {253, 255}
 PROTECTED_ROUTING_TABLE_IDS = {253, 254, 255}
 PROTECTED_RULE_PRIORITIES = {0, 32766, 32767}

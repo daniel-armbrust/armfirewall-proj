@@ -50,7 +50,6 @@ def rt_table_line_matches(line: str, table: RoutingTableRow) -> bool:
 def write_rt_tables(lines: list[str]) -> None:
     """Persist rt_tables content atomically enough for this small registry file."""
     RT_TABLES_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     text = "".join(lines)
     
     if text and not text.endswith("\n"):
@@ -79,12 +78,9 @@ def apply_table(table: RoutingTableRow) -> int:
         raise RuntimeError(f"Protected routing table cannot be changed: id={table['id']}")
     
     ensure_base_rt_tables()
-
     lines = RT_TABLES_PATH.read_text(encoding="utf-8").splitlines(keepends=True) if RT_TABLES_PATH.exists() else []
-
     kept = [line for line in lines if not rt_table_line_matches(line, table)]
     kept.append(f"{table['table_id']}\t{table['table_name']}\n")
-    
     write_rt_tables(kept)
     
     return 1
@@ -117,7 +113,6 @@ def mark_tables_applied(conn: db.Connection, table_row_ids: list[int], enabled: 
         return
     
     placeholders = ",".join("?" for _ in table_row_ids)
-    
     db.execute_on(
         conn,
         f"""
