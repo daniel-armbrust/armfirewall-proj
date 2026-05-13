@@ -239,7 +239,7 @@
             optionalServiceTitle.textContent = action === "uninstall" ? "Uninstall optional service" : "Install optional service";
         }
         if (optionalServiceMessage) {
-            optionalServiceMessage.textContent = `${action.toUpperCase()} ${serviceName}? This will create a work request.`;
+            optionalServiceMessage.textContent = action === "uninstall" ? `Do you want to uninstall ${serviceName}?` : `Do you want to install ${serviceName}?`;
         }
         if (optionalServiceConfirm) {
             optionalServiceConfirm.textContent = action === "uninstall" ? "Uninstall" : "Install";

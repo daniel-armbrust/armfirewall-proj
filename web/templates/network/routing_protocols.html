@@ -9,15 +9,24 @@
     <div class="refresh-state">Ready</div>
 </section>
 
+{% if bird_installed %}
+<nav class="local-tabs routing-protocols-tabs" aria-label="Routing protocols menu">
+    <button class="local-tab active" type="button">RIP</button>
+    <button class="local-tab" type="button">OSPF</button>
+    <button class="local-tab" type="button">BGP</button>
+    <button class="local-tab" type="button">WORK REQUESTS</button>
+</nav>
+{% endif %}
+
 <section class="panel module-panel">
     <div class="panel-head">
         <h2>BIRD Routing Daemon</h2>
         <span>service=bird</span>
     </div>
     {% if bird_installed %}
-    <div class="terminal-empty">
+    <div class="terminal-empty compact">
         <span class="prompt">$</span>
-        <span>BIRD is installed. Protocol configuration will be available here.</span>
+        <span>Select a routing protocol to manage its BIRD configuration.</span>
     </div>
     {% else %}
     <div class="terminal-empty">

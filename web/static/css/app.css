@@ -1936,6 +1936,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     color: var(--muted);
 }
 
+.terminal-empty.compact {
+    min-height: 120px;
+}
+
 .prompt {
     color: var(--accent);
     font-weight: 900;
