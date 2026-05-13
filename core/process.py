@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from pathlib import Path
 
 
 class ProcessExecutionError(subprocess.CalledProcessError):
@@ -19,6 +20,16 @@ class ProcessExecutionError(subprocess.CalledProcessError):
 def command_exists(command: str) -> bool:
     """Return whether one command exists in PATH."""
     return shutil.which(command) is not None
+
+
+def count_processes() -> int:
+    """Count numeric process directories from /proc."""
+    proc = Path("/proc")
+
+    if not proc.exists():
+        return 0
+
+    return sum(1 for item in proc.iterdir() if item.name.isdigit())
 
 
 def run_command(

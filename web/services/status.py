@@ -12,11 +12,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core import db
+from core.constants import SUPERVISOR_CONF
 from core.process import command_exists
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-SUPERVISOR_CONF = ROOT_DIR / "conf" / "supervisord.conf"
 WORK_REQUEST_DB_PATH = ROOT_DIR / "db" / "work-requests.db"
 templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
 

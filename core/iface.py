@@ -11,7 +11,30 @@ def fetch_iface_rows(query: str, params: tuple[Any, ...] = ()) -> list[dict[str,
     return db.fetch_all(query, params, db_path=IFACE_DB_PATH)
 
 
-def byte_label(value: int | None) -> str:
+def get_role_config() -> dict[str, str]:
+    """Return LAN and WAN interface names persisted in iface.db."""
+    values: dict[str, str] = {}
+    
+    try:
+        rows = fetch_iface_rows(
+            """
+            SELECT role, name
+            FROM ifaces
+            WHERE role IN ('LAN', 'WAN')
+            ORDER BY CASE role WHEN 'LAN' THEN 0 WHEN 'WAN' THEN 1 ELSE 2 END, id
+            """
+        )
+    except (FileNotFoundError, db.DatabaseError):
+        return values
+
+    for row in rows:
+        key = "lan_iface" if row["role"] == "LAN" else "wan_iface"
+        values.setdefault(key, str(row["name"]))
+    
+    return values
+
+
+def bytes_label(value: int | None) -> str:
     """Format a byte count as a compact binary unit label."""
     number = float(value or 0)
     units = ("B", "KiB", "MiB", "GiB", "TiB")
@@ -25,6 +48,11 @@ def byte_label(value: int | None) -> str:
         return f"{int(number)} {units[unit]}"
     
     return f"{number:.1f} {units[unit]}"
+
+
+def byte_label(value: int | None) -> str:
+    """Return a compact byte label."""
+    return bytes_label(value)
 
 
 def get_interfaces() -> dict[str, Any]:
@@ -82,8 +110,8 @@ def get_interfaces() -> dict[str, Any]:
 
     for iface in interfaces:
         iface["addresses"] = by_iface.get(int(iface["id"]), [])
-        iface["rx_label"] = byte_label(iface.get("rx_bytes"))
-        iface["tx_label"] = byte_label(iface.get("tx_bytes"))
+        iface["rx_label"] = bytes_label(iface.get("rx_bytes"))
+        iface["tx_label"] = bytes_label(iface.get("tx_bytes"))
 
     return {"interfaces": interfaces}
 

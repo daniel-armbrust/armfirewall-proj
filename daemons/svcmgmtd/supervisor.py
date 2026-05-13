@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from core.constants import ROOT_DIR
 from core.process import command_exists
+from core.supervisor import supervisor_program_exists
 
 from .commons import run_bounded_command
 from .constants import SUPERVISOR_CONF
@@ -33,14 +34,6 @@ def supervisor_status(service_name: str) -> str:
         raise RuntimeError(output or f"Could not read supervisor status for {service_name}.")
     
     return state
-
-
-def supervisor_program_exists(service_name: str) -> bool:
-    """Return whether a supervisor program section exists."""
-    if not SUPERVISOR_CONF.exists():
-        return False
-    
-    return f"[program:{service_name}]" in SUPERVISOR_CONF.read_text(encoding="utf-8")
 
 
 def register_supervisor_program(service: OptionalService) -> None:

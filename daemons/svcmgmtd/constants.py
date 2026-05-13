@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from core.constants import CONF_DIR
+from core.constants import SUPERVISOR_CONF
 
-SUPERVISOR_CONF = CONF_DIR / "supervisord.conf"
 LOG_SOURCE = "svcmgmtd.py"
 
 ALLOWED_SERVICES = {

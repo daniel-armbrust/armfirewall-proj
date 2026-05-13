@@ -7,17 +7,16 @@ from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from core.supervisor import supervisor_program_exists
+
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
-SUPERVISOR_CONF = ROOT_DIR / "conf" / "supervisord.conf"
 templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
 
 
 def proxy_service_installed() -> bool:
     """Return whether the Squid proxy service is registered in supervisord."""
-    if not SUPERVISOR_CONF.exists():
-        return False
-    return "[program:armfirewall-squid]" in SUPERVISOR_CONF.read_text(encoding="utf-8")
+    return supervisor_program_exists("armfirewall-squid")
 
 
 def page_context(request: Request, title: str) -> dict[str, Any]:
