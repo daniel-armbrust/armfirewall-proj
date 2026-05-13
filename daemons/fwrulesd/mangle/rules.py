@@ -2,178 +2,62 @@ from __future__ import annotations
 
 import json
 import uuid
-from pathlib import Path
+from functools import partial
 from typing import Any
 
-from fastapi import HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-
 from core import db
+from core.constants import WORK_REQUEST_DB_PATH
+from daemons.fwrulesd import commons
+from daemons.fwrulesd.constants import (
+    MANGLE_ACTIONS,
+    MANGLE_CHAIN_TABLES,
+    MANGLE_FAMILY_DATABASES,
+)
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
-
-FAMILY_DATABASES = {
-    "IPV4": ROOT_DIR / "db" / "ipv4-mangle-rules.db",
-    "IPV6": ROOT_DIR / "db" / "ipv6-mangle-rules.db",
-}
-WORK_REQUEST_DB_PATH = ROOT_DIR / "db" / "work-requests.db"
-
-CHAIN_TABLES = {
-    "PREROUTING": "mangle_prerouting_rules",
-    "INPUT": "mangle_input_rules",
-    "FORWARD": "mangle_forward_rules",
-    "OUTPUT": "mangle_output_rules",
-    "POSTROUTING": "mangle_postrouting_rules",
-}
-PROTOCOLS = {
-    "IPV4": {"all", "tcp", "udp", "icmp"},
-    "IPV6": {"all", "tcp", "udp", "icmpv6"},
-}
-MANGLE_ACTIONS = {"MARK", "CONNMARK", "DSCP", "TOS", "TTL", "ACCEPT", "DROP", "RETURN"}
+class MangleRuleError(commons.FirewallRuleError):
+    """Mangle rule failure with an HTTP-friendly status code for callers."""
 
 
-def page_context(request: Request, title: str) -> dict[str, Any]:
-    """Create shared template context for firewall mangle pages."""
-    return {
-        "request": request,
-        "title": title,
-        "user_name": "admin",
-        "current_path": request.url.path,
-    }
-
-
-def render_mangle_rules(request: Request) -> HTMLResponse:
-    """Render the firewall mangle rules template."""
-    return templates.TemplateResponse(
-        request,
-        "firewall/mangle_rules.html",
-        context=page_context(request, "Mangle Rules"),
-    )
-
-
-def normalize_family(value: Any) -> str:
-    """Normalize and validate a mangle address family."""
-    family = str(value or "IPV4").strip().upper()
-    if family not in FAMILY_DATABASES:
-        raise HTTPException(status_code=400, detail="family must be IPV4 or IPV6.")
-    return family
-
-
-def normalize_chain(value: Any) -> str:
-    """Normalize and validate a mangle chain."""
-    chain = str(value or "PREROUTING").strip().upper()
-    if chain not in CHAIN_TABLES:
-        raise HTTPException(status_code=400, detail="Unsupported mangle chain.")
-    return chain
-
-
-def normalize_protocol(family: str, value: Any) -> str:
-    """Normalize and validate a mangle protocol."""
-    protocol = str(value or "tcp").strip().lower()
-    if protocol == "icmp" and family == "IPV6":
-        protocol = "icmpv6"
-    if protocol not in PROTOCOLS[family]:
-        raise HTTPException(status_code=400, detail=f"Unsupported protocol for {family}.")
-    return protocol
+normalize_family = partial(
+    commons.normalize_family,
+    family_databases=MANGLE_FAMILY_DATABASES,
+    error_cls=MangleRuleError,
+)
+normalize_chain = partial(
+    commons.normalize_chain,
+    chain_tables=MANGLE_CHAIN_TABLES,
+    default="PREROUTING",
+    error_message="Unsupported mangle chain.",
+    error_cls=MangleRuleError,
+)
+normalize_protocol = partial(commons.normalize_protocol, error_cls=MangleRuleError)
+normalize_enabled = commons.normalize_enabled
+default_address = commons.default_address
+optional_int = partial(commons.optional_int, error_cls=MangleRuleError)
+next_rule_order = commons.next_rule_order
+ensure_pending_delete_column = commons.ensure_pending_delete_column
+row_to_rule = partial(commons.row_to_rule, chain_tables=MANGLE_CHAIN_TABLES)
+last_successful_apply_times = partial(commons.last_successful_apply_times, "MANGLE_RULES.%mangle_%")
+mark_apply_state = partial(
+    commons.mark_apply_state,
+    category_prefix="MANGLE_RULES",
+    apply_times_callback=last_successful_apply_times,
+)
 
 
 def normalize_mangle_action(value: Any) -> str:
     """Normalize and validate a mangle target action."""
     action = str(value or "ACCEPT").strip().upper()
     if action not in MANGLE_ACTIONS:
-        raise HTTPException(status_code=400, detail="Unsupported mangle action.")
+        raise MangleRuleError("Unsupported mangle action.", 400)
     return action
-
-
-def normalize_enabled(value: Any) -> int:
-    """Convert an enabled value to a SQLite flag."""
-    return 1 if str(value).lower() in {"1", "true", "yes", "on"} else 0
-
-
-def default_address(family: str) -> str:
-    """Return the wildcard address for a family."""
-    return "::/0" if family == "IPV6" else "0.0.0.0/0"
-
-
-def optional_int(value: Any) -> int | None:
-    """Convert an optional numeric value to int."""
-    if value is None or str(value).strip() == "":
-        return None
-    try:
-        return int(value)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid integer value: {value}") from exc
-
-
-def next_rule_order(conn: db.Connection, table: str) -> int:
-    """Return the next mangle rule order for one chain table."""
-    row = db.fetch_one_on(conn, f"SELECT COALESCE(MAX(rule_order), 0) + 1 AS next_order FROM {table}")
-    return int(row["next_order"] if row is not None else 1)
-
-
-def ensure_pending_delete_column(conn: db.Connection, table: str) -> None:
-    """Add the pending delete marker to older rule tables when needed."""
-    columns = {str(row["name"]) for row in db.execute_on(conn, f"PRAGMA table_info({table})").fetchall()}
-    if "pending_delete" not in columns:
-        db.execute_on(conn, f"ALTER TABLE {table} ADD COLUMN pending_delete INTEGER NOT NULL DEFAULT 0")
-
-
-def row_to_rule(family: str, chain: str, row: Any) -> dict[str, Any]:
-    """Convert a SQLite mangle rule row into API data."""
-    data = db.row_to_dict(row)
-    data["family"] = family
-    data["chain"] = chain
-    data["table_name"] = CHAIN_TABLES[chain]
-    data["enabled_label"] = "enabled" if int(data["enabled"]) == 1 else "disabled"
-    data["protected_label"] = "protected" if int(data["protected"]) == 1 else "editable"
-    return data
-
-
-def last_successful_apply_times() -> dict[str, str]:
-    """Return the last successful mangle apply timestamp by category."""
-    query = """
-        SELECT category_name, MAX(updated_at) AS applied_at
-        FROM work_requests
-        WHERE category_name LIKE 'MANGLE_RULES.%mangle_%'
-          AND action_name = 'apply'
-          AND status = 'success'
-        GROUP BY category_name
-    """
-    with db.connection(WORK_REQUEST_DB_PATH) as conn:
-        rows = db.fetch_all_on(conn, query)
-
-    return {
-        str(row["category_name"]): str(row["applied_at"])
-        for row in rows
-        if row.get("applied_at") is not None
-    }
-
-
-def mark_apply_state(rules: list[dict[str, Any]]) -> None:
-    """Mark mangle rules as active only when saved before the last Apply."""
-    apply_times = last_successful_apply_times()
-    for rule in rules:
-        category_name = f"MANGLE_RULES.{rule['family']}.{rule['table_name']}"
-        applied_at = apply_times.get(category_name)
-        is_enabled = int(rule["enabled"]) == 1
-        is_protected = int(rule["protected"]) == 1
-        is_pending_delete = int(rule.get("pending_delete") or 0) == 1
-        is_active = bool(
-            is_enabled
-            and not is_pending_delete
-            and (is_protected or (applied_at and str(rule["updated_at"]) <= applied_at))
-        )
-        rule["applied"] = 1 if is_active else 0
-        rule["apply_state"] = "delete_pending" if is_pending_delete else "active" if is_active else "pending" if is_enabled else "disabled"
 
 
 def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
     """Read rules from one mangle chain table."""
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = MANGLE_CHAIN_TABLES[chain]
+    db_path = MANGLE_FAMILY_DATABASES[family]
 
     if chain in {"PREROUTING", "INPUT"}:
         query = f"""
@@ -218,8 +102,8 @@ def get_mangle_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
     """Return one persisted mangle rule or fail when it is missing."""
     family = normalize_family(family)
     chain = normalize_chain(chain)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = MANGLE_CHAIN_TABLES[chain]
+    db_path = MANGLE_FAMILY_DATABASES[family]
 
     if chain in {"PREROUTING", "INPUT"}:
         query = f"""
@@ -260,7 +144,7 @@ def get_mangle_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
         row = db.fetch_one_on(conn, query, (rule_id,))
 
     if row is None:
-        raise HTTPException(status_code=404, detail="Mangle rule not found.")
+        raise MangleRuleError("Mangle rule not found.", 404)
 
     return row_to_rule(family, chain, row)
 
@@ -268,7 +152,7 @@ def get_mangle_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
 def get_mangle_rules() -> dict[str, Any]:
     """Return all persisted IPv4 and IPv6 mangle rules grouped by chain."""
     rules: list[dict[str, Any]] = []
-    by_chain = {chain: [] for chain in CHAIN_TABLES}
+    by_chain = {chain: [] for chain in MANGLE_CHAIN_TABLES}
     for family in ("IPV4", "IPV6"):
         for chain in ("PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"):
             chain_rules = get_rules_for_table(family, chain)
@@ -349,7 +233,7 @@ def sanitize_mangle_payload(payload: dict[str, Any]) -> dict[str, Any]:
     rule = {
         "family": family,
         "chain": chain,
-        "table": CHAIN_TABLES[chain],
+        "table": MANGLE_CHAIN_TABLES[chain],
         "iface_in": str(payload.get("iface_in", "")).strip(),
         "iface_out": str(payload.get("iface_out", "")).strip(),
         "ct_new": normalize_enabled(payload.get("ct_new", 0)),
@@ -373,11 +257,11 @@ def sanitize_mangle_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
     if chain in {"PREROUTING", "INPUT", "FORWARD"} and not rule["iface_in"]:
-        raise HTTPException(status_code=400, detail="iface_in is required for PREROUTING, INPUT, and FORWARD.")
+        raise MangleRuleError("iface_in is required for PREROUTING, INPUT, and FORWARD.", 400)
     if chain in {"FORWARD", "OUTPUT", "POSTROUTING"} and not rule["iface_out"]:
-        raise HTTPException(status_code=400, detail="iface_out is required for FORWARD, OUTPUT, and POSTROUTING.")
+        raise MangleRuleError("iface_out is required for FORWARD, OUTPUT, and POSTROUTING.", 400)
     if is_icmp and ((rule["protocol_type"] is None) != (rule["protocol_code"] is None)):
-        raise HTTPException(status_code=400, detail="ICMP type and code must be filled together.")
+        raise MangleRuleError("ICMP type and code must be filled together.", 400)
 
     return rule
 
@@ -431,7 +315,7 @@ def insert_mangle_rule(conn: db.Connection, rule: dict[str, Any]) -> int:
 def create_mangle_rule(payload: dict[str, Any]) -> dict[str, Any]:
     """Create a mangle rule without applying it to the operating system."""
     rule = sanitize_mangle_payload(payload)
-    db_path = FAMILY_DATABASES[rule["family"]]
+    db_path = MANGLE_FAMILY_DATABASES[rule["family"]]
 
     with db.transaction(db_path) as conn:
         ensure_pending_delete_column(conn, rule["table"])
@@ -444,8 +328,8 @@ def mangle_family_needs_apply(family: str, chain: str, apply_times: dict[str, st
     """Return whether one mangle family has pending changes to apply."""
     family = normalize_family(family)
     chain = normalize_chain(chain)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = MANGLE_CHAIN_TABLES[chain]
+    db_path = MANGLE_FAMILY_DATABASES[family]
     category_name = f"MANGLE_RULES.{family}.{table}"
     applied_at = apply_times.get(category_name)
 
@@ -473,15 +357,13 @@ def mangle_family_needs_apply(family: str, chain: str, apply_times: dict[str, st
 def apply_mangle_chain(chain: str) -> dict[str, Any]:
     """Queue only mangle families with pending changes for one chain."""
     chain = chain.strip().upper()
-    if chain not in CHAIN_TABLES:
-        from fastapi import HTTPException
+    if chain not in MANGLE_CHAIN_TABLES:
+        raise MangleRuleError("Unsupported mangle chain.", 400)
 
-        raise HTTPException(status_code=400, detail="Unsupported mangle chain.")
-
-    table = CHAIN_TABLES[chain]
+    table = MANGLE_CHAIN_TABLES[chain]
     apply_times = last_successful_apply_times()
     work_requests = []
-    for family, db_path in FAMILY_DATABASES.items():
+    for family, db_path in MANGLE_FAMILY_DATABASES.items():
         if not mangle_family_needs_apply(family, chain, apply_times):
             continue
 
@@ -512,19 +394,19 @@ def set_mangle_rule_enabled(family_value: str, chain_value: str, rule_id: int, p
     """Update the enabled flag for a mangle rule without applying it."""
     family = normalize_family(family_value)
     chain = normalize_chain(chain_value)
-    table = CHAIN_TABLES[chain]
+    table = MANGLE_CHAIN_TABLES[chain]
     enabled = normalize_enabled(payload.get("enabled", 0))
-    db_path = FAMILY_DATABASES[family]
+    db_path = MANGLE_FAMILY_DATABASES[family]
 
     with db.transaction(db_path) as conn:
         ensure_pending_delete_column(conn, table)
         current = db.fetch_one_on(conn, f"SELECT enabled, protected, pending_delete FROM {table} WHERE id = ?", (rule_id,))
         if current is None:
-            raise HTTPException(status_code=404, detail="Mangle rule not found.")
+            raise MangleRuleError("Mangle rule not found.", 404)
         if int(current["pending_delete"]) == 1:
-            raise HTTPException(status_code=403, detail="Mangle rules pending deletion cannot be changed.")
+            raise MangleRuleError("Mangle rules pending deletion cannot be changed.", 403)
         if int(current["protected"]) == 1 and enabled == 0:
-            raise HTTPException(status_code=403, detail="Protected mangle rules cannot be disabled.")
+            raise MangleRuleError("Protected mangle rules cannot be disabled.", 403)
 
         db.execute_on(
             conn,
@@ -539,14 +421,14 @@ def delete_mangle_rule(family_value: str, chain_value: str, rule_id: int) -> dic
     """Mark an editable mangle rule for deletion on the next Apply."""
     family = normalize_family(family_value)
     chain = normalize_chain(chain_value)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = MANGLE_CHAIN_TABLES[chain]
+    db_path = MANGLE_FAMILY_DATABASES[family]
     rule = get_mangle_rule(family, chain, rule_id)
 
     if int(rule["enabled"]) == 0:
-        raise HTTPException(status_code=403, detail="Disabled mangle rules cannot be deleted.")
+        raise MangleRuleError("Disabled mangle rules cannot be deleted.", 403)
     if int(rule["protected"]) == 1:
-        raise HTTPException(status_code=403, detail="Protected mangle rules cannot be deleted.")
+        raise MangleRuleError("Protected mangle rules cannot be deleted.", 403)
 
     if int(rule.get("pending_delete") or 0) == 1:
         return {"rule_id": rule_id, "status": "saved"}

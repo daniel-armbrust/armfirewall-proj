@@ -6,24 +6,12 @@ from core.constants import SUPERVISOR_CONF
 
 LOG_SOURCE = "svcmgmtd.py"
 
-ALLOWED_SERVICES = {
-    "armfirewall-squid": {
-        "package": "squid",
-        "binary": "/usr/sbin/squid",
-    },
-}
-
-CONTROLLABLE_SERVICES = {
-    "armfirewall-ifaced",
-    "armfirewall-monitord",
-    "armfirewall-workreqd",
-    "armfirewall-dnsmasq",
-    "armfirewall-linkfailover",
-    "armfirewall-squid",
-}
-
 PROTECTED_SERVICES = {
     "armfirewall-api",
     "armfirewall-workreqd",
     "armfirewall-ifaced",
+}
+
+RESTARTABLE_PROTECTED_SERVICES = {
+    "armfirewall-api",
 }

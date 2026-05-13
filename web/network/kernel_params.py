@@ -9,9 +9,10 @@ from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from web.constants import TEMPLATE_DIR
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
+
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 
 @dataclass(frozen=True)

@@ -1,48 +1,98 @@
 ArmFirewall Firewall Rules Executor
 ===================================
 
-The firewall rules executor applies ArmFirewall-managed iptables and ip6tables
-changes from the SQLite rule databases.
+fwrulesd is the ArmFirewall one-shot firewall rule executor. It is called by
+workreqd whenever the web interface queues a firewall work request.
 
-This module is not a persistent daemon. It is a one-shot work request executor
-called by workreqd when the web interface queues Filter, NAT or Mangle rule
-changes.
+This component is responsible for applying ArmFirewall-managed Filter, NAT and
+Mangle rules to the operating system through iptables and ip6tables. It reads
+the requested rule data from the SQLite rule databases, builds the operating
+system command, applies or removes the rule, and keeps the database state in
+sync after successful execution.
 
-The web interface persists firewall rule changes in the IPv4 and IPv6 rule
-databases first. This executor loads the requested rule rows, validates the
-selected rule table, applies or removes the matching operating system rules,
-updates the SQLite applied state, and removes rows that were marked for delete
-after successful execution.
+fwrulesd is not a persistent daemon. It runs once per work request and then
+exits.
 
-Files
------
+Execution Flow
+--------------
+
+1. The web interface persists the rule change in the proper SQLite database.
+2. The web interface creates a work request.
+3. workreqd dispatches the work request to daemons.fwrulesd.fwrulesd.
+4. fwrulesd loads the affected rule rows.
+5. fwrulesd applies, changes or removes the operating system rule.
+6. Protected rules are reconciled after apply actions.
+7. Pending delete rows are removed from SQLite after a successful full apply.
+
+Directory Layout
+----------------
 
 __init__.py
     Marks this directory as the daemons.fwrulesd Python package.
 
 fwrulesd.py
-    Work request entry point, request normalization, database selection,
-    shared iptables rule specification building and execution orchestration.
+    CLI entry point. It parses work request arguments, decodes the payload and
+    calls the execution flow.
+
+actions.py
+    Work request execution flow. It validates the category, logs execution
+    status, applies the requested action and reconciles protected rules.
+
+commands.py
+    iptables/ip6tables command builder and executor helpers. It builds common
+    rule specifications, appends protocol, address, interface and conntrack
+    matches, and applies, removes or flushes operating system rules.
+
+repository.py
+    SQLite access layer for firewall work requests. It resolves rule databases,
+    loads rule rows, loads protected rules, and removes pending-delete rows
+    after successful execution.
 
 constants.py
-    Rule database paths, table metadata, protected rule tables, selected SQL
-    columns and daemon log source.
+    Rule database paths, table metadata, selected SQL columns, protected rule
+    table lists, supported protocol/action values and daemon log source.
 
 models.py
-    Data class used to represent the decoded firewall work request context.
+    Data classes used by the firewall rule executor.
 
 commons.py
-    Shared command helper used to select iptables or ip6tables from the work
-    request family.
+    Shared helpers used by the firewall rule modules.
 
-filter.py
-    Filter table operations, including chain policies, rule actions, pending
-    apply handling and protected rule behavior.
+filter/
+    Filter-specific logic.
 
-nat.py
-    NAT table operations, including NAT target action mapping, target options
-    and port handling.
+filter/rules.py
+    Filter rule persistence and web-facing rule operations.
 
-mangle.py
-    Mangle table operations, including mangle target action mapping and pending
-    apply handling.
+filter/table.py
+    Filter table operating system behavior, including rule action lookup,
+    chain policy handling and configured policy enforcement.
+
+nat/
+    NAT-specific logic.
+
+nat/rules.py
+    NAT rule persistence and web-facing rule operations.
+
+nat/table.py
+    NAT table operating system behavior, including target action lookup,
+    destination/source translation options, redirect options and port handling.
+
+mangle/
+    Mangle-specific logic.
+
+mangle/rules.py
+    Mangle rule persistence and web-facing rule operations.
+
+mangle/table.py
+    Mangle table operating system behavior, including target action lookup and
+    target-specific options such as MARK, CONNMARK, DSCP, TOS and TTL.
+
+Responsibility Boundary
+-----------------------
+
+The web layer creates or updates database records and queues work requests.
+fwrulesd performs the operating system firewall changes.
+
+Firewall rule execution should stay inside daemons/fwrulesd. Shared generic
+helpers may live in core, but iptables/ip6tables behavior belongs here.

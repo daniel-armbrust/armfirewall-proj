@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import Request
@@ -9,9 +8,9 @@ from fastapi.templating import Jinja2Templates
 
 from core import db
 from core.constants import IFACE_DB_PATH
+from web.constants import TEMPLATE_DIR
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 
 def page_context(request: Request, title: str) -> dict[str, Any]:

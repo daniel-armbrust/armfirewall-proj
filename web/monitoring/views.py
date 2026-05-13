@@ -10,13 +10,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core import db
-from core.constants import IFACE_DB_PATH
+from core.constants import IFACE_DB_PATH, LATENCY_DB_PATH, RRD_IMG_DIR
+from web.constants import TEMPLATE_DIR
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-RRD_IMG_DIR = ROOT_DIR / "rrd" / "img"
-LATENCY_DB_PATH = ROOT_DIR / "db" / "latency.db"
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 CPU_MEM_GRAPHS = [
     {

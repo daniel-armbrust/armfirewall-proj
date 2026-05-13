@@ -16,11 +16,11 @@ from fastapi.templating import Jinja2Templates
 from web import auth
 from core import db
 from core.constants import IFACE_DB_PATH
+from web.constants import TEMPLATE_DIR
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
 TRACEROUTE_LOCK_PATH = Path("/tmp/armfirewall-traceroute.lock")
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 HOST_RE = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
 
 

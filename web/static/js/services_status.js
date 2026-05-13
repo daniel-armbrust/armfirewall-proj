@@ -22,6 +22,12 @@
     let workRequestsLoading = false;
     const POLL_MS = 5000;
 
+    function attachModalToBody(modal) {
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+    }
+
     function setState(state, updated = "") {
         if (!stateLabel) {
             return;
@@ -149,12 +155,13 @@
         }
         servicesBody.innerHTML = services.map((service) => {
             const protectedService = Boolean(service.protected);
+            const restartAllowed = Boolean(service.restart_allowed);
             const running = String(service.state || "").toUpperCase() === "RUNNING";
             const installed = Boolean(service.installed);
             const protectedBadge = protectedService ? '<span class="status protected">PROTECTED</span>' : "";
             const startDisabled = protectedService || !installed || running ? "disabled" : "";
             const stopDisabled = protectedService || !installed || !running ? "disabled" : "";
-            const restartDisabled = protectedService || !installed || !running ? "disabled" : "";
+            const restartDisabled = (protectedService && !restartAllowed) || !installed || !running ? "disabled" : "";
             return `
                 <tr>
                     <td><strong>${HF.escapeHtml(service.name)}</strong> ${protectedBadge}</td>
@@ -180,7 +187,7 @@
         if (!services.length) {
             optionalBody.innerHTML = `
                 <tr>
-                    <td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>no optional services</span></div></td>
+                    <td colspan="4"><div class="terminal-empty"><span class="prompt">$</span><span>no optional services</span></div></td>
                 </tr>
             `;
             return;
@@ -195,7 +202,6 @@
             return `
                 <tr>
                     <td><strong>${HF.escapeHtml(service.display_name)}</strong><br><span class="muted">${HF.escapeHtml(service.name)}</span></td>
-                    <td>${HF.escapeHtml(service.package)}</td>
                     <td><span class="status ${statusClass(service.state)}">${HF.escapeHtml(service.state)}</span></td>
                     <td>${HF.escapeHtml(service.description)}</td>
                     <td>
@@ -373,6 +379,8 @@
         optionalServiceConfirm.addEventListener("click", runPendingOptionalServiceAction);
     }
 
+    attachModalToBody(actionModal);
+    attachModalToBody(optionalServiceModal);
     setActiveView("status");
     pollServices();
     setInterval(pollServices, POLL_MS);

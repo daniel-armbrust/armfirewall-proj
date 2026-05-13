@@ -5,7 +5,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from core.constants import RRD_IMG_DIR
-from core.supervisor import supervisor_program_exists
 
 from web import auth
 from web.constants import STATIC_DIR
@@ -19,6 +18,8 @@ from web.routes.network import routes as network_routes
 from web.routes.settings import routes as settings_routes
 from web.routes.services import routes as service_routes
 from web.routes.tools import routes as tools_routes
+from web.routes.workrequests import routes as workrequest_routes
+from web.services.api import supervisor_program_exists
 
 
 app = FastAPI(title="ArmFirewall")
@@ -30,7 +31,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/rrd-img", StaticFiles(directory=RRD_IMG_DIR), name="rrd_img")
 
 app.state.menu_context = {
-    "proxy_service_installed": supervisor_program_exists("armfirewall-squid"),
+    "proxy_service_installed": supervisor_program_exists("squid"),
 }
 
 app.include_router(login_routes.router)
@@ -42,4 +43,5 @@ app.include_router(monitoring_routes.router)
 app.include_router(settings_routes.router)
 app.include_router(service_routes.router)
 app.include_router(tools_routes.router)
+app.include_router(workrequest_routes.router)
 app.include_router(menu_routes.router)

@@ -1,0 +1,1 @@
+"""NAT firewall rule logic."""

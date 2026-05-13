@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+
 from core import log as logger
+from core.constants import CONF_DIR, ROOT_DIR
 
 from .constants import LOG_SOURCE
 from .models import ControllableService, OptionalService
+from .commons import run_bounded_command
 from .packages import install_package, uninstall_package
 from .supervisor import (
     register_supervisor_program,
@@ -15,6 +19,35 @@ from .supervisor import (
     supervisor_program_exists,
     supervisor_status,
 )
+
+
+def validate_api_restart_readiness(state: str) -> None:
+    """Validate the web API before allowing a protected restart."""
+    if state != "RUNNING":
+        raise RuntimeError("armfirewall-api must be RUNNING before a protected restart.")
+
+    cert_path = CONF_DIR / "armfirewall.crt"
+    key_path = CONF_DIR / "armfirewall.key"
+
+    if not cert_path.exists():
+        raise RuntimeError(f"armfirewall-api TLS certificate was not found: {cert_path}")
+
+    if not key_path.exists():
+        raise RuntimeError(f"armfirewall-api TLS key was not found: {key_path}")
+
+    run_bounded_command([sys.executable, "-m", "py_compile", str(ROOT_DIR / "web" / "main.py")], timeout=60)
+    run_bounded_command([sys.executable, "-c", "import web.main; assert web.main.app"], timeout=60)
+
+
+def restart_service(service_name: str) -> None:
+    """Restart one supervisord service and verify it returns to RUNNING."""
+    supervisor_command("stop", service_name, timeout=60)
+    supervisor_command("start", service_name, timeout=60)
+
+    state = supervisor_status(service_name)
+
+    if state != "RUNNING":
+        raise RuntimeError(f"Service {service_name} did not return to RUNNING after restart: {state}")
 
 
 def install_service(service: OptionalService) -> None:
@@ -56,8 +89,11 @@ def control_service(service: ControllableService, action: str) -> None:
             return
         supervisor_command("stop", service_name, timeout=60)
     elif action == "restart":
-        if state == "RUNNING":
-            supervisor_command("restart", service_name, timeout=60)
+        if service_name == "armfirewall-api":
+            validate_api_restart_readiness(state)
+            restart_service(service_name)
+        elif state == "RUNNING":
+            restart_service(service_name)
         else:
             supervisor_command("start", service_name, timeout=60)
     else:

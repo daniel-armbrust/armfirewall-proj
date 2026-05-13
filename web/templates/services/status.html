@@ -73,7 +73,6 @@
             <thead>
                 <tr>
                     <th>Service</th>
-                    <th>Package</th>
                     <th>State</th>
                     <th>Description</th>
                     <th>Ops</th>
@@ -81,7 +80,7 @@
             </thead>
             <tbody id="optional-services-body">
                 <tr>
-                    <td colspan="5">
+                    <td colspan="4">
                         <div class="terminal-empty"><span class="prompt">$</span><span>loading optional services</span></div>
                     </td>
                 </tr>
@@ -150,5 +149,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_status.js') }}?v=20260512-standard-service-modal" defer></script>
+<script src="{{ url_for('static', path='/js/services_status.js') }}?v=20260525-service-modal-overlay" defer></script>
 {% endblock %}

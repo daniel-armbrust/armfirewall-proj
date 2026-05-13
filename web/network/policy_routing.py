@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, Request
@@ -10,14 +9,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core import db
+from core.constants import POLICY_ROUTING_DB_PATH, POLICY_ROUTING_DDL_PATH, WORK_REQUEST_DB_PATH
+from web.constants import TEMPLATE_DIR
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
-POLICY_DB_PATH = ROOT_DIR / "db" / "policy-routing.db"
-POLICY_DDL_PATH = ROOT_DIR / "db" / "ddl" / "policy-routing.ddl"
-WORK_REQUEST_DB_PATH = ROOT_DIR / "db" / "work-requests.db"
+POLICY_DB_PATH = POLICY_ROUTING_DB_PATH
+POLICY_DDL_PATH = POLICY_ROUTING_DDL_PATH
 
 ADDR_FAMILIES = {"ipv4", "ipv6"}
 ROUTE_TYPES = {"unicast", "local", "broadcast", "multicast", "throw", "unreachable", "prohibit", "blackhole", "anycast"}

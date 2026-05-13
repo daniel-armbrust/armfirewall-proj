@@ -46,7 +46,7 @@ def main() -> int:
         service = validate_service(payload)
         uninstall_service(service)
     elif args.action_name in {"start", "stop", "restart"}:
-        service = validate_control_service(payload)
+        service = validate_control_service(payload, args.action_name)
         control_service(service, args.action_name)
     else:
         raise RuntimeError(f"Unsupported service management action: {args.action_name}")

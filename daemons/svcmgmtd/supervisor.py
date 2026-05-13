@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from core.constants import ROOT_DIR
 from core.process import command_exists
-from core.supervisor import supervisor_program_exists
 
 from .commons import run_bounded_command
 from .constants import SUPERVISOR_CONF
 from .models import OptionalService
+
+
+def supervisor_program_exists(program_name: str) -> bool:
+    """Return whether a supervisor program section exists."""
+    if not SUPERVISOR_CONF.exists():
+        return False
+
+    return f"[program:{program_name}]" in SUPERVISOR_CONF.read_text(encoding="utf-8")
 
 
 def supervisor_command(*args: str, timeout: int = 60, check: bool = True):

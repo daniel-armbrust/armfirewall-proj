@@ -1059,7 +1059,7 @@
     async function runServiceAction(action) {
         const resolvedAction = action === "start-restart" && currentServiceState === "RUNNING" ? "restart" : action === "start-restart" ? "start" : action;
         clearFormStatus();
-        await HF.fetchJson("/api/services/status/armfirewall-dnsmasq/action", {
+        await HF.fetchJson("/api/services/status/dnsmasq/action", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({action: resolvedAction}),

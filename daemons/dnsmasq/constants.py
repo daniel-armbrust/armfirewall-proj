@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from core.constants import CONF_DIR, DB_DIR
+from core.constants import CONF_DIR, DB_DIR, WORK_REQUEST_DB_PATH
 
 
 DNSMASQ_DB_PATH = DB_DIR / "dnsmasq.db"
-
-WORK_REQUEST_DB_PATH = DB_DIR / "work-requests.db"
 
 DNSMASQ_CONF = CONF_DIR / "dnsmasq.conf"
 

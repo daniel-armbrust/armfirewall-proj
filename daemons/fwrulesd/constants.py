@@ -124,16 +124,75 @@ SELECT_COLUMNS = {
 }
 
 WILDCARD_ADDRESSES = {"0.0.0.0/0", "::/0", "", None}
+
+FAMILY_PROTOCOLS = {
+    "IPV4": {"all", "tcp", "udp", "icmp"},
+    "IPV6": {"all", "tcp", "udp", "icmpv6"},
+}
+
 FILTER_POLICY_CHAINS = ("INPUT", "FORWARD")
+
 FILTER_BUILTIN_CHAINS = ("INPUT", "FORWARD", "OUTPUT")
+
 DEFAULT_FILTER_POLICIES = {
     "INPUT": "DROP",
     "FORWARD": "DROP",
     "OUTPUT": "ACCEPT",
 }
 
+FILTER_DEFAULT_POLICIES = DEFAULT_FILTER_POLICIES
+
 FILTER_POLICIES = {"ACCEPT", "DROP"}
+
+FILTER_ACTIONS = {"ACCEPT", "DROP", "REJECT"}
+
+FILTER_FAMILY_DATABASES = {
+    "IPV4": RULE_DATABASES[("FIREWALL_RULES", "IPV4")],
+    "IPV6": RULE_DATABASES[("FIREWALL_RULES", "IPV6")],
+}
+
+FILTER_CHAIN_TABLES = {
+    "INPUT": "filter_input_rules",
+    "FORWARD": "filter_forward_rules",
+    "OUTPUT": "filter_output_rules",
+}
+
 FILTER_RULE_TABLES = ("filter_input_rules", "filter_forward_rules", "filter_output_rules")
+
+NAT_FAMILY_DATABASES = {
+    "IPV4": RULE_DATABASES[("NAT_RULES", "IPV4")],
+    "IPV6": RULE_DATABASES[("NAT_RULES", "IPV6")],
+}
+
+NAT_CHAIN_TABLES = {
+    "PREROUTING": "nat_prerouting_rules",
+    "INPUT": "nat_input_rules",
+    "OUTPUT": "nat_output_rules",
+    "POSTROUTING": "nat_postrouting_rules",
+}
+
+NAT_CHAIN_ACTIONS = {
+    "PREROUTING": {"DNAT", "REDIRECT", "ACCEPT", "RETURN"},
+    "INPUT": {"DNAT", "REDIRECT", "ACCEPT", "RETURN"},
+    "OUTPUT": {"DNAT", "REDIRECT", "ACCEPT", "RETURN"},
+    "POSTROUTING": {"SNAT", "MASQUERADE", "ACCEPT", "RETURN"},
+}
+
+MANGLE_FAMILY_DATABASES = {
+    "IPV4": RULE_DATABASES[("MANGLE_RULES", "IPV4")],
+    "IPV6": RULE_DATABASES[("MANGLE_RULES", "IPV6")],
+}
+
+MANGLE_CHAIN_TABLES = {
+    "PREROUTING": "mangle_prerouting_rules",
+    "INPUT": "mangle_input_rules",
+    "FORWARD": "mangle_forward_rules",
+    "OUTPUT": "mangle_output_rules",
+    "POSTROUTING": "mangle_postrouting_rules",
+}
+
+MANGLE_ACTIONS = {"MARK", "CONNMARK", "DSCP", "TOS", "TTL", "ACCEPT", "DROP", "RETURN"}
+
 PROTECTED_RULE_TABLES = {
     "FIREWALL_RULES": FILTER_RULE_TABLES,
     "NAT_RULES": ("nat_prerouting_rules", "nat_input_rules", "nat_output_rules", "nat_postrouting_rules"),

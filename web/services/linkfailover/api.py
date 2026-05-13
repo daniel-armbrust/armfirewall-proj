@@ -3,41 +3,17 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-from fastapi import HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import HTTPException
 
 from core import db
 from core import iface as iface_module
+from core.constants import LINKFAILOVER_DB_PATH
+from core.workrequest import list_work_requests
 
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-LINKFAILOVER_DB_PATH = ROOT_DIR / "db" / "linkfailover.db"
-WORK_REQUEST_DB_PATH = ROOT_DIR / "db" / "work-requests.db"
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
 TARGET_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
-
-
-def page_context(request: Request, title: str) -> dict[str, Any]:
-    """Create shared template context for the Link Failover page."""
-    return {
-        "request": request,
-        "title": title,
-        "user_name": "admin",
-        "current_path": request.url.path,
-    }
-
-
-def render_linkfailover(request: Request) -> HTMLResponse:
-    """Render the Link Failover service template."""
-    return templates.TemplateResponse(
-        request,
-        "services/linkfailover.html",
-        context=page_context(request, "Link Failover"),
-    )
 
 
 def require_linkfailover_db() -> None:
@@ -116,33 +92,12 @@ def interfaces() -> list[dict[str, Any]]:
 
 def get_service_work_requests(limit: int = 50) -> dict[str, Any]:
     """Return recent Link Failover service work requests."""
-    query = """
-        SELECT id, request_uid, status, category_name, action_name,
-               payload_json, error_message, created_at, updated_at
-        FROM work_requests
-        WHERE category_name = 'SERVICE_MANAGEMENT.SERVICE_CONTROL'
-        ORDER BY id DESC
-        LIMIT ?
-    """
-    rows: list[dict[str, Any]] = []
-    try:
-        with db.connection(WORK_REQUEST_DB_PATH) as conn:
-            raw_rows = db.fetch_all_on(conn, query, (limit,))
-    except FileNotFoundError:
-        raw_rows = []
-
-    for row in raw_rows:
-        try:
-            payload = json.loads(str(row.get("payload_json") or "{}"))
-        except json.JSONDecodeError:
-            payload = {}
-        if payload.get("service_name") != "armfirewall-linkfailover":
-            continue
-        item = dict(row)
-        item["service_name"] = payload.get("service_name", "-")
-        item.pop("payload_json", None)
-        rows.append(item)
-    return {"requests": rows}
+    return list_work_requests(
+        limit=limit,
+        category_names=("SERVICE_MANAGEMENT.SERVICE_CONTROL",),
+        service_name="armfirewall-linkfailover",
+        include_payload_service_fields=True,
+    )
 
 
 def get_config() -> dict[str, Any]:

@@ -2,239 +2,73 @@ from __future__ import annotations
 
 import json
 import uuid
-from pathlib import Path
+from functools import partial
 from typing import Any
 
-from fastapi import HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-
 from core import db
+from core.constants import WORK_REQUEST_DB_PATH
+from daemons.fwrulesd import commons
+from daemons.fwrulesd.constants import (
+    FILTER_ACTIONS,
+    FILTER_CHAIN_TABLES,
+    FILTER_DEFAULT_POLICIES,
+    FILTER_FAMILY_DATABASES,
+    FILTER_POLICIES,
+)
+from daemons.fwrulesd.filter.policies import require_filter_chain_policies
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
-
-FAMILY_DATABASES = {
-    "IPV4": ROOT_DIR / "db" / "ipv4-firewall-rules.db",
-    "IPV6": ROOT_DIR / "db" / "ipv6-firewall-rules.db",
-}
-WORK_REQUEST_DB_PATH = ROOT_DIR / "db" / "work-requests.db"
-
-CHAIN_TABLES = {
-    "INPUT": "filter_input_rules",
-    "FORWARD": "filter_forward_rules",
-    "OUTPUT": "filter_output_rules",
-}
-TABLE_CHAINS = {table: chain for chain, table in CHAIN_TABLES.items()}
-PROTOCOLS = {
-    "IPV4": {"all", "tcp", "udp", "icmp"},
-    "IPV6": {"all", "tcp", "udp", "icmpv6"},
-}
-ACTIONS = {"ACCEPT", "DROP", "REJECT"}
-POLICIES = {"ACCEPT", "DROP"}
-DEFAULT_POLICIES = {
-    "INPUT": "DROP",
-    "FORWARD": "DROP",
-    "OUTPUT": "ACCEPT",
-}
+class FilterRuleError(commons.FirewallRuleError):
+    """Filter rule failure with an HTTP-friendly status code for callers."""
 
 
-def page_context(request: Request, title: str) -> dict[str, Any]:
-    """Create shared template context for firewall filter pages."""
-    return {
-        "request": request,
-        "title": title,
-        "user_name": "admin",
-        "current_path": request.url.path,
-    }
-
-
-def render_filter_rules(request: Request) -> HTMLResponse:
-    """Render the firewall filter rules template."""
-    return templates.TemplateResponse(
-        request,
-        "firewall/filter_rules.html",
-        context=page_context(request, "Filter Rules"),
-    )
-
-
-def normalize_family(value: Any) -> str:
-    """Normalize and validate a firewall address family."""
-    family = str(value or "IPV4").strip().upper()
-    if family not in FAMILY_DATABASES:
-        raise HTTPException(status_code=400, detail="family must be IPV4 or IPV6.")
-    return family
-
-
-def normalize_chain(value: Any) -> str:
-    """Normalize and validate a filter chain name."""
-    chain = str(value or "INPUT").strip().upper()
-    if chain not in CHAIN_TABLES:
-        raise HTTPException(status_code=400, detail="chain must be INPUT, FORWARD, or OUTPUT.")
-    return chain
-
-
-def normalize_protocol(family: str, value: Any) -> str:
-    """Normalize and validate a protocol for a family."""
-    protocol = str(value or "tcp").strip().lower()
-    if protocol == "icmp" and family == "IPV6":
-        protocol = "icmpv6"
-    if protocol not in PROTOCOLS[family]:
-        raise HTTPException(status_code=400, detail=f"Unsupported protocol for {family}.")
-    return protocol
+normalize_family = partial(
+    commons.normalize_family,
+    family_databases=FILTER_FAMILY_DATABASES,
+    error_cls=FilterRuleError,
+)
+normalize_chain = partial(
+    commons.normalize_chain,
+    chain_tables=FILTER_CHAIN_TABLES,
+    default="INPUT",
+    error_message="chain must be INPUT, FORWARD, or OUTPUT.",
+    error_cls=FilterRuleError,
+)
+normalize_protocol = partial(commons.normalize_protocol, error_cls=FilterRuleError)
+normalize_enabled = commons.normalize_enabled
+default_address = commons.default_address
+optional_int = partial(commons.optional_int, error_cls=FilterRuleError)
+next_rule_order = commons.next_rule_order
+ensure_pending_delete_column = commons.ensure_pending_delete_column
+row_to_rule = partial(commons.row_to_rule, chain_tables=FILTER_CHAIN_TABLES)
+last_successful_apply_times = partial(commons.last_successful_apply_times, "FIREWALL_RULES.%filter_%")
+mark_apply_state = partial(
+    commons.mark_apply_state,
+    category_prefix="FIREWALL_RULES",
+    apply_times_callback=last_successful_apply_times,
+)
 
 
 def normalize_action(value: Any) -> str:
     """Normalize and validate a filter action."""
     action = str(value or "ACCEPT").strip().upper()
-    if action not in ACTIONS:
-        raise HTTPException(status_code=400, detail="action must be ACCEPT, DROP, or REJECT.")
+    if action not in FILTER_ACTIONS:
+        raise FilterRuleError("action must be ACCEPT, DROP, or REJECT.", 400)
     return action
 
 
 def normalize_policy(value: Any) -> str:
     """Normalize and validate a built-in chain policy."""
     policy = str(value or "DROP").strip().upper()
-    if policy not in POLICIES:
-        raise HTTPException(status_code=400, detail="policy must be ACCEPT or DROP.")
+    if policy not in FILTER_POLICIES:
+        raise FilterRuleError("policy must be ACCEPT or DROP.", 400)
     return policy
-
-
-def normalize_enabled(value: Any) -> int:
-    """Convert an enabled value to a SQLite flag."""
-    return 1 if str(value).lower() in {"1", "true", "yes", "on"} else 0
-
-
-def default_address(family: str) -> str:
-    """Return the wildcard source or destination address for a family."""
-    return "::/0" if family == "IPV6" else "0.0.0.0/0"
-
-
-def optional_int(value: Any) -> int | None:
-    """Convert an optional numeric value to int."""
-    if value is None or str(value).strip() == "":
-        return None
-    try:
-        return int(value)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid integer value: {value}") from exc
-
-
-def next_rule_order(conn: db.Connection, table: str) -> int:
-    """Return the next rule order for one chain table."""
-    row = db.fetch_one_on(conn, f"SELECT COALESCE(MAX(rule_order), 0) + 1 AS next_order FROM {table}")
-    return int(row["next_order"] if row is not None else 1)
-
-
-def ensure_pending_delete_column(conn: db.Connection, table: str) -> None:
-    """Add the pending delete marker to older rule tables when needed."""
-    columns = {str(row["name"]) for row in db.execute_on(conn, f"PRAGMA table_info({table})").fetchall()}
-    if "pending_delete" not in columns:
-        db.execute_on(conn, f"ALTER TABLE {table} ADD COLUMN pending_delete INTEGER NOT NULL DEFAULT 0")
-
-
-def ensure_filter_chain_policies(conn: db.Connection) -> None:
-    """Create and seed filter policy metadata for older firewall databases."""
-    row = db.fetch_one_on(
-        conn,
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'filter_chain_policies'",
-    )
-    if row is not None and "REJECT" in str(row["sql"]):
-        db.execute_on(conn, "DROP TABLE IF EXISTS filter_chain_policies_legacy")
-        db.execute_on(conn, "ALTER TABLE filter_chain_policies RENAME TO filter_chain_policies_legacy")
-        db.execute_on(
-            conn,
-            """
-            CREATE TABLE filter_chain_policies (
-                 chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
-                 policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
-                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            """,
-        )
-        db.execute_on(
-            conn,
-            """
-            INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy, created_at, updated_at)
-            SELECT chain_name, CASE WHEN policy = 'REJECT' THEN 'DROP' ELSE policy END, created_at, updated_at
-            FROM filter_chain_policies_legacy
-            """,
-        )
-        db.execute_on(conn, "DROP TABLE filter_chain_policies_legacy")
-    db.execute_on(
-        conn,
-        """
-        CREATE TABLE IF NOT EXISTS filter_chain_policies (
-             chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
-             policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
-             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-        """,
-    )
-    for chain, policy in DEFAULT_POLICIES.items():
-        db.execute_on(
-            conn,
-            "INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy) VALUES (?, ?)",
-            (chain, policy),
-        )
-
-
-def row_to_rule(family: str, chain: str, row: Any) -> dict[str, Any]:
-    """Convert a SQLite rule row into API data."""
-    data = db.row_to_dict(row)
-    data["family"] = family
-    data["chain"] = chain
-    data["table_name"] = CHAIN_TABLES[chain]
-    data["enabled_label"] = "enabled" if int(data["enabled"]) == 1 else "disabled"
-    data["protected_label"] = "protected" if int(data["protected"]) == 1 else "editable"
-    return data
-
-
-def last_successful_apply_times() -> dict[str, str]:
-    """Return the last successful filter apply timestamp by category."""
-    query = """
-        SELECT category_name, MAX(updated_at) AS applied_at
-        FROM work_requests
-        WHERE category_name LIKE 'FIREWALL_RULES.%filter_%'
-          AND action_name = 'apply'
-          AND status = 'success'
-        GROUP BY category_name
-    """
-    with db.connection(WORK_REQUEST_DB_PATH) as conn:
-        rows = db.fetch_all_on(conn, query)
-
-    return {
-        str(row["category_name"]): str(row["applied_at"])
-        for row in rows
-        if row.get("applied_at") is not None
-    }
-
-
-def mark_apply_state(rules: list[dict[str, Any]]) -> None:
-    """Mark filter rules as active only when saved before the last Apply."""
-    apply_times = last_successful_apply_times()
-    for rule in rules:
-        category_name = f"FIREWALL_RULES.{rule['family']}.{rule['table_name']}"
-        applied_at = apply_times.get(category_name)
-        is_enabled = int(rule["enabled"]) == 1
-        is_protected = int(rule["protected"]) == 1
-        is_pending_delete = int(rule.get("pending_delete") or 0) == 1
-        is_active = bool(
-            is_enabled
-            and not is_pending_delete
-            and (is_protected or (applied_at and str(rule["updated_at"]) <= applied_at))
-        )
-        rule["applied"] = 1 if is_active else 0
-        rule["apply_state"] = "delete_pending" if is_pending_delete else "active" if is_active else "pending" if is_enabled else "disabled"
 
 
 def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
     """Read enabled and disabled rules from one filter chain table."""
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = FILTER_CHAIN_TABLES[chain]
+    db_path = FILTER_FAMILY_DATABASES[family]
 
     if chain == "INPUT":
         query = f"""
@@ -268,17 +102,17 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
         """
 
     with db.connection(db_path) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         return [row_to_rule(family, chain, row) for row in db.execute_on(conn, query).fetchall()]
 
 
 def get_filter_policies() -> dict[str, dict[str, Any]]:
     """Return persisted filter policies by chain and family."""
-    policies: dict[str, dict[str, Any]] = {chain: {} for chain in CHAIN_TABLES}
-    for family, db_path in FAMILY_DATABASES.items():
+    policies: dict[str, dict[str, Any]] = {chain: {} for chain in FILTER_CHAIN_TABLES}
+    for family, db_path in FILTER_FAMILY_DATABASES.items():
         with db.connection(db_path) as conn:
-            ensure_filter_chain_policies(conn)
+            require_filter_chain_policies(conn)
             rows = db.fetch_all_on(
                 conn,
                 """
@@ -300,8 +134,8 @@ def get_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
     """Return one persisted filter rule or fail when it is missing."""
     family = normalize_family(family)
     chain = normalize_chain(chain)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = FILTER_CHAIN_TABLES[chain]
+    db_path = FILTER_FAMILY_DATABASES[family]
 
     if chain == "INPUT":
         query = f"""
@@ -335,12 +169,12 @@ def get_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
         """
 
     with db.connection(db_path) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         row = db.fetch_one_on(conn, query, (rule_id,))
 
     if row is None:
-        raise HTTPException(status_code=404, detail="Filter rule not found.")
+        raise FilterRuleError("Filter rule not found.", 404)
 
     return row_to_rule(family, chain, row)
 
@@ -348,7 +182,7 @@ def get_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
 def get_filter_rules() -> dict[str, Any]:
     """Return all persisted filter rules grouped by family and chain."""
     rules: list[dict[str, Any]] = []
-    by_chain = {chain: [] for chain in CHAIN_TABLES}
+    by_chain = {chain: [] for chain in FILTER_CHAIN_TABLES}
     for family in ("IPV4", "IPV6"):
         for chain in ("INPUT", "FORWARD", "OUTPUT"):
             chain_rules = get_rules_for_table(family, chain)
@@ -417,14 +251,14 @@ def sanitize_rule_payload(payload: dict[str, Any]) -> dict[str, Any]:
     protocol_code = optional_int(payload.get("protocol_code")) if is_icmp else None
 
     if not is_icmp and not is_all and (src_port is None or dst_port is None):
-        raise HTTPException(status_code=400, detail="TCP/UDP rules require source and destination ports.")
+        raise FilterRuleError("TCP/UDP rules require source and destination ports.", 400)
     if is_icmp and ((protocol_type is None) != (protocol_code is None)):
-        raise HTTPException(status_code=400, detail="ICMP type and code must be filled together.")
+        raise FilterRuleError("ICMP type and code must be filled together.", 400)
 
     rule = {
         "family": family,
         "chain": chain,
-        "table": CHAIN_TABLES[chain],
+        "table": FILTER_CHAIN_TABLES[chain],
         "iface_in": str(payload.get("iface_in", "")).strip(),
         "iface_out": str(payload.get("iface_out", "")).strip(),
         "src_addr": str(payload.get("src_addr") or default_address(family)).strip(),
@@ -444,9 +278,9 @@ def sanitize_rule_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
     if chain in {"INPUT", "FORWARD"} and not rule["iface_in"]:
-        raise HTTPException(status_code=400, detail="iface_in is required for INPUT and FORWARD.")
+        raise FilterRuleError("iface_in is required for INPUT and FORWARD.", 400)
     if chain in {"FORWARD", "OUTPUT"} and not rule["iface_out"]:
-        raise HTTPException(status_code=400, detail="iface_out is required for FORWARD and OUTPUT.")
+        raise FilterRuleError("iface_out is required for FORWARD and OUTPUT.", 400)
 
     return rule
 
@@ -531,11 +365,11 @@ def enabled_rule_ids_for_chain(family: str, chain: str) -> list[int]:
     """Return enabled rule ids for one family and chain."""
     family = normalize_family(family)
     chain = normalize_chain(chain)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = FILTER_CHAIN_TABLES[chain]
+    db_path = FILTER_FAMILY_DATABASES[family]
 
     with db.connection(db_path) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         rows = db.fetch_all_on(conn, f"SELECT id FROM {table} WHERE enabled = 1 AND pending_delete = 0 ORDER BY rule_order, id")
 
@@ -546,11 +380,11 @@ def pending_delete_rule_ids_for_chain(family: str, chain: str) -> list[int]:
     """Return pending delete rule ids for one family and chain."""
     family = normalize_family(family)
     chain = normalize_chain(chain)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = FILTER_CHAIN_TABLES[chain]
+    db_path = FILTER_FAMILY_DATABASES[family]
 
     with db.connection(db_path) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         rows = db.fetch_all_on(conn, f"SELECT id FROM {table} WHERE pending_delete = 1 ORDER BY rule_order, id")
 
@@ -561,13 +395,13 @@ def filter_family_needs_apply(family: str, chain: str, apply_times: dict[str, st
     """Return whether one filter family has pending changes to apply."""
     family = normalize_family(family)
     chain = normalize_chain(chain)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = FILTER_CHAIN_TABLES[chain]
+    db_path = FILTER_FAMILY_DATABASES[family]
     category_name = f"FIREWALL_RULES.{family}.{table}"
     applied_at = apply_times.get(category_name)
 
     with db.connection(db_path) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         policy_row = db.fetch_one_on(
             conn,
@@ -575,7 +409,7 @@ def filter_family_needs_apply(family: str, chain: str, apply_times: dict[str, st
             (chain,),
         )
         if policy_row is not None:
-            default_policy = DEFAULT_POLICIES[chain]
+            default_policy = FILTER_DEFAULT_POLICIES[chain]
             policy_changed_without_apply = applied_at is None and str(policy_row["policy"]) != default_policy
             policy_changed_after_apply = applied_at is not None and str(policy_row["updated_at"]) > applied_at
             if policy_changed_without_apply or policy_changed_after_apply:
@@ -603,10 +437,10 @@ def filter_family_needs_apply(family: str, chain: str, apply_times: dict[str, st
 def create_filter_rule(payload: dict[str, Any]) -> dict[str, Any]:
     """Create a filter rule without applying it to the operating system."""
     rule = sanitize_rule_payload(payload)
-    db_path = FAMILY_DATABASES[rule["family"]]
+    db_path = FILTER_FAMILY_DATABASES[rule["family"]]
 
     with db.transaction(db_path) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, rule["table"])
         rule_id = insert_rule(conn, rule)
 
@@ -617,25 +451,25 @@ def update_filter_rule(family_value: str, chain_value: str, rule_id: int, payloa
     """Update an editable filter rule without applying it to the operating system."""
     family = normalize_family(family_value)
     chain = normalize_chain(chain_value)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = FILTER_CHAIN_TABLES[chain]
+    db_path = FILTER_FAMILY_DATABASES[family]
     payload = dict(payload)
     payload["family"] = family
     payload["chain"] = chain
     rule = sanitize_rule_payload(payload)
 
     with db.transaction(db_path) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         current = db.fetch_one_on(conn, f"SELECT protected, enabled, pending_delete FROM {table} WHERE id = ?", (rule_id,))
         if current is None:
-            raise HTTPException(status_code=404, detail="Filter rule not found.")
+            raise FilterRuleError("Filter rule not found.", 404)
         if int(current["pending_delete"]) == 1:
-            raise HTTPException(status_code=403, detail="Filter rules pending deletion cannot be edited.")
+            raise FilterRuleError("Filter rules pending deletion cannot be edited.", 403)
         if int(current["enabled"]) == 0:
-            raise HTTPException(status_code=403, detail="Disabled filter rules cannot be edited.")
+            raise FilterRuleError("Disabled filter rules cannot be edited.", 403)
         if int(current["protected"]) == 1:
-            raise HTTPException(status_code=403, detail="Protected filter rules cannot be edited.")
+            raise FilterRuleError("Protected filter rules cannot be edited.", 403)
 
         if chain == "INPUT":
             query = f"""
@@ -690,13 +524,13 @@ def apply_filter_rule(family_value: str, chain_value: str, rule_id: int) -> dict
     """Reject per-rule application so only the chain Apply button can run."""
     normalize_family(family_value)
     normalize_chain(chain_value)
-    raise HTTPException(status_code=403, detail="Rules can only be applied with the chain Apply button.")
+    raise FilterRuleError("Rules can only be applied with the chain Apply button.", 403)
 
 
 def apply_filter_chain(chain_value: str) -> dict[str, Any]:
     """Queue only filter families with pending changes for one chain."""
     chain = normalize_chain(chain_value)
-    table = CHAIN_TABLES[chain]
+    table = FILTER_CHAIN_TABLES[chain]
     apply_times = last_successful_apply_times()
     work_requests = []
 
@@ -706,7 +540,7 @@ def apply_filter_chain(chain_value: str) -> dict[str, Any]:
 
         rule_ids = enabled_rule_ids_for_chain(family, chain)
         delete_rule_ids = pending_delete_rule_ids_for_chain(family, chain)
-        policy = get_filter_policies().get(chain, {}).get(family, {}).get("policy", DEFAULT_POLICIES[chain])
+        policy = get_filter_policies().get(chain, {}).get(family, {}).get("policy", FILTER_DEFAULT_POLICIES[chain])
         category_name = f"FIREWALL_RULES.{family}.{table}"
         payload = {
             "family": family,
@@ -735,8 +569,8 @@ def set_filter_chain_policy(chain_value: str, payload: dict[str, Any]) -> dict[s
     chain = normalize_chain(chain_value)
     policy = normalize_policy(payload.get("policy"))
 
-    with db.transaction(FAMILY_DATABASES["IPV4"]) as conn:
-        ensure_filter_chain_policies(conn)
+    with db.transaction(FILTER_FAMILY_DATABASES["IPV4"]) as conn:
+        require_filter_chain_policies(conn)
         db.execute_on(
             conn,
             """
@@ -746,8 +580,8 @@ def set_filter_chain_policy(chain_value: str, payload: dict[str, Any]) -> dict[s
             """,
             (policy, chain),
         )
-    with db.transaction(FAMILY_DATABASES["IPV6"]) as conn:
-        ensure_filter_chain_policies(conn)
+    with db.transaction(FILTER_FAMILY_DATABASES["IPV6"]) as conn:
+        require_filter_chain_policies(conn)
         db.execute_on(
             conn,
             """
@@ -765,20 +599,20 @@ def set_filter_rule_enabled(family_value: str, chain_value: str, rule_id: int, p
     """Update the enabled flag for a filter rule without applying it."""
     family = normalize_family(family_value)
     chain = normalize_chain(chain_value)
-    table = CHAIN_TABLES[chain]
+    table = FILTER_CHAIN_TABLES[chain]
     enabled = normalize_enabled(payload.get("enabled", 0))
-    db_path = FAMILY_DATABASES[family]
+    db_path = FILTER_FAMILY_DATABASES[family]
 
     with db.transaction(db_path) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
         ensure_pending_delete_column(conn, table)
         current = db.fetch_one_on(conn, f"SELECT enabled, protected, pending_delete FROM {table} WHERE id = ?", (rule_id,))
         if current is None:
-            raise HTTPException(status_code=404, detail="Filter rule not found.")
+            raise FilterRuleError("Filter rule not found.", 404)
         if int(current["pending_delete"]) == 1:
-            raise HTTPException(status_code=403, detail="Filter rules pending deletion cannot be changed.")
+            raise FilterRuleError("Filter rules pending deletion cannot be changed.", 403)
         if int(current["protected"]) == 1 and enabled == 0:
-            raise HTTPException(status_code=403, detail="Protected filter rules cannot be disabled.")
+            raise FilterRuleError("Protected filter rules cannot be disabled.", 403)
 
         cursor = db.execute_on(
             conn,
@@ -793,14 +627,14 @@ def delete_filter_rule(family_value: str, chain_value: str, rule_id: int) -> dic
     """Mark an editable filter rule for deletion on the next Apply."""
     family = normalize_family(family_value)
     chain = normalize_chain(chain_value)
-    table = CHAIN_TABLES[chain]
-    db_path = FAMILY_DATABASES[family]
+    table = FILTER_CHAIN_TABLES[chain]
+    db_path = FILTER_FAMILY_DATABASES[family]
     rule = get_filter_rule(family, chain, rule_id)
 
     if int(rule["enabled"]) == 0:
-        raise HTTPException(status_code=403, detail="Disabled filter rules cannot be deleted.")
+        raise FilterRuleError("Disabled filter rules cannot be deleted.", 403)
     if int(rule["protected"]) == 1:
-        raise HTTPException(status_code=403, detail="Protected filter rules cannot be deleted.")
+        raise FilterRuleError("Protected filter rules cannot be deleted.", 403)
 
     if int(rule.get("pending_delete") or 0) == 1:
         return {"rule_id": rule_id, "status": "saved"}

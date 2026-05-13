@@ -7,23 +7,18 @@ import shutil
 import subprocess
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-from fastapi import HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import HTTPException
 
 from core import db
 from core import iface as iface_module
-from web.services import status as service_status
+from core.constants import DNSMASQ_DB_PATH, ROOT_DIR, WORK_REQUEST_DB_PATH
+from core.workrequest import list_work_requests
+from web.services.api import supervisor_programs
 
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
 DNSMASQ_CONF = ROOT_DIR / "conf" / "dnsmasq.conf"
-DNSMASQ_DB_PATH = ROOT_DIR / "db" / "dnsmasq.db"
-WORK_REQUEST_DB_PATH = ROOT_DIR / "db" / "work-requests.db"
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
 
 DOMAIN_LABEL_RE = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$")
 BOOL_DEFAULTS = {
@@ -34,25 +29,6 @@ BOOL_DEFAULTS = {
 }
 ALL_INTERFACES_TOKEN = "__all__"
 INTERFACE_CONFIG_PREFIX = "# armfirewall-interface-config="
-
-
-def page_context(request: Request, title: str) -> dict[str, Any]:
-    """Create shared template context for service pages."""
-    return {
-        "request": request,
-        "title": title,
-        "user_name": "admin",
-        "current_path": request.url.path,
-    }
-
-
-def render_dnsmasq(request: Request) -> HTMLResponse:
-    """Render the Dnsmasq service template."""
-    return templates.TemplateResponse(
-        request,
-        "services/dnsmasq.html",
-        context=page_context(request, "Dnsmasq"),
-    )
 
 
 def default_config() -> dict[str, Any]:
@@ -600,9 +576,9 @@ def dnsmasq_version() -> str:
 
 
 def dnsmasq_status() -> dict[str, Any]:
-    """Return supervisor status for armfirewall-dnsmasq."""
-    rows = service_status.supervisor_programs()
-    row = next((item for item in rows if item["name"] == "armfirewall-dnsmasq"), None)
+    """Return supervisor status for dnsmasq."""
+    rows = supervisor_programs()
+    row = next((item for item in rows if item["name"] == "dnsmasq"), None)
     return {
         "installed": row is not None,
         "state": row["state"] if row else "NOT INSTALLED",
@@ -615,55 +591,12 @@ def dnsmasq_status() -> dict[str, Any]:
 
 def get_dnsmasq_work_requests(limit: int = 50) -> dict[str, Any]:
     """Return recent Dnsmasq configuration and service control work requests."""
-    query = """
-        SELECT
-            id,
-            request_uid,
-            status,
-            source,
-            category_name,
-            action_name,
-            target_rule_id,
-            payload_json,
-            error_message,
-            created_at,
-            updated_at
-        FROM work_requests
-        WHERE category_name IN (
-            'SERVICE_MANAGEMENT.DNSMASQ_CONFIG',
-            'SERVICE_MANAGEMENT.SERVICE_CONTROL'
-        )
-        ORDER BY id DESC
-    """
-    with db.connection(WORK_REQUEST_DB_PATH) as conn:
-        raw_rows = db.fetch_all_on(conn, query)
-
-    rows: list[dict[str, Any]] = []
-    for row in raw_rows:
-        category_name = str(row.get("category_name") or "")
-        payload = {}
-        try:
-            payload = json.loads(str(row.get("payload_json") or "{}"))
-        except json.JSONDecodeError:
-            payload = {}
-
-        if category_name == "SERVICE_MANAGEMENT.SERVICE_CONTROL":
-            if payload.get("service_name") != "armfirewall-dnsmasq":
-                continue
-
-        item = dict(row)
-        item.pop("payload_json", None)
-        rows.append(item)
-        if len(rows) >= limit:
-            break
-
-    summary = {"total": len(rows), "queue": 0, "running": 0, "success": 0, "failed": 0}
-    for row in rows:
-        status = str(row.get("status") or "")
-        if status in summary:
-            summary[status] += 1
-
-    return {"summary": summary, "requests": rows}
+    return list_work_requests(
+        limit=limit,
+        category_names=("SERVICE_MANAGEMENT.DNSMASQ_CONFIG", "SERVICE_MANAGEMENT.SERVICE_CONTROL"),
+        service_name="dnsmasq",
+        service_name_categories=("SERVICE_MANAGEMENT.SERVICE_CONTROL",),
+    )
 
 
 def get_dnsmasq_config() -> dict[str, Any]:

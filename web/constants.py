@@ -11,6 +11,7 @@ WEB_DIR = ROOT_DIR / "web"
 TEMPLATE_DIR = WEB_DIR / "templates"
 STATIC_DIR = WEB_DIR / "static"
 
+SERVICES_STATUS_ACTIONS = {"start", "stop", "restart"}
 SESSION_COOKIE = "armfw_session"
 SESSION_TTL = timedelta(hours=8)
 LOGIN_PATH = "/login"

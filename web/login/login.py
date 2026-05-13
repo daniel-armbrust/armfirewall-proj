@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
 
@@ -9,10 +8,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from web import auth
+from web.constants import TEMPLATE_DIR
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-templates = Jinja2Templates(directory=[ROOT_DIR / "web" / "templates", ROOT_DIR / "templates"])
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 
 def page_context(request: Request, title: str) -> dict[str, Any]:

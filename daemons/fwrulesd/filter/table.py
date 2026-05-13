@@ -7,8 +7,8 @@ from typing import Any
 from core import db
 from core.process import run_command
 
-from .commons import command_name
-from .constants import (
+from ..commons import command_name
+from ..constants import (
     DEFAULT_FILTER_POLICIES,
     FILTER_BUILTIN_CHAINS,
     FILTER_POLICIES,
@@ -16,6 +16,7 @@ from .constants import (
     RULE_DATABASES,
     TABLE_METADATA,
 )
+from .policies import require_filter_chain_policies
 
 
 def rule_action(rule: dict[str, Any]) -> str:
@@ -33,63 +34,10 @@ def filter_database_for_family(family: str) -> Any:
     return db_path
 
 
-def ensure_filter_chain_policies(conn: db.Connection) -> None:
-    """Create and seed filter policy metadata when an older database is used."""
-    row = db.fetch_one_on(
-        conn,
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'filter_chain_policies'",
-    )
-
-    if row is not None and "REJECT" in str(row["sql"]):
-        db.execute_on(conn, "DROP TABLE IF EXISTS filter_chain_policies_legacy")
-        db.execute_on(conn, "ALTER TABLE filter_chain_policies RENAME TO filter_chain_policies_legacy")
-        db.execute_on(
-            conn,
-            """
-            CREATE TABLE filter_chain_policies (
-                 chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
-                 policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
-                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            """,
-        )
-
-        db.execute_on(
-            conn,
-            """
-            INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy, created_at, updated_at)
-            SELECT chain_name, CASE WHEN policy = 'REJECT' THEN 'DROP' ELSE policy END, created_at, updated_at
-            FROM filter_chain_policies_legacy
-            """,
-        )
-
-        db.execute_on(conn, "DROP TABLE filter_chain_policies_legacy")
-
-    db.execute_on(
-        conn,
-        """
-        CREATE TABLE IF NOT EXISTS filter_chain_policies (
-             chain_name TEXT PRIMARY KEY CHECK (chain_name IN ('INPUT', 'FORWARD', 'OUTPUT')),
-             policy TEXT NOT NULL DEFAULT 'DROP' CHECK (policy IN ('ACCEPT', 'DROP')),
-             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-        """,
-    )
-
-    for chain, policy in DEFAULT_FILTER_POLICIES.items():
-        db.execute_on(
-            conn,
-            "INSERT OR IGNORE INTO filter_chain_policies (chain_name, policy) VALUES (?, ?)",
-            (chain, policy),
-        )
-
-
 def filter_policy_for_chain(family: str, chain: str) -> str:
     """Return the persisted filter policy for one family and chain."""
     with db.connection(filter_database_for_family(family)) as conn:
-        ensure_filter_chain_policies(conn)
+        require_filter_chain_policies(conn)
 
         row = db.fetch_one_on(
             conn,
