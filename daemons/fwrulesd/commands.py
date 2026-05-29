@@ -21,7 +21,7 @@ def add_if_value(command: list[str], flag: str, value: Any) -> None:
 
     text = str(value).strip()
 
-    if text:
+    if text and text.upper() != "ANY":
         command.extend([flag, text])
 
 

@@ -44,6 +44,11 @@ def execute_work_request(args: Any, payload: dict[str, Any]) -> tuple[int, int]:
 
     if args.action_name == "apply" and isinstance(payload.get("rule_ids"), list):
         flush_chain(args, table)
+
+        base_rule = filter_table.ensure_base_conntrack_rule(args.family, table)
+        if base_rule is not None:
+            applied += 1 if apply_rule(args, base_rule) else 0
+
         applied += filter_table.apply_payload_filter_policy(args, table, payload)
 
     for rule in rules:

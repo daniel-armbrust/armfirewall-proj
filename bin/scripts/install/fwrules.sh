@@ -357,9 +357,9 @@ allow_lan_services() {
 main() {
     [[ -n "${LAN_IFACE:-}" ]] || fatal "LAN_IFACE is not set."
 
-    allow_lan_services "$LAN_IFACE"
     record_conntrack_base_rules
     apply_conntrack_base_rules
+    allow_lan_services "$LAN_IFACE"
     allow_required_icmpv6
     record_default_filter_policies
     set_default_filter_policies

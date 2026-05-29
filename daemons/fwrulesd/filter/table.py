@@ -17,6 +17,7 @@ from ..constants import (
     TABLE_METADATA,
 )
 from .policies import require_filter_chain_policies
+from ..repository import ensure_pending_delete_column
 
 
 def rule_action(rule: dict[str, Any]) -> str:
@@ -32,6 +33,93 @@ def filter_database_for_family(family: str) -> Any:
         raise RuntimeError(f"Unsupported filter rule database mapping: family={family}")
     
     return db_path
+
+
+
+def wildcard_address_for_family(family: str) -> str:
+    """Return the wildcard source/destination address for one family."""
+    return "::/0" if family == "IPV6" else "0.0.0.0/0"
+
+
+def ensure_base_conntrack_rule(family: str, table_name: str) -> dict[str, Any] | None:
+    """Persist the base return-traffic rule required after chain flushes."""
+    if table_name not in {"filter_input_rules", "filter_forward_rules"}:
+        return None
+
+    db_path = filter_database_for_family(family)
+    any_addr = wildcard_address_for_family(family)
+    has_iface_out = table_name == "filter_forward_rules"
+    iface_out_column = "iface_out, " if has_iface_out else ""
+    iface_out_value = "'ANY', " if has_iface_out else ""
+    iface_out_match = "AND iface_out = 'ANY'" if has_iface_out else ""
+    iface_out_select = "iface_out" if has_iface_out else "'' AS iface_out"
+
+    with db.transaction(db_path) as conn:
+        ensure_pending_delete_column(conn, table_name)
+        db.execute_on(
+            conn,
+            f"""
+            INSERT INTO {table_name} (
+                iface_in, {iface_out_column}rule_order,
+                ct_new, ct_established, ct_related, ct_invalid,
+                src_addr, src_port, dst_addr, dst_port,
+                protocol_name, protocol_type, protocol_code, action,
+                protected, enabled, created_at, updated_at
+            )
+            SELECT
+                'ANY', {iface_out_value}
+                (SELECT COALESCE(MIN(rule_order), 1) - 1 FROM {table_name}),
+                0, 1, 1, 0,
+                ?, NULL, ?, NULL,
+                'all', NULL, NULL, 'ACCEPT',
+                0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM {table_name}
+                WHERE iface_in = 'ANY'
+                  {iface_out_match}
+                  AND protocol_name = 'all'
+                  AND ct_established = 1
+                  AND ct_related = 1
+                  AND action = 'ACCEPT'
+                  AND enabled = 1
+                  AND COALESCE(pending_delete, 0) = 0
+            )
+            """,
+            (any_addr, any_addr),
+        )
+
+        row = db.fetch_one_on(
+            conn,
+            f"""
+            SELECT id, rule_order, iface_in,
+                   {iface_out_select},
+                   ct_new, ct_established, ct_related, ct_invalid,
+                   src_addr, src_port, dst_addr, dst_port,
+                   protocol_name, protocol_type, protocol_code,
+                   action, protected, enabled, created_at, updated_at
+            FROM {table_name}
+            WHERE iface_in = 'ANY'
+              {iface_out_match}
+              AND protocol_name = 'all'
+              AND ct_established = 1
+              AND ct_related = 1
+              AND action = 'ACCEPT'
+              AND enabled = 1
+              AND COALESCE(pending_delete, 0) = 0
+            ORDER BY rule_order, id
+            LIMIT 1
+            """,
+        )
+
+    if row is None:
+        return None
+
+    rule = db.row_to_dict(row)
+    rule["family"] = family
+    rule["table"] = table_name
+
+    return rule
 
 
 def filter_policy_for_chain(family: str, chain: str) -> str:
