@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from core import db
+from core import ipsec
 from core.constants import IFACE_DB_PATH, LIBRESWAN_DB_PATH, WORK_REQUEST_DB_PATH
 from web.services.api import service_installed
 from web.services.libreswan.constants import (
@@ -428,6 +429,9 @@ def list_connections() -> dict[str, Any]:
     )
 
     enabled = sum(1 for row in rows if int(row["enabled"]) == 1)
+    established_names = ipsec.established_connection_names()
+    for row in rows:
+        row["ipsec_status"] = "up" if str(row["conn_name"]) in established_names else "down"
     
     return {
         "summary": {

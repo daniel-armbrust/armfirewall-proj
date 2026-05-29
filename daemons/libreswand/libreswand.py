@@ -64,6 +64,11 @@ def escape_psk(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def left_secret_identity(conn: LibreswanConnection) -> str:
+    """Return the local identity used to match the Libreswan PSK."""
+    return conn.left_id.strip() or conn.left_addr
+
+
 def load_connections() -> list[LibreswanConnection]:
     """Return persisted Libreswan tunnel definitions."""
     rows = db.fetch_all(
@@ -132,7 +137,7 @@ def render_secrets(connections: list[LibreswanConnection]) -> str:
         "# Generated from Services / Libreswan.",
     ]
     for conn in connections:
-        lines.append(f'{conn.left_addr} {conn.right_addr} : PSK "{escape_psk(conn.shared_secret)}"')
+        lines.append(f'{left_secret_identity(conn)} {conn.right_addr} : PSK "{escape_psk(conn.shared_secret)}"')
     return "\n".join(lines).rstrip() + "\n"
 
 

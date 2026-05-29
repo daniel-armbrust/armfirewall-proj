@@ -48,8 +48,12 @@
         }
     }
 
-    function statusClass(enabled) {
-        return Number(enabled) === 1 ? "up" : "disabled";
+    function ipsecStatusClass(status) {
+        return String(status || "").toLowerCase() === "up" ? "up" : "down";
+    }
+
+    function ipsecStatusLabel(status) {
+        return String(status || "").toLowerCase() === "up" ? "IPSec Up" : "IPSec Down";
     }
 
     function workRequestStatusClass(status) {
@@ -401,7 +405,10 @@
                 <td>${HF.escapeHtml(item.leftsubnet)} -> ${HF.escapeHtml(item.rightsubnet)}</td>
                 <td>${HF.escapeHtml(item.vti_interface)}<br><span class="muted">mark=${HF.escapeHtml(item.mark)}</span></td>
                 <td>${HF.escapeHtml(item.ikev2)}<br><span class="muted">${HF.escapeHtml(item.ike)}</span></td>
-                <td><span class="status ${statusClass(item.enabled)}">${Number(item.enabled) === 1 ? "ENABLED" : "DISABLED"}</span></td>
+                <td>
+                    <span class="status ${ipsecStatusClass(item.ipsec_status)}">${ipsecStatusLabel(item.ipsec_status)}</span>
+                    <br><span class="muted">${Number(item.enabled) === 1 ? "enabled" : "disabled"}</span>
+                </td>
                 <td>
                     <button class="text-button compact" type="button" data-libreswan-edit="${HF.escapeHtml(item.id)}">Edit</button>
                     <button class="text-button compact" type="button" data-libreswan-toggle="${HF.escapeHtml(item.id)}">${Number(item.enabled) === 1 ? "Disable" : "Enable"}</button>
