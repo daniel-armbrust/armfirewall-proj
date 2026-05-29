@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -244,27 +245,56 @@ def build_parser() -> argparse.ArgumentParser:
     Returns:
         argparse.ArgumentParser: parser configured to parse CLI arguments.
     """
+    examples = textwrap.dedent(
+        """\
+        Examples:
+          libreswan.py add \\
+            --conn-name oracle-1 \\
+            --left 10.100.10.3 \\
+            --right 129.148.17.5 \\
+            --left-id 137.131.222.14 \\
+            --shared-secret secret \\
+            --ikev2 insist \\
+            --vti-addr 169.254.10.2/30
+
+          libreswan.py update --id 1 --ikev2 insist --vti-routing yes
+          libreswan.py list
+          libreswan.py show --id 1
+        """
+    )
     root = argparse.ArgumentParser(
         prog="libreswan.py",
         description="Create and manage ArmFirewall Libreswan VPN connections.",
-        epilog=(
-            "Example: bin/libreswan.py add --conn-name oracle-1 --left 10.100.10.3 "
-            "--right 129.148.17.5 --left-id 137.131.222.14 --shared-secret secret "
-            "--ikev2 insist --vti-addr 169.254.10.2/30"
-        ),
+        epilog=examples,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    subparsers = root.add_subparsers(dest="command", required=True)
+    subparsers = root.add_subparsers(dest="command", metavar="COMMAND", required=True)
 
-    add_parser = subparsers.add_parser("add", aliases=("create",), help="Create a Libreswan connection.")
+    add_parser = subparsers.add_parser(
+        "add",
+        aliases=("create",),
+        help="Create a Libreswan connection and queue configuration apply.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     add_connection_options(add_parser)
 
-    update_parser = subparsers.add_parser("update", help="Update a Libreswan connection.")
+    update_parser = subparsers.add_parser(
+        "update",
+        help="Update a Libreswan connection and queue configuration apply.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     update_parser.add_argument("--id", type=int, required=True)
     add_connection_options(update_parser)
 
-    for command in ("delete", "enable", "disable", "show"):
-        command_parser = subparsers.add_parser(command)
+    command_help = {
+        "delete": "Delete a Libreswan connection and queue configuration apply.",
+        "enable": "Enable a Libreswan connection and queue configuration apply.",
+        "disable": "Disable a Libreswan connection and queue configuration apply.",
+        "show": "Print one Libreswan connection as JSON.",
+    }
+    for command, help_text in command_help.items():
+        command_parser = subparsers.add_parser(command, help=help_text)
         command_parser.add_argument("--id", type=int, required=True)
 
     subparsers.add_parser("list", help="List Libreswan connections.")
