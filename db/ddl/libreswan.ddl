@@ -34,9 +34,6 @@ ON libreswan_connections (enabled, conn_name);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_libreswan_connections_conn_name
 ON libreswan_connections (conn_name);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_libreswan_connections_left_addr
-ON libreswan_connections (left_addr);
-
 CREATE UNIQUE INDEX IF NOT EXISTS idx_libreswan_connections_right_addr
 ON libreswan_connections (right_addr);
 

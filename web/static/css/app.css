@@ -1547,6 +1547,57 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     max-height: 300px;
 }
 
+.libreswan-connections-table {
+    table-layout: fixed;
+    min-width: 1120px;
+}
+
+.libreswan-connections-table th:nth-child(1),
+.libreswan-connections-table td:nth-child(1) {
+    width: 22%;
+}
+
+.libreswan-connections-table th:nth-child(2),
+.libreswan-connections-table td:nth-child(2) {
+    width: 22%;
+}
+
+.libreswan-connections-table th:nth-child(3),
+.libreswan-connections-table td:nth-child(3) {
+    width: 18%;
+}
+
+.libreswan-connections-table th:nth-child(4),
+.libreswan-connections-table td:nth-child(4) {
+    width: 12%;
+}
+
+.libreswan-connections-table th:nth-child(5),
+.libreswan-connections-table td:nth-child(5) {
+    width: 16%;
+}
+
+.libreswan-connections-table th:nth-child(6),
+.libreswan-connections-table td:nth-child(6) {
+    width: 10%;
+}
+
+.libreswan-connection-name {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.libreswan-connections-table .table-actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.libreswan-connections-table .table-actions .text-button {
+    margin-left: 6px;
+}
+
 .secret-field-control {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 34px 34px;

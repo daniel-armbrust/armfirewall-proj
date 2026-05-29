@@ -393,23 +393,29 @@
         if (!connections.length) {
             connectionsBody.innerHTML = `
                 <tr>
-                    <td colspan="7"><div class="terminal-empty"><span class="prompt">$</span><span>no Libreswan connections configured</span></div></td>
+                    <td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>no Libreswan connections configured</span></div></td>
                 </tr>
             `;
             return;
         }
         connectionsBody.innerHTML = connections.map((item) => `
             <tr>
-                <td><strong>${HF.escapeHtml(item.conn_name)}</strong><br><span class="muted">${HF.escapeHtml(item.description || "")}</span></td>
-                <td>${HF.escapeHtml(item.left_addr)} -> ${HF.escapeHtml(item.right_addr)}</td>
+                <td>
+                    <div class="libreswan-connection-name">
+                        <strong>${HF.escapeHtml(item.conn_name)}</strong>
+                        <span class="status ${ipsecStatusClass(item.ipsec_status)}">${ipsecStatusLabel(item.ipsec_status)}</span>
+                    </div>
+                    <span class="muted">${Number(item.enabled) === 1 ? "enabled" : "disabled"}${item.description ? ` / ${HF.escapeHtml(item.description)}` : ""}</span>
+                </td>
+                <td>
+                    <strong>${HF.escapeHtml(item.left_addr)}</strong>
+                    <span class="muted"> -> </span>
+                    <strong>${HF.escapeHtml(item.right_addr)}</strong>
+                </td>
                 <td>${HF.escapeHtml(item.leftsubnet)} -> ${HF.escapeHtml(item.rightsubnet)}</td>
                 <td>${HF.escapeHtml(item.vti_interface)}<br><span class="muted">mark=${HF.escapeHtml(item.mark)}</span></td>
                 <td>${HF.escapeHtml(item.ikev2)}<br><span class="muted">${HF.escapeHtml(item.ike)}</span></td>
-                <td>
-                    <span class="status ${ipsecStatusClass(item.ipsec_status)}">${ipsecStatusLabel(item.ipsec_status)}</span>
-                    <br><span class="muted">${Number(item.enabled) === 1 ? "enabled" : "disabled"}</span>
-                </td>
-                <td>
+                <td class="table-actions">
                     <button class="text-button compact" type="button" data-libreswan-edit="${HF.escapeHtml(item.id)}">Edit</button>
                     <button class="text-button compact" type="button" data-libreswan-toggle="${HF.escapeHtml(item.id)}">${Number(item.enabled) === 1 ? "Disable" : "Enable"}</button>
                     <button class="text-button compact danger" type="button" data-libreswan-delete="${HF.escapeHtml(item.id)}">Delete</button>

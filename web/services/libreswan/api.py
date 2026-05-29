@@ -27,6 +27,12 @@ def libreswan_service_installed() -> bool:
     return service_installed("libreswan")
 
 
+def ensure_libreswan_schema() -> None:
+    """Apply lightweight Libreswan schema compatibility fixes."""
+    with db.transaction(LIBRESWAN_DB_PATH) as conn:
+        db.execute_on(conn, "DROP INDEX IF EXISTS idx_libreswan_connections_left_addr")
+
+
 def get_libreswan_work_requests(limit: int = 50) -> dict[str, Any]:
     """Return recent Libreswan configuration and service control work requests."""
     return list_work_requests(
@@ -309,14 +315,14 @@ def connection_name_in_use(conn_name: str, *, exclude_connection_id: int | None 
     return bool(rows)
 
 
-def endpoint_ip_in_use(address: str, *, exclude_connection_id: int | None = None) -> bool:
-    """Return whether one Libreswan endpoint IP is already assigned."""
-    params: tuple[Any, ...] = (address, address)
-    where = "WHERE left_addr = ? OR right_addr = ?"
+def right_ip_in_use(address: str, *, exclude_connection_id: int | None = None) -> bool:
+    """Return whether one Libreswan right endpoint IP is already assigned."""
+    params: tuple[Any, ...] = (address,)
+    where = "WHERE right_addr = ?"
 
     if exclude_connection_id is not None:
-        where = "WHERE (left_addr = ? OR right_addr = ?) AND id <> ?"
-        params = (address, address, exclude_connection_id)
+        where = "WHERE right_addr = ? AND id <> ?"
+        params = (address, exclude_connection_id)
 
     rows = db.fetch_all(
         f"""
@@ -340,8 +346,6 @@ def database_error_message(exc: db.DatabaseError) -> str:
         return "Shared secret is required."
     if "libreswan_connections.conn_name" in message:
         return "Connection Name already exists."
-    if "libreswan_connections.left_addr" in message:
-        return "Left IP address already exists."
     if "libreswan_connections.right_addr" in message:
         return "Right IP address already exists."
     if "libreswan_connections.mark" in message:
@@ -370,10 +374,9 @@ def connection_payload(payload: dict[str, Any], *, connection_id: int | None = N
     if left_addr == right_addr:
         raise ValueError("Left and Right IP addresses must be different.")
 
-    if endpoint_ip_in_use(left_addr, exclude_connection_id=connection_id):
-        raise ValueError("Left IP address already exists.")
+    ensure_libreswan_schema()
 
-    if endpoint_ip_in_use(right_addr, exclude_connection_id=connection_id):
+    if right_ip_in_use(right_addr, exclude_connection_id=connection_id):
         raise ValueError("Right IP address already exists.")
 
     if not shared_secret:
@@ -419,6 +422,8 @@ def connection_payload(payload: dict[str, Any], *, connection_id: int | None = N
 
 def list_connections() -> dict[str, Any]:
     """Return Libreswan connection inventory."""
+    ensure_libreswan_schema()
+
     rows = db.fetch_all(
         """
         SELECT *
