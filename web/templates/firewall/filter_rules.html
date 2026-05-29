@@ -35,6 +35,11 @@
 </section>
 
 <section data-filter-view="rules">
+    <nav class="local-tabs compact" aria-label="Filter rule family">
+        <button class="local-tab active" type="button" data-filter-family-tab="IPV4">IPv4</button>
+        <button class="local-tab" type="button" data-filter-family-tab="IPV6">IPv6</button>
+    </nav>
+
     {% for chain in ["INPUT", "FORWARD", "OUTPUT"] %}
     <section class="panel">
         <div class="panel-head">

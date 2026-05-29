@@ -35,6 +35,11 @@
 </section>
 
 <section data-nat-view="rules">
+    <nav class="local-tabs compact" aria-label="NAT rule family">
+        <button class="local-tab active" type="button" data-nat-family-tab="IPV4">IPv4</button>
+        <button class="local-tab" type="button" data-nat-family-tab="IPV6">IPv6</button>
+    </nav>
+
     {% for chain in ["PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"] %}
     <section class="panel">
         <div class="panel-head">

@@ -122,9 +122,13 @@ def api_apply_firewall_filter_rule(family: str, chain: str, rule_id: int) -> dic
 
 
 @router.post("/api/firewall/filter-rules/{chain}/apply")
-def api_apply_firewall_filter_chain(chain: str) -> dict[str, Any]:
-    """Queue enabled IPv4 and IPv6 filter rules for one chain."""
-    return firewall_filter_api.apply_filter_chain(chain)
+async def api_apply_firewall_filter_chain(request: Request, chain: str) -> dict[str, Any]:
+    """Queue enabled filter rules for one chain and optional family."""
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 - empty request body keeps old behavior.
+        payload = {}
+    return firewall_filter_api.apply_filter_chain(chain, payload)
 
 
 @router.put("/api/firewall/filter-rules/{chain}/policy")
@@ -135,15 +139,23 @@ async def api_set_firewall_filter_chain_policy(request: Request, chain: str) -> 
 
 
 @router.post("/api/firewall/nat-rules/{chain}/apply")
-def api_apply_firewall_nat_chain(chain: str) -> dict[str, Any]:
-    """Queue enabled IPv4 and IPv6 NAT rules for one chain."""
-    return firewall_nat_api.apply_nat_chain(chain)
+async def api_apply_firewall_nat_chain(request: Request, chain: str) -> dict[str, Any]:
+    """Queue enabled NAT rules for one chain and optional family."""
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 - empty request body keeps old behavior.
+        payload = {}
+    return firewall_nat_api.apply_nat_chain(chain, payload)
 
 
 @router.post("/api/firewall/mangle-rules/{chain}/apply")
-def api_apply_firewall_mangle_chain(chain: str) -> dict[str, Any]:
-    """Queue enabled IPv4 and IPv6 mangle rules for one chain."""
-    return firewall_mangle_api.apply_mangle_chain(chain)
+async def api_apply_firewall_mangle_chain(request: Request, chain: str) -> dict[str, Any]:
+    """Queue enabled mangle rules for one chain and optional family."""
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 - empty request body keeps old behavior.
+        payload = {}
+    return firewall_mangle_api.apply_mangle_chain(chain, payload)
 
 
 @router.put("/api/firewall/filter-rules/{family}/{chain}/{rule_id}/enabled")

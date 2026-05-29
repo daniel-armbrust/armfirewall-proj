@@ -22,6 +22,8 @@
     let pendingApplyChain = "";
     let pendingDeleteButton = null;
     let currentRulesByKey = new Map();
+    let currentRulesData = null;
+    let selectedRuleFamily = "IPV4";
     let workRequestsPoller = null;
     let workRequestsLoading = false;
     const WORK_REQUESTS_POLL_MS = 3000;
@@ -274,32 +276,11 @@
         `;
     }
 
-    function familyLabel(family) {
-        return family === "IPV4" ? "IPv4" : "IPv6";
-    }
-
-    function familyGroupRows(family, rules) {
-        if (!rules.length) {
-            return "";
-        }
-
-        return `
-            <tr class="firewall-family-row">
-                <td colspan="11">
-                    <span class="role">${familyLabel(family)}</span>
-                    <span class="muted">rules=${rules.length}</span>
-                </td>
-            </tr>
-            ${rules.map(ruleRow).join("")}
-        `;
-    }
-
     function renderChain(chain, rules) {
         const body = rulesBodies[chain];
         const count = ruleCounts[chain];
-        const chainRules = rules || [];
-        const ipv4Rules = chainRules.filter((rule) => rule.family === "IPV4");
-        const ipv6Rules = chainRules.filter((rule) => rule.family === "IPV6");
+        const allChainRules = rules || [];
+        const chainRules = allChainRules.filter((rule) => rule.family === selectedRuleFamily);
 
         if (count) {
             count.textContent = `rules=${chainRules.length}`;
@@ -311,28 +292,27 @@
             body.innerHTML = `
                 <tr>
                     <td colspan="11">
-                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${HF.escapeHtml(chain)} mangle rules</span></div>
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${HF.escapeHtml(selectedRuleFamily)} ${HF.escapeHtml(chain)} mangle rules</span></div>
                     </td>
                 </tr>
             `;
             return;
         }
-        body.innerHTML = [
-            familyGroupRows("IPV4", ipv4Rules),
-            familyGroupRows("IPV6", ipv6Rules),
-        ].join("");
+        body.innerHTML = chainRules.map(ruleRow).join("");
     }
 
     function renderRules(data) {
         const chains = data.chains || {};
+        const selectedRules = (data.rules || []).filter((rule) => rule.family === selectedRuleFamily);
         currentRulesByKey = new Map();
+        currentRulesData = data;
         (data.rules || []).forEach((rule) => {
             currentRulesByKey.set(ruleKey(rule.family, rule.chain, rule.id), rule);
         });
-        updateMetric("#mangle-summary-total", data.summary.total);
-        updateMetric("#mangle-summary-enabled", data.summary.enabled);
-        updateMetric("#mangle-summary-disabled", data.summary.disabled);
-        updateMetric("#mangle-summary-protected", data.summary.protected);
+        updateMetric("#mangle-summary-total", selectedRules.length);
+        updateMetric("#mangle-summary-enabled", selectedRules.filter((rule) => HF.number(rule.enabled) === 1).length);
+        updateMetric("#mangle-summary-disabled", selectedRules.filter((rule) => HF.number(rule.enabled) !== 1).length);
+        updateMetric("#mangle-summary-protected", selectedRules.filter((rule) => HF.number(rule.protected) === 1).length);
         ["PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"].forEach((chain) => renderChain(chain, chains[chain] || []));
     }
 
@@ -373,13 +353,13 @@
 
     function openApplyModal(chain) {
         pendingApplyChain = chain;
-        const chainRules = Array.from(document.querySelectorAll(`#mangle-${chain.toLowerCase()}-body tr:not(.firewall-family-row)`)).length;
+        const chainRules = Array.from(currentRulesByKey.values()).filter((rule) => rule.chain === chain && rule.family === selectedRuleFamily).length;
 
         if (applyChainLabel) {
-            applyChainLabel.textContent = `chain=${chain}`;
+            applyChainLabel.textContent = `family=${selectedRuleFamily} chain=${chain}`;
         }
         if (applyMessage) {
-            applyMessage.textContent = `Are you sure you want to apply ${chainRules} rule row(s) from the ${chain} chain?`;
+            applyMessage.textContent = `Are you sure you want to apply ${chainRules} enabled mangle ${selectedRuleFamily} rule(s) from the ${chain} chain?`;
         }
         if (applyModal) {
             applyModal.hidden = false;
@@ -476,6 +456,8 @@
             const chain = pendingApplyChain;
             const result = await HF.fetchJson(`/api/firewall/mangle-rules/${chain}/apply`, {
                 method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({family: selectedRuleFamily}),
             });
             setFormStatus(`queued=${result.work_request_count}`);
             closeApplyModal();
@@ -558,6 +540,18 @@
 
     document.querySelectorAll("[data-mangle-tab]").forEach((tab) => {
         tab.addEventListener("click", () => setActiveTab(tab.dataset.mangleTab, true));
+    });
+
+    document.querySelectorAll("[data-mangle-family-tab]").forEach((tab) => {
+        tab.addEventListener("click", () => {
+            selectedRuleFamily = tab.dataset.mangleFamilyTab || "IPV4";
+            document.querySelectorAll("[data-mangle-family-tab]").forEach((item) => {
+                item.classList.toggle("active", item.dataset.mangleFamilyTab === selectedRuleFamily);
+            });
+            if (currentRulesData) {
+                renderRules(currentRulesData);
+            }
+        });
     });
 
     document.querySelectorAll("[data-chain-apply]").forEach((button) => {

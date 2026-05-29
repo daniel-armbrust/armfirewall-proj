@@ -527,14 +527,15 @@ def apply_filter_rule(family_value: str, chain_value: str, rule_id: int) -> dict
     raise FilterRuleError("Rules can only be applied with the chain Apply button.", 403)
 
 
-def apply_filter_chain(chain_value: str) -> dict[str, Any]:
+def apply_filter_chain(chain_value: str, family_value: Any | None = None) -> dict[str, Any]:
     """Queue only filter families with pending changes for one chain."""
     chain = normalize_chain(chain_value)
     table = FILTER_CHAIN_TABLES[chain]
     apply_times = last_successful_apply_times()
+    families = (normalize_family(family_value),) if family_value else ("IPV4", "IPV6")
     work_requests = []
 
-    for family in ("IPV4", "IPV6"):
+    for family in families:
         if not filter_family_needs_apply(family, chain, apply_times):
             continue
 
@@ -561,26 +562,16 @@ def apply_filter_chain(chain_value: str) -> dict[str, Any]:
             }
         )
 
-    return {"chain": chain, "work_requests": work_requests, "work_request_count": len(work_requests)}
+    return {"chain": chain, "family": family_value or "ALL", "work_requests": work_requests, "work_request_count": len(work_requests)}
 
 
 def set_filter_chain_policy(chain_value: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """Persist a filter chain policy for IPv4 and IPv6 without applying it."""
+    """Persist a filter chain policy without applying it."""
     chain = normalize_chain(chain_value)
+    family = normalize_family(payload.get("family"))
     policy = normalize_policy(payload.get("policy"))
 
-    with db.transaction(FILTER_FAMILY_DATABASES["IPV4"]) as conn:
-        require_filter_chain_policies(conn)
-        db.execute_on(
-            conn,
-            """
-            UPDATE filter_chain_policies
-            SET policy = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE chain_name = ?
-            """,
-            (policy, chain),
-        )
-    with db.transaction(FILTER_FAMILY_DATABASES["IPV6"]) as conn:
+    with db.transaction(FILTER_FAMILY_DATABASES[family]) as conn:
         require_filter_chain_policies(conn)
         db.execute_on(
             conn,
@@ -592,7 +583,7 @@ def set_filter_chain_policy(chain_value: str, payload: dict[str, Any]) -> dict[s
             (policy, chain),
         )
 
-    return {"chain": chain, "policy": policy, "status": "saved"}
+    return {"chain": chain, "family": family, "policy": policy, "status": "saved"}
 
 
 def set_filter_rule_enabled(family_value: str, chain_value: str, rule_id: int, payload: dict[str, Any]) -> dict[str, Any]:

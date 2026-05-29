@@ -354,7 +354,7 @@ def mangle_family_needs_apply(family: str, chain: str, apply_times: dict[str, st
         return int(changed_rows["total"]) > 0
 
 
-def apply_mangle_chain(chain: str) -> dict[str, Any]:
+def apply_mangle_chain(chain: str, family_value: Any = None) -> dict[str, Any]:
     """Queue only mangle families with pending changes for one chain."""
     chain = chain.strip().upper()
     if chain not in MANGLE_CHAIN_TABLES:
@@ -362,8 +362,9 @@ def apply_mangle_chain(chain: str) -> dict[str, Any]:
 
     table = MANGLE_CHAIN_TABLES[chain]
     apply_times = last_successful_apply_times()
+    family_databases = {normalize_family(family_value): MANGLE_FAMILY_DATABASES[normalize_family(family_value)]} if family_value else MANGLE_FAMILY_DATABASES
     work_requests = []
-    for family, db_path in MANGLE_FAMILY_DATABASES.items():
+    for family, db_path in family_databases.items():
         if not mangle_family_needs_apply(family, chain, apply_times):
             continue
 
@@ -387,7 +388,7 @@ def apply_mangle_chain(chain: str) -> dict[str, Any]:
             }
         )
 
-    return {"chain": chain, "work_requests": work_requests, "work_request_count": len(work_requests)}
+    return {"chain": chain, "family": family_value or "ALL", "work_requests": work_requests, "work_request_count": len(work_requests)}
 
 
 def set_mangle_rule_enabled(family_value: str, chain_value: str, rule_id: int, payload: dict[str, Any]) -> dict[str, Any]:

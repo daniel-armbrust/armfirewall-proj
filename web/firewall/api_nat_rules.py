@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from fastapi import HTTPException
 
@@ -43,9 +43,9 @@ def update_nat_rule(family: str, chain: str, rule_id: int, payload: dict[str, An
     return _call_core(nat_core.update_nat_rule, family, chain, rule_id, payload)
 
 
-def apply_nat_chain(chain: str) -> dict[str, Any]:
+def apply_nat_chain(chain: str, payload: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Queue only NAT families with pending changes for one chain."""
-    return _call_core(nat_core.apply_nat_chain, chain)
+    return _call_core(nat_core.apply_nat_chain, chain, (payload or {}).get("family"))
 
 
 def set_nat_rule_enabled(family: str, chain: str, rule_id: int, payload: dict[str, Any]) -> dict[str, Any]:

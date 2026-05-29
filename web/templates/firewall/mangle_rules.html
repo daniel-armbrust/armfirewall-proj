@@ -35,6 +35,11 @@
 </section>
 
 <section data-mangle-view="rules">
+    <nav class="local-tabs compact" aria-label="MANGLE rule family">
+        <button class="local-tab active" type="button" data-mangle-family-tab="IPV4">IPv4</button>
+        <button class="local-tab" type="button" data-mangle-family-tab="IPV6">IPv6</button>
+    </nav>
+
     {% for chain in ["PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"] %}
     <section class="panel">
         <div class="panel-head">

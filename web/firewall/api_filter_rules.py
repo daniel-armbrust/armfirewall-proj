@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from fastapi import HTTPException
 
@@ -47,9 +47,9 @@ def apply_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
     return _call_core(filter_core.apply_filter_rule, family, chain, rule_id)
 
 
-def apply_filter_chain(chain: str) -> dict[str, Any]:
+def apply_filter_chain(chain: str, payload: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Queue only filter families with pending changes for one chain."""
-    return _call_core(filter_core.apply_filter_chain, chain)
+    return _call_core(filter_core.apply_filter_chain, chain, (payload or {}).get("family"))
 
 
 def set_filter_chain_policy(chain: str, payload: dict[str, Any]) -> dict[str, Any]:

@@ -368,7 +368,7 @@ def update_nat_rule(family_value: str, chain_value: str, rule_id: int, payload: 
     return {"rule_id": rule_id, "status": "saved"}
 
 
-def apply_nat_chain(chain: str) -> dict[str, Any]:
+def apply_nat_chain(chain: str, family_value: Any = None) -> dict[str, Any]:
     """Queue only NAT families with pending changes for one chain."""
     chain = chain.strip().upper()
     if chain not in NAT_CHAIN_TABLES:
@@ -376,8 +376,9 @@ def apply_nat_chain(chain: str) -> dict[str, Any]:
 
     table = NAT_CHAIN_TABLES[chain]
     apply_times = last_successful_apply_times()
+    family_databases = {normalize_family(family_value): NAT_FAMILY_DATABASES[normalize_family(family_value)]} if family_value else NAT_FAMILY_DATABASES
     work_requests = []
-    for family, db_path in NAT_FAMILY_DATABASES.items():
+    for family, db_path in family_databases.items():
         if not nat_family_needs_apply(family, chain, apply_times):
             continue
 
@@ -401,7 +402,7 @@ def apply_nat_chain(chain: str) -> dict[str, Any]:
             }
         )
 
-    return {"chain": chain, "work_requests": work_requests, "work_request_count": len(work_requests)}
+    return {"chain": chain, "family": family_value or "ALL", "work_requests": work_requests, "work_request_count": len(work_requests)}
 
 
 def set_nat_rule_enabled(family_value: str, chain_value: str, rule_id: int, payload: dict[str, Any]) -> dict[str, Any]:
