@@ -2,7 +2,7 @@ PRAGMA foreign_keys = ON;
 
 -- Stores the supported Layer 4 protocols used by firewall rules.
 CREATE TABLE IF NOT EXISTS protocols (
-     name TEXT PRIMARY KEY CHECK (name IN ('all', 'tcp', 'udp', 'icmp')),
+     name TEXT PRIMARY KEY CHECK (name IN ('all', 'tcp', 'udp', 'icmp', 'esp')),
      description TEXT NOT NULL
 );
 
@@ -10,7 +10,8 @@ INSERT OR IGNORE INTO protocols (name, description) VALUES
      ('all', 'All protocols'),
      ('tcp', 'Transmission Control Protocol'),
      ('udp', 'User Datagram Protocol'),
-     ('icmp', 'Internet Control Message Protocol');
+     ('icmp', 'Internet Control Message Protocol'),
+     ('esp', 'Encapsulating Security Payload');
 
 -- Stores IPv4 filter table built-in chain policies.
 CREATE TABLE IF NOT EXISTS filter_chain_policies (
@@ -64,7 +65,7 @@ CREATE TABLE IF NOT EXISTS filter_input_rules (
           )
           OR
           (
-               protocol_name = 'all'
+               protocol_name IN ('all', 'esp')
                AND src_port IS NULL
                AND dst_port IS NULL
                AND protocol_type IS NULL
@@ -124,7 +125,7 @@ CREATE TABLE IF NOT EXISTS filter_forward_rules (
           )
           OR
           (
-               protocol_name = 'all'
+               protocol_name IN ('all', 'esp')
                AND src_port IS NULL
                AND dst_port IS NULL
                AND protocol_type IS NULL
@@ -183,7 +184,7 @@ CREATE TABLE IF NOT EXISTS filter_output_rules (
           )
           OR
           (
-               protocol_name = 'all'
+               protocol_name IN ('all', 'esp')
                AND src_port IS NULL
                AND dst_port IS NULL
                AND protocol_type IS NULL
