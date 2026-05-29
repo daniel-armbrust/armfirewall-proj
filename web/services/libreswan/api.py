@@ -101,6 +101,8 @@ def queue_libreswan_apply(
     connection_id: int | None = None,
     conn_name: str | None = None,
     previous_conn_name: str | None = None,
+    conn: db.Connection | None = None,
+    table_prefix: str = "",
 ) -> int:
     """Queue Libreswan configuration rendering and activation."""
     payload = {
@@ -111,11 +113,11 @@ def queue_libreswan_apply(
         "previous_conn_name": previous_conn_name,
     }
 
-    with db.transaction(WORK_REQUEST_DB_PATH) as conn:
+    def insert_work_request(target_conn: db.Connection, prefix: str) -> int:
         cursor = db.execute_on(
-            conn,
-            """
-            INSERT INTO work_requests (
+            target_conn,
+            f"""
+            INSERT INTO {prefix}work_requests (
                 request_uid, source, category_name, action_name,
                 target_rule_id, priority, status, payload_json
             )
@@ -129,13 +131,21 @@ def queue_libreswan_apply(
         )
         work_request_id = int(cursor.lastrowid)
         db.execute_on(
-            conn,
-            """
-            INSERT INTO work_request_events (work_request_id, event_type, message)
+            target_conn,
+            f"""
+            INSERT INTO {prefix}work_request_events (work_request_id, event_type, message)
             VALUES (?, 'queue', ?)
             """,
             (work_request_id, f"Queued Libreswan configuration apply: {operation}."),
         )
+
+        return work_request_id
+
+    if conn is not None:
+        return insert_work_request(conn, table_prefix)
+
+    with db.transaction(WORK_REQUEST_DB_PATH) as work_conn:
+        work_request_id = insert_work_request(work_conn, "")
 
     return work_request_id
 
@@ -436,6 +446,7 @@ def create_connection(payload: dict[str, Any]) -> dict[str, Any]:
 
     try:
         with db.transaction(LIBRESWAN_DB_PATH) as conn:
+            db.execute_on(conn, "ATTACH DATABASE ? AS workreq", (str(WORK_REQUEST_DB_PATH),))
             cursor = db.execute_on(
                 conn,
                 """
@@ -449,10 +460,15 @@ def create_connection(payload: dict[str, Any]) -> dict[str, Any]:
                 tuple(item[name] for name in CONNECTION_FIELDS),
             )
             connection_id = int(cursor.lastrowid)
+            work_request_id = queue_libreswan_apply(
+                "create",
+                connection_id=connection_id,
+                conn_name=item["conn_name"],
+                conn=conn,
+                table_prefix="workreq.",
+            )
     except db.DatabaseError as exc:
         raise ValueError(database_error_message(exc)) from exc
-
-    work_request_id = queue_libreswan_apply("create", connection_id=connection_id, conn_name=item["conn_name"])
 
     return {"id": connection_id, "status": "created", "work_request_id": work_request_id}
 
@@ -556,32 +572,31 @@ def set_connection_enabled(connection_id: int, enabled: bool) -> dict[str, Any]:
 
 
 def delete_connection(connection_id: int) -> dict[str, Any]:
-    """Delete one Libreswan connection."""
-    previous = db.fetch_one(
-        """
-        SELECT conn_name
-        FROM libreswan_connections
-        WHERE id = ?
-        """,
-        (connection_id,),
-        db_path=LIBRESWAN_DB_PATH,
-    )
-    if previous is None:
-        raise ValueError("Libreswan connection was not found.")
+    """Delete one Libreswan connection and queue its configuration apply."""
+    with db.transaction(LIBRESWAN_DB_PATH) as conn:
+        db.execute_on(conn, "ATTACH DATABASE ? AS workreq", (str(WORK_REQUEST_DB_PATH),))
+        previous = db.fetch_one_on(
+            conn,
+            """
+            SELECT conn_name
+            FROM libreswan_connections
+            WHERE id = ?
+            """,
+            (connection_id,),
+        )
+        if previous is None:
+            raise ValueError("Libreswan connection was not found.")
 
-    rowcount = db.execute(
-        "DELETE FROM libreswan_connections WHERE id = ?",
-        (connection_id,),
-        db_path=LIBRESWAN_DB_PATH,
-    )
+        cursor = db.execute_on(conn, "DELETE FROM libreswan_connections WHERE id = ?", (connection_id,))
+        if cursor.rowcount == 0:
+            raise ValueError("Libreswan connection was not found.")
 
-    if rowcount == 0:
-        raise ValueError("Libreswan connection was not found.")
-
-    work_request_id = queue_libreswan_apply(
-        "delete",
-        connection_id=connection_id,
-        previous_conn_name=str(previous["conn_name"]),
-    )
+        work_request_id = queue_libreswan_apply(
+            "delete",
+            connection_id=connection_id,
+            previous_conn_name=str(previous["conn_name"]),
+            conn=conn,
+            table_prefix="workreq.",
+        )
 
     return {"id": connection_id, "status": "deleted", "work_request_id": work_request_id}

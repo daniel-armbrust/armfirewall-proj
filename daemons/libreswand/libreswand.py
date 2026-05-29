@@ -19,8 +19,12 @@ from .constants import (
     LIBRESWAN_CONFIG_DIR,
     LIBRESWAN_DB_PATH,
     LIBRESWAN_IPSEC_CONF,
+    LIBRESWAN_SERVICE_NAME,
     LIBRESWAN_SECRETS,
     LOG_SOURCE,
+    SUPERVISOR_CONF,
+    SUPERVISOR_TIMEOUT_SECONDS,
+    SUPERVISORCTL_COMMAND,
     WORK_REQUEST_DB_PATH,
 )
 from .models import LibreswanConnection, LibreswanWorkRequest
@@ -224,12 +228,40 @@ def activate_connections(connections: list[LibreswanConnection], request: Libres
             run_ipsec(["--route", conn.conn_name])
 
 
+def supervisorctl(command: str, *args: str, check: bool = True) -> str:
+    """Run one supervisorctl command and return its output."""
+    completed = run_command(
+        [SUPERVISORCTL_COMMAND, "-c", str(SUPERVISOR_CONF), command, *args],
+        check=check,
+        timeout=SUPERVISOR_TIMEOUT_SECONDS,
+    )
+    return completed.stdout.strip()
+
+
+def restart_libreswan_service() -> None:
+    """Restart or start the Libreswan supervisord program after config changes."""
+    if not command_exists(SUPERVISORCTL_COMMAND):
+        raise RuntimeError("supervisorctl command was not found.")
+
+    status = supervisorctl("status", LIBRESWAN_SERVICE_NAME, check=False)
+
+    if "RUNNING" in status:
+        supervisorctl("stop", LIBRESWAN_SERVICE_NAME, check=False)
+
+    supervisorctl("start", LIBRESWAN_SERVICE_NAME)
+
+    next_status = supervisorctl("status", LIBRESWAN_SERVICE_NAME, check=False)
+    if "RUNNING" not in next_status:
+        raise RuntimeError(f"Libreswan service did not return to RUNNING: {next_status}")
+
+
 def apply_config(request: LibreswanWorkRequest) -> None:
     """Render SQLite Libreswan settings to conf/libreswan and activate them."""
     connections = load_connections()
     active_connections = render_files(connections)
+    restart_libreswan_service()
     activate_connections(active_connections, request)
-    logger.log("Libreswan configuration files were rendered and enabled tunnels were loaded.", source=LOG_SOURCE)
+    logger.log("Libreswan configuration files were rendered, service was restarted, and enabled tunnels were loaded.", source=LOG_SOURCE)
 
 
 def build_parser() -> argparse.ArgumentParser:

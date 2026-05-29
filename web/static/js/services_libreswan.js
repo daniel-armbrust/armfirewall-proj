@@ -28,7 +28,7 @@
     let logsLoading = false;
     let workRequestsLoading = false;
     const POLL_MS = 5000;
-    const LOG_POLL_MS = 2000;
+    const LOG_POLL_MS = 10000;
 
     function setState(state, updated = "") {
         if (!stateLabel) {
@@ -572,6 +572,8 @@
     async function deleteConnection(connectionId) {
         await HF.fetchJson(`/api/services/libreswan/connections/${connectionId}`, {method: "DELETE"});
         await loadConfig();
+        await loadWorkRequests();
+        setActiveView("work-requests");
     }
 
     viewButtons.forEach((button) => {
