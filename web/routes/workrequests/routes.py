@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, List, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
 
@@ -13,9 +13,9 @@ router = APIRouter()
 @router.get("/api/work-requests")
 def api_work_requests(
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
-    category: Annotated[list[str] | None, Query()] = None,
-    category_like: str | None = None,
-    service_name: str | None = None,
+    category: Annotated[Optional[List[str]], Query()] = None,
+    category_like: Optional[str] = None,
+    service_name: Optional[str] = None,
     include_payload: bool = False,
 ) -> dict[str, Any]:
     """Return ArmFirewall work requests using shared filters."""
