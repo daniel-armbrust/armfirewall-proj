@@ -101,7 +101,7 @@ wait_for_supervisor() {
     [[ -n "$supervisorctl_bin" ]] || fatal "supervisorctl was not found."
 
     while [[ "$wait_count" -lt 20 ]]; do
-        if "$supervisorctl_bin" -c "$SUPERVISORD_CONF" status >/dev/null 2>&1; then
+        if "$supervisorctl_bin" -c "$SUPERVISORD_CONF" pid >/dev/null 2>&1; then
             return 0
         fi
         sleep 1
