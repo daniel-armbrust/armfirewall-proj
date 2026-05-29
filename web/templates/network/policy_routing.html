@@ -37,6 +37,11 @@
     </div>
 </section>
 
+<nav class="local-tabs" aria-label="Policy routing family">
+    <button class="local-tab active" type="button" data-policy-family="ipv4">IPv4</button>
+    <button class="local-tab" type="button" data-policy-family="ipv6">IPv6</button>
+</nav>
+
 <section class="panel" data-policy-view="routes">
     <div class="panel-head">
         <h2>Routes</h2>
@@ -205,7 +210,7 @@
         <div class="form-grid firewall-form-grid">
             <label class="field">
                 <span>Family</span>
-                <select name="addr_family">
+                <select name="addr_family" id="policy-rule-family">
                     <option value="ipv4">IPv4</option>
                     <option value="ipv6">IPv6</option>
                 </select>
@@ -390,5 +395,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/policy_routing.js') }}" defer></script>
+<script src="{{ url_for('static', path='/js/policy_routing.js') }}?v=20260530-policy-family-tabs" defer></script>
 {% endblock %}

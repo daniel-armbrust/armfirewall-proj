@@ -194,9 +194,11 @@ def cidr_value(payload: dict[str, Any], name: str) -> str:
         return ""
 
     try:
-        ipaddress.ip_interface(value)
+        interface = ipaddress.ip_interface(value)
     except ValueError as exc:
         raise ValueError(f"{name} must use CIDR format, for example 169.254.10.2/30.") from exc
+    if interface.version != 4:
+        raise ValueError(f"{name} must be an IPv4 address and mask, for example 169.254.10.2/30.")
 
     return value
 

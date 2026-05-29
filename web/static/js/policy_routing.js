@@ -20,15 +20,19 @@
     const routeTableSelect = document.querySelector("#policy-route-table");
     const ruleTableSelect = document.querySelector("#policy-rule-table");
     const ruleActionSelect = document.querySelector("#policy-rule-action");
+    const routeFamilySelect = document.querySelector("#policy-route-family");
+    const ruleFamilySelect = document.querySelector("#policy-rule-family");
     const routeDevSelect = document.querySelector("#policy-route-dev");
     const ruleIifSelect = document.querySelector("#policy-rule-iif");
     const ruleOifSelect = document.querySelector("#policy-rule-oif");
+    const familyButtons = Array.from(document.querySelectorAll("[data-policy-family]"));
     let currentData = {tables: [], routes: [], rules: []};
     let pendingDelete = null;
     let workRequestsPoller = null;
     let workRequestsLoading = false;
     let interfaceDescriptions = new Map();
     let interfaceRoles = new Map();
+    let activeFamily = "ipv4";
     const WORK_REQUESTS_POLL_MS = 3000;
     const PROTECTED_ROUTE_TABLE_IDS = new Set([253, 255]);
 
@@ -179,6 +183,40 @@
         return String(family || "").toLowerCase() === "ipv6" ? "IPv6" : "IPv4";
     }
 
+    function setSelectValue(select, value) {
+        if (select) {
+            select.value = value;
+        }
+    }
+
+    function familyMatches(item) {
+        return String(item.addr_family || "ipv4").toLowerCase() === activeFamily;
+    }
+
+    function filteredRoutes() {
+        return (currentData.routes || []).filter(familyMatches);
+    }
+
+    function filteredRules() {
+        return (currentData.rules || []).filter(familyMatches);
+    }
+
+    function setPolicyFormFamily(family) {
+        setSelectValue(routeFamilySelect, family);
+        setSelectValue(ruleFamilySelect, family);
+    }
+
+    function setActiveFamily(family) {
+        activeFamily = String(family || "ipv4").toLowerCase() === "ipv6" ? "ipv6" : "ipv4";
+        familyButtons.forEach((button) => {
+            button.classList.toggle("active", button.dataset.policyFamily === activeFamily);
+        });
+        setPolicyFormFamily(activeFamily);
+        if (currentData.summary) {
+            renderData(currentData);
+        }
+    }
+
     function tableGroupLabel(item) {
         if (item.table_name) {
             return `${item.table_name} (${item.table_id})`;
@@ -321,17 +359,20 @@
 
     function renderData(data) {
         currentData = data;
+        const routes = filteredRoutes();
+        const rules = filteredRules();
         setMetric("#policy-summary-tables", data.summary.tables);
         setMetric("#policy-summary-routes", data.summary.routes);
         setMetric("#policy-summary-rules", data.summary.rules);
         setMetric("#policy-summary-enabled", data.summary.enabled);
-        document.querySelector("#policy-routes-count").textContent = `routes=${data.routes.length}`;
-        document.querySelector("#policy-rules-count").textContent = `rules=${data.rules.length}`;
+        document.querySelector("#policy-routes-count").textContent = `${familyLabel(activeFamily)} routes=${routes.length}`;
+        document.querySelector("#policy-rules-count").textContent = `${familyLabel(activeFamily)} rules=${rules.length}`;
         document.querySelector("#policy-tables-count").textContent = `tables=${data.tables.length}`;
-        routesBody.innerHTML = data.routes.length ? groupedRows(data.routes, routeRow, 9) : emptyRow(9, "no policy routes");
-        rulesBody.innerHTML = data.rules.length ? groupedRows(data.rules, ruleRow, 7) : emptyRow(7, "no policy rules");
+        routesBody.innerHTML = routes.length ? groupedRows(routes, routeRow, 9) : emptyRow(9, `no ${familyLabel(activeFamily)} policy routes`);
+        rulesBody.innerHTML = rules.length ? groupedRows(rules, ruleRow, 7) : emptyRow(7, `no ${familyLabel(activeFamily)} policy rules`);
         tablesBody.innerHTML = data.tables.length ? data.tables.map(tableRow).join("") : emptyRow(5, "no routing tables");
         refreshTableChoices();
+        setPolicyFormFamily(activeFamily);
     }
 
     function emptyRow(colspan, message) {
@@ -433,6 +474,7 @@
             setStatus(statusElement, `saved=${result.route_id || result.rule_id || result.table_row_id}`);
             form.reset();
             updateRuleFormShape();
+            setPolicyFormFamily(activeFamily);
             setActiveTab(url.includes("routes") ? "routes" : url.includes("rules") ? "rules" : "tables", true);
         } catch (error) {
             setStatus(statusElement, `error=${error.message}`);
@@ -513,6 +555,9 @@
     document.querySelectorAll("[data-policy-tab]").forEach((tab) => {
         tab.addEventListener("click", () => setActiveTab(tab.dataset.policyTab, true));
     });
+    familyButtons.forEach((button) => {
+        button.addEventListener("click", () => setActiveFamily(button.dataset.policyFamily));
+    });
     document.querySelectorAll("[data-policy-apply]").forEach((button) => {
         button.addEventListener("click", openApplyModal);
     });
@@ -525,6 +570,8 @@
     applyConfirmButton.addEventListener("click", applyPolicyRouting);
     deleteConfirmButton.addEventListener("click", deleteItem);
     ruleActionSelect.addEventListener("change", updateRuleFormShape);
+    routeFamilySelect.addEventListener("change", () => setActiveFamily(routeFamilySelect.value));
+    ruleFamilySelect.addEventListener("change", () => setActiveFamily(ruleFamilySelect.value));
     routeForm.addEventListener("submit", (event) => submitForm(event, routeForm, "/api/network/policy-routing/routes", routeStatus));
     ruleForm.addEventListener("submit", (event) => submitForm(event, ruleForm, "/api/network/policy-routing/rules", ruleStatus));
     tableForm.addEventListener("submit", (event) => submitForm(event, tableForm, "/api/network/policy-routing/tables", tableStatus));
@@ -543,6 +590,7 @@
     });
 
     updateRuleFormShape();
+    setActiveFamily("ipv4");
     setActiveTab("routes");
     loadInterfaceChoices();
     loadData();

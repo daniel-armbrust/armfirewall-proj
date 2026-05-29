@@ -159,6 +159,25 @@
             .join(".");
     }
 
+    function normalizeIpv4CidrInput(value) {
+        const filtered = String(value || "").replace(/[^\d./]/g, "");
+        const slashIndex = filtered.indexOf("/");
+        const addressPart = slashIndex >= 0 ? filtered.slice(0, slashIndex) : filtered;
+        const maskPart = slashIndex >= 0 ? filtered.slice(slashIndex + 1).replace(/\D/g, "").slice(0, 2) : "";
+        const normalizedAddress = normalizeIpv4Input(addressPart);
+
+        if (slashIndex < 0) {
+            return normalizedAddress;
+        }
+
+        if (!maskPart) {
+            return `${normalizedAddress}/`;
+        }
+
+        const mask = Math.min(Number(maskPart), 32);
+        return `${normalizedAddress}/${mask}`;
+    }
+
     function validIpv4Address(value) {
         const parts = String(value || "").split(".");
         return parts.length === 4 && parts.every((part) => {
@@ -170,10 +189,30 @@
         });
     }
 
+    function validIpv4Cidr(value) {
+        const trimmed = String(value || "").trim();
+        if (!trimmed) {
+            return true;
+        }
+        const parts = trimmed.split("/");
+        if (parts.length !== 2 || !validIpv4Address(parts[0]) || !/^\d{1,2}$/.test(parts[1])) {
+            return false;
+        }
+        const mask = Number(parts[1]);
+        return mask >= 0 && mask <= 32;
+    }
+
     function setIpv4Validity(element) {
         const valid = validIpv4Address(element.value);
         element.classList.toggle("is-invalid", !valid && Boolean(element.value));
         element.setCustomValidity(valid ? "" : "Use a valid IPv4 address.");
+        return valid;
+    }
+
+    function setIpv4CidrValidity(element) {
+        const valid = validIpv4Cidr(element.value);
+        element.classList.toggle("is-invalid", !valid && Boolean(element.value));
+        element.setCustomValidity(valid ? "" : "Use a valid IPv4 address and mask.");
         return valid;
     }
 
@@ -188,9 +227,31 @@
         setIpv4Validity(element);
     }
 
+    function normalizeIpv4CidrField(element) {
+        const cursor = element.selectionStart;
+        const before = element.value;
+        element.value = normalizeIpv4CidrInput(element.value);
+        if (cursor !== null && before !== element.value) {
+            const nextCursor = Math.min(cursor, element.value.length);
+            element.setSelectionRange(nextCursor, nextCursor);
+        }
+        setIpv4CidrValidity(element);
+    }
+
     function validateIpv4Fields() {
         const ipv4Fields = Array.from(document.querySelectorAll("[data-ipv4-address]"));
         const invalidField = ipv4Fields.find((element) => !setIpv4Validity(element));
+        if (invalidField) {
+            invalidField.reportValidity();
+            invalidField.focus();
+            return false;
+        }
+        return true;
+    }
+
+    function validateIpv4CidrFields() {
+        const cidrFields = Array.from(document.querySelectorAll("[data-ipv4-cidr]"));
+        const invalidField = cidrFields.find((element) => !setIpv4CidrValidity(element));
         if (invalidField) {
             invalidField.reportValidity();
             invalidField.focus();
@@ -552,6 +613,9 @@
         if (!validateIpv4Fields()) {
             return;
         }
+        if (!validateIpv4CidrFields()) {
+            return;
+        }
         if (!validateSharedSecret()) {
             return;
         }
@@ -628,6 +692,10 @@
     document.querySelectorAll("[data-ipv4-address]").forEach((element) => {
         element.addEventListener("input", () => normalizeIpv4Field(element));
         element.addEventListener("blur", () => setIpv4Validity(element));
+    });
+    document.querySelectorAll("[data-ipv4-cidr]").forEach((element) => {
+        element.addEventListener("input", () => normalizeIpv4CidrField(element));
+        element.addEventListener("blur", () => setIpv4CidrValidity(element));
     });
 
     loadInterfaceInventory();
