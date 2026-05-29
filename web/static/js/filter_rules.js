@@ -505,6 +505,7 @@
         const protocol = protocolSelect ? protocolSelect.value : "tcp";
         const isIcmp = protocol === "icmp";
         const isAll = protocol === "all";
+        const hasPorts = ["tcp", "udp"].includes(protocol);
         const wildcard = family === "IPV6" ? "::/0" : "0.0.0.0/0";
 
         if (srcAddr && (srcAddr.value === "" || srcAddr.value === "0.0.0.0/0" || srcAddr.value === "::/0")) {
@@ -521,7 +522,7 @@
             setFieldHidden(field, chain === "INPUT");
         });
         document.querySelectorAll("[data-port-field]").forEach((field) => {
-            setFieldHidden(field, isIcmp || isAll);
+            setFieldHidden(field, !hasPorts);
         });
         document.querySelectorAll("[data-icmp-field]").forEach((field) => {
             setFieldHidden(field, !isIcmp);

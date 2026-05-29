@@ -126,8 +126,8 @@ SELECT_COLUMNS = {
 WILDCARD_ADDRESSES = {"0.0.0.0/0", "::/0", "", None}
 
 FAMILY_PROTOCOLS = {
-    "IPV4": {"all", "tcp", "udp", "icmp"},
-    "IPV6": {"all", "tcp", "udp", "icmpv6"},
+    "IPV4": {"all", "tcp", "udp", "icmp", "esp"},
+    "IPV6": {"all", "tcp", "udp", "icmpv6", "esp"},
 }
 
 FILTER_POLICY_CHAINS = ("INPUT", "FORWARD")

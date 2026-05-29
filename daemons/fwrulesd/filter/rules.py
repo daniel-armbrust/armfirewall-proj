@@ -244,13 +244,14 @@ def sanitize_rule_payload(payload: dict[str, Any]) -> dict[str, Any]:
     action = normalize_action(payload.get("action"))
     is_icmp = protocol in {"icmp", "icmpv6"}
     is_all = protocol == "all"
+    has_ports = protocol in {"tcp", "udp"}
 
-    src_port = None if is_icmp or is_all else optional_int(payload.get("src_port", 0))
-    dst_port = None if is_icmp or is_all else optional_int(payload.get("dst_port", 0))
+    src_port = optional_int(payload.get("src_port", 0)) if has_ports else None
+    dst_port = optional_int(payload.get("dst_port", 0)) if has_ports else None
     protocol_type = optional_int(payload.get("protocol_type")) if is_icmp else None
     protocol_code = optional_int(payload.get("protocol_code")) if is_icmp else None
 
-    if not is_icmp and not is_all and (src_port is None or dst_port is None):
+    if has_ports and (src_port is None or dst_port is None):
         raise FilterRuleError("TCP/UDP rules require source and destination ports.", 400)
     if is_icmp and ((protocol_type is None) != (protocol_code is None)):
         raise FilterRuleError("ICMP type and code must be filled together.", 400)
