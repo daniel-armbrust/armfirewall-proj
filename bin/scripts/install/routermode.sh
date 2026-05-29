@@ -264,6 +264,13 @@ record_router_forward_rules() {
     record_router_forward_rule "$IPV6_FILTER_RULES_DB" "::/0" "$WAN_IFACE" "$LAN_IFACE" 0 1 1
 }
 
+# Record successful system apply state for router-mode rules created during install.
+record_router_apply_state() {
+    record_install_apply_work_request "FIREWALL_RULES.IPV4.filter_forward_rules" "routermode.sh"
+    record_install_apply_work_request "FIREWALL_RULES.IPV6.filter_forward_rules" "routermode.sh"
+    record_install_apply_work_request "NAT_RULES.IPV4.nat_postrouting_rules" "routermode.sh"
+}
+
 # Apply IPv4 and IPv6 router mode FORWARD rules.
 apply_router_forward_rules() {
     apply_ipv4_router_forward_rules
@@ -281,6 +288,7 @@ configure_router_mode() {
     apply_masquerade_rule
     record_router_forward_rules
     apply_router_forward_rules
+    record_router_apply_state
 }
 
 # Persist WAN interface and optionally enable router mode.

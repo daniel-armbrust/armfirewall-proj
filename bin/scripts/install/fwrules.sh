@@ -319,6 +319,22 @@ record_default_filter_policies() {
     record_filter_policy ipv6 FORWARD DROP
 }
 
+# Record successful system apply state for firewall rules created during install.
+record_initial_filter_apply_state() {
+    local category_name
+
+    for category_name in \
+        FIREWALL_RULES.IPV4.filter_input_rules \
+        FIREWALL_RULES.IPV4.filter_forward_rules \
+        FIREWALL_RULES.IPV4.filter_output_rules \
+        FIREWALL_RULES.IPV6.filter_input_rules \
+        FIREWALL_RULES.IPV6.filter_forward_rules \
+        FIREWALL_RULES.IPV6.filter_output_rules; do
+        record_install_apply_work_request "$category_name" "fwrules.sh"
+    done
+}
+
+
 # Set restrictive default policies for IPv4 and IPv6 filter chains.
 set_default_filter_policies() {
     log "Setting INPUT and FORWARD default policies to DROP."
@@ -363,6 +379,7 @@ main() {
     allow_required_icmpv6
     record_default_filter_policies
     set_default_filter_policies
+    record_initial_filter_apply_state
 }
 
 main "$@"
