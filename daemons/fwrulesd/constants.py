@@ -8,8 +8,8 @@ from core.constants import DB_DIR
 LOG_SOURCE = "fwrulesd/fwrulesd.py"
 
 RULE_DATABASES = {
-    ("FIREWALL_RULES", "IPV4"): DB_DIR / "ipv4-firewall-rules.db",
-    ("FIREWALL_RULES", "IPV6"): DB_DIR / "ipv6-firewall-rules.db",
+    ("FIREWALL_RULES", "IPV4"): DB_DIR / "ipv4-filter-rules.db",
+    ("FIREWALL_RULES", "IPV6"): DB_DIR / "ipv6-filter-rules.db",
     ("NAT_RULES", "IPV4"): DB_DIR / "ipv4-nat-rules.db",
     ("NAT_RULES", "IPV6"): DB_DIR / "ipv6-nat-rules.db",
     ("MANGLE_RULES", "IPV4"): DB_DIR / "ipv4-mangle-rules.db",

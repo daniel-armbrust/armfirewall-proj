@@ -92,6 +92,40 @@ enable_and_start_systemd_unit() {
     log "Enabled and started systemd service: ${SYSTEMD_SERVICE_NAME}."
 }
 
+# Wait until supervisord is reachable through its local control socket.
+wait_for_supervisor() {
+    local supervisorctl_bin
+    local wait_count=0
+
+    supervisorctl_bin="$(command -v supervisorctl || true)"
+    [[ -n "$supervisorctl_bin" ]] || fatal "supervisorctl was not found."
+
+    while [[ "$wait_count" -lt 20 ]]; do
+        if "$supervisorctl_bin" -c "$SUPERVISORD_CONF" status >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+
+    fatal "ArmFirewall supervisord did not become ready."
+}
+
+# Persist supervisord runtime states in services.db for the Services / Status page.
+sync_services_status() {
+    wait_for_supervisor
+    sleep 4
+    (
+        cd "$ROOT_DIR"
+        "$ROOT_DIR/.venv/bin/python" - <<'PY'
+from daemons.svcmgmtd.supervisor import sync_supervisor_statuses
+
+sync_supervisor_statuses()
+PY
+    )
+    log "Synchronized ArmFirewall service runtime status."
+}
+
 # Create the supervisord configuration used by ArmFirewall services.
 create_supervisord_conf() {
     mkdir -p "$CONF_DIR" "$ROOT_DIR/logs"
@@ -118,7 +152,6 @@ serverurl=unix://$ROOT_DIR/logs/supervisor.sock
 [program:armfirewall-api]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/uvicorn web.main:app --app-dir $ROOT_DIR --host 0.0.0.0 --port 8000 --ssl-keyfile $ROOT_DIR/conf/armfirewall.key --ssl-certfile $ROOT_DIR/conf/armfirewall.crt
-user=armfw
 autostart=true
 autorestart=true
 startsecs=3
@@ -136,7 +169,6 @@ environment=PYTHONUNBUFFERED="1"
 [program:armfirewall-ifaced]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/python -m daemons.ifaced.ifaced
-user=armfw
 autostart=true
 autorestart=true
 startsecs=3
@@ -154,7 +186,6 @@ environment=PYTHONUNBUFFERED="1"
 [program:armfirewall-monitord]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/python -m daemons.monitord
-user=armfw
 autostart=true
 autorestart=true
 startsecs=3
@@ -172,7 +203,6 @@ environment=PYTHONUNBUFFERED="1"
 [program:armfirewall-workreqd]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/python -m daemons.workreqd.workreqd
-user=armfw
 autostart=true
 autorestart=true
 startsecs=3
@@ -183,6 +213,23 @@ stdout_logfile=$ROOT_DIR/logs/armfirewall-workreqd.out.log
 stdout_logfile_maxbytes=5MB
 stdout_logfile_backups=5
 stderr_logfile=$ROOT_DIR/logs/armfirewall-workreqd.err.log
+stderr_logfile_maxbytes=5MB
+stderr_logfile_backups=5
+environment=PYTHONUNBUFFERED="1"
+
+[program:armfirewall-linkfailover]
+directory=$ROOT_DIR
+command=$ROOT_DIR/.venv/bin/python -m daemons.linkfailoverd.linkfailoverd
+autostart=false
+autorestart=true
+startsecs=3
+stopsignal=TERM
+stopasgroup=true
+killasgroup=true
+stdout_logfile=$ROOT_DIR/logs/armfirewall-linkfailover.out.log
+stdout_logfile_maxbytes=5MB
+stdout_logfile_backups=5
+stderr_logfile=$ROOT_DIR/logs/armfirewall-linkfailover.err.log
 stderr_logfile_maxbytes=5MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
@@ -198,6 +245,7 @@ main() {
     create_systemd_unit
     stop_existing_supervisord
     enable_and_start_systemd_unit
+    sync_services_status
 }
 
 main "$@"

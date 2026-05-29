@@ -178,6 +178,8 @@ filter_db_for_family() {
         fallback="$IPV4_FILTER_FALLBACK_DB"
     fi
 
+    sqlite_table_exists "$preferred" "filter_chain_policies" && printf '%s\n' "$preferred" && return 0
+    sqlite_table_exists "$fallback" "filter_chain_policies" && printf '%s\n' "$fallback" && return 0
     [[ -f "$preferred" ]] && printf '%s\n' "$preferred" && return 0
     [[ -f "$fallback" ]] && printf '%s\n' "$fallback" && return 0
     printf '%s\n' "$preferred"
