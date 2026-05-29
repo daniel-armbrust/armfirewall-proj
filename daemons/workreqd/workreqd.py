@@ -98,6 +98,8 @@ def command_for_request(request: QueuedWorkRequest) -> list[str]:
     """Build the action command for a work request."""
     if request.category_name == "SERVICE_MANAGEMENT.DNSMASQ_CONFIG":
         command = [sys.executable, "-m", "daemons.dnsmasq.dnsmasq"]
+    elif request.category_name == "SERVICE_MANAGEMENT.LIBRESWAN_CONFIG":
+        command = [sys.executable, "-m", "daemons.libreswand.libreswand"]
     else:
         script_name = request.script_name
 

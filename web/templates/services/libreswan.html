@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">services/libreswan</p>
+        <h1>Libreswan</h1>
+    </div>
+    <div class="refresh-state" id="libreswan-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Libreswan summary">
+    <div class="metric">
+        <span class="metric-label">Connections</span>
+        <strong id="libreswan-summary-connections">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Enabled</span>
+        <strong id="libreswan-summary-enabled">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Disabled</span>
+        <strong id="libreswan-summary-disabled">-</strong>
+    </div>
+</section>
+
+<nav class="local-tabs" aria-label="Libreswan menu">
+    <button class="local-tab active" type="button" data-libreswan-view="connections">CONNECTIONS</button>
+    <button class="local-tab" type="button" data-libreswan-view="new-connection">NEW CONNECTION</button>
+    <button class="local-tab" type="button" data-libreswan-view="logs">LOGS</button>
+    <button class="local-tab" type="button" data-libreswan-view="work-requests">WORK REQUESTS</button>
+</nav>
+
+<section class="panel" id="libreswan-connections-panel">
+    <div class="panel-head">
+        <h2>IPsec Connections</h2>
+        <span id="libreswan-connections-count">connections=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Connection</th>
+                    <th>Peer</th>
+                    <th>Subnets</th>
+                    <th>VTI</th>
+                    <th>IKE</th>
+                    <th>Status</th>
+                    <th>Ops</th>
+                </tr>
+            </thead>
+            <tbody id="libreswan-connections-body">
+                <tr>
+                    <td colspan="7">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>loading Libreswan connections</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel" id="libreswan-form-panel" hidden>
+    <div class="panel-head">
+        <h2 id="libreswan-form-title">New IPsec Connection</h2>
+        <span id="libreswan-form-state">mode=create</span>
+    </div>
+    <form class="edit-form" id="libreswan-form">
+        <input id="libreswan-id" type="hidden">
+        <input id="libreswan-enabled" name="enabled" type="hidden" value="1">
+        <input id="libreswan-leftsubnet" name="leftsubnet" type="hidden" value="0.0.0.0/0">
+        <input id="libreswan-rightsubnet" name="rightsubnet" type="hidden" value="0.0.0.0/0">
+        <input id="libreswan-auto" name="auto" type="hidden" value="start">
+        <input id="libreswan-encapsulation" name="encapsulation" type="hidden" value="yes">
+        <div class="form-grid libreswan-form-grid">
+            <label class="field libreswan-field-half">
+                <span>Connection Name</span>
+                <input id="libreswan-conn-name" name="conn_name" type="text" autocomplete="off">
+            </label>
+            <label class="field libreswan-field-wide">
+                <span>Description</span>
+                <input id="libreswan-description" name="description" type="text" autocomplete="off">
+            </label>
+            <label class="field libreswan-field-half">
+                <span>Left</span>
+                <input id="libreswan-left-addr" name="left_addr" type="text" autocomplete="off" inputmode="decimal" placeholder="192.0.2.10" maxlength="15" data-ipv4-address required>
+            </label>
+            <label class="field libreswan-field-half">
+                <span>Left ID</span>
+                <input id="libreswan-left-id" name="left_id" type="text" autocomplete="off">
+            </label>
+            <label class="field libreswan-field-half">
+                <span>Right</span>
+                <input id="libreswan-right-addr" name="right_addr" type="text" autocomplete="off" inputmode="decimal" placeholder="198.51.100.10" maxlength="15" data-ipv4-address required>
+            </label>
+            <label class="field libreswan-field-half">
+                <span>VTI interface</span>
+                <input id="libreswan-vti-interface" name="vti_interface" type="text" autocomplete="off" readonly>
+            </label>
+            <label class="field libreswan-field-half">
+                <span>VTI routing</span>
+                <select id="libreswan-vti-routing" name="vti_routing">
+                    <option value="no">no</option>
+                    <option value="yes">yes</option>
+                </select>
+            </label>
+            <label class="field libreswan-field-half">
+                <span>Mark</span>
+                <input id="libreswan-mark" name="mark" type="text" autocomplete="off" placeholder="5/0xffffffff" readonly required>
+            </label>
+            <label class="field libreswan-field-half">
+                <span>IKEv2</span>
+                <select id="libreswan-ikev2" name="ikev2">
+                    <option value="no">no</option>
+                    <option value="never">never</option>
+                    <option value="permit">permit</option>
+                    <option value="propose">propose</option>
+                    <option value="insist">insist</option>
+                    <option value="yes">yes</option>
+                </select>
+            </label>
+            <label class="field libreswan-field-half">
+                <span>IKE</span>
+                <select id="libreswan-ike" name="ike">
+                    <option value="aes_gcm256-sha2_512;dh20">aes_gcm256-sha2_512;dh20</option>
+                    <option value="aes_gcm256-sha2_384;dh19">aes_gcm256-sha2_384;dh19</option>
+                    <option value="aes256-sha2_384;modp3072">aes256-sha2_384;modp3072</option>
+                    <option value="aes256-sha2_256;modp2048">aes256-sha2_256;modp2048</option>
+                    <option value="aes_cbc256-sha2_384;modp1536" selected>aes_cbc256-sha2_384;modp1536</option>
+                </select>
+            </label>
+            <label class="field libreswan-field-half">
+                <span>Phase2 alg</span>
+                <select id="libreswan-phase2alg" name="phase2alg">
+                    <option value="aes_gcm256;dh20">aes_gcm256;dh20</option>
+                    <option value="aes_gcm256;dh19">aes_gcm256;dh19</option>
+                    <option value="aes256-sha2_384;modp3072">aes256-sha2_384;modp3072</option>
+                    <option value="aes256-sha2_256;modp2048">aes256-sha2_256;modp2048</option>
+                    <option value="aes_gcm256;modp1536" selected>aes_gcm256;modp1536</option>
+                </select>
+            </label>
+            <label class="field libreswan-field-half">
+                <span>IKE lifetime</span>
+                <input id="libreswan-ikelifetime" name="ikelifetime" type="text" autocomplete="off" value="28800s">
+            </label>
+            <label class="field libreswan-field-half">
+                <span>SA lifetime</span>
+                <input id="libreswan-salifetime" name="salifetime" type="text" autocomplete="off" value="3600s">
+            </label>
+            <label class="field libreswan-field-wide">
+                <span>Shared secret</span>
+                <div class="secret-field-control">
+                    <input id="libreswan-shared-secret" name="shared_secret" type="password" autocomplete="new-password" required>
+                    <button class="icon-button secret-action" type="button" id="libreswan-secret-generate" title="Generate shared secret" aria-label="Generate shared secret">↻</button>
+                    <button class="icon-button secret-action" type="button" id="libreswan-secret-toggle" title="Show shared secret" aria-label="Show shared secret" aria-pressed="false">◉</button>
+                </div>
+            </label>
+        </div>
+        <div class="form-actions">
+            <button class="text-button primary" type="submit" id="libreswan-submit">Add connection</button>
+            <button class="text-button" type="button" id="libreswan-clear">Clear</button>
+        </div>
+        <div class="form-status" id="libreswan-form-status" hidden></div>
+    </form>
+</section>
+
+<section class="panel" id="libreswan-logs-panel" hidden>
+    <div class="libreswan-log-box">
+        <div class="panel-head compact">
+            <h2>Logs - STDOUT</h2>
+            <span id="libreswan-stdout-count">lines=0</span>
+        </div>
+        <pre class="tool-output" id="libreswan-stdout-output">Waiting for libreswan.out.log...</pre>
+    </div>
+    <div class="libreswan-log-box">
+        <div class="panel-head compact">
+            <h2>Logs - STDERR</h2>
+            <span id="libreswan-stderr-count">lines=0</span>
+        </div>
+        <pre class="tool-output" id="libreswan-stderr-output">Waiting for libreswan.err.log...</pre>
+    </div>
+    <span id="libreswan-logs-count" hidden>lines=0</span>
+</section>
+<section class="panel" id="libreswan-work-requests-panel" hidden>
+    <div class="panel-head">
+        <h2>Work Requests</h2>
+        <span id="libreswan-work-requests-count">requests=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                    <th>Updated</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="libreswan-work-requests-body">
+                <tr>
+                    <td colspan="5">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no Libreswan work requests</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/services_libreswan.js') }}?v=20260529-libreswan-log-follow" defer></script>
+{% endblock %}

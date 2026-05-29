@@ -51,9 +51,21 @@ def restart_service(service_name: str) -> None:
         raise RuntimeError(f"Service {service_name} did not return to RUNNING after restart: {state}")
 
 
+def initialize_libreswan_nss() -> None:
+    """Ensure the Libreswan NSS database exists before Pluto is started."""
+    run_bounded_command(["ipsec", "checknss"], timeout=60)
+
+
+def run_post_install_tasks(service: OptionalService) -> None:
+    """Run service-specific initialization after package installation."""
+    if service.name == "libreswan":
+        initialize_libreswan_nss()
+
+
 def install_service(service: OptionalService) -> None:
     """Install a package and register its supervisor program."""
     install_package(service.package)
+    run_post_install_tasks(service)
     register_supervisor_program(service)
     reread_and_update()
     sync_supervisor_statuses()

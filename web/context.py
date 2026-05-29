@@ -15,6 +15,12 @@ def menu_context() -> dict[str, Any]:
     except (FileNotFoundError, db.DatabaseError):
         squid_installed = False
 
+    try:
+        libreswan_installed = service_installed("libreswan")
+    except (FileNotFoundError, db.DatabaseError):
+        libreswan_installed = False
+
     return {
         "squid_installed": squid_installed,
+        "libreswan_installed": libreswan_installed,
     }

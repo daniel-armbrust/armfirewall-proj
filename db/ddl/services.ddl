@@ -128,4 +128,32 @@ stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 ',
         120
+    ),
+    (
+        'libreswan',
+        'Libreswan',
+        'vpn',
+        'IPsec VPN service.',
+        'optional',
+        0,
+        0,
+        'libreswan',
+        '/usr/sbin/ipsec',
+        '[program:libreswan]
+directory={root}
+command=/usr/sbin/ipsec pluto --nofork --config {root}/conf/libreswan/ipsec.conf --secretsfile {root}/conf/libreswan/ipsec.secrets --logfile {root}/logs/libreswan.out.log
+autostart=false
+autorestart=true
+startsecs=3
+stopsignal=TERM
+stopasgroup=true
+killasgroup=true
+stdout_logfile={root}/logs/libreswan.out.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
+stderr_logfile={root}/logs/libreswan.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=5
+',
+        130
     );

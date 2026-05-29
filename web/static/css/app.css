@@ -1516,6 +1516,54 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
+.libreswan-form-grid {
+    max-width: 920px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 36px;
+    row-gap: 18px;
+}
+
+.libreswan-field-half {
+    grid-column: span 2;
+}
+
+.libreswan-field-wide {
+    grid-column: 1 / -1;
+}
+
+.libreswan-log-box {
+    border: 1px solid var(--line);
+    background: var(--panel);
+}
+
+.libreswan-log-box + .libreswan-log-box {
+    margin-top: 22px;
+}
+
+.libreswan-log-box .tool-output {
+    border-top: 1px solid var(--line);
+    height: 300px;
+    min-height: 300px;
+    max-height: 300px;
+}
+
+.secret-field-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 34px 34px;
+    gap: 8px;
+    align-items: center;
+}
+
+.secret-field-control input {
+    min-width: 0;
+}
+
+.secret-field-control .icon-button {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+}
+
 .firewall-rules-table {
     min-width: 1180px;
 }
@@ -1871,6 +1919,11 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .libreswan-field-half,
+    .libreswan-field-wide {
+        grid-column: 1 / -1;
     }
 
     .panel-head {

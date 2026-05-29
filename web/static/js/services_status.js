@@ -21,6 +21,8 @@
     let loading = false;
     let workRequestsLoading = false;
     const POLL_MS = 5000;
+    const SERVICE_REFRESH_KEY = "armfw.pendingServiceMenuRefresh";
+    const SERVICE_REFRESH_TTL_MS = 10 * 60 * 1000;
 
     function attachModalToBody(modal) {
         if (modal && modal.parentElement !== document.body) {
@@ -257,6 +259,51 @@
         }
     }
 
+    function rememberPendingServiceRefresh(serviceName, action) {
+        sessionStorage.setItem(SERVICE_REFRESH_KEY, JSON.stringify({
+            serviceName,
+            action,
+            createdAt: Date.now(),
+        }));
+    }
+
+    function pendingServiceMenuRefresh() {
+        const raw = sessionStorage.getItem(SERVICE_REFRESH_KEY);
+        if (!raw) {
+            return null;
+        }
+        try {
+            const payload = JSON.parse(raw);
+            if (!payload.serviceName || !payload.action || Date.now() - Number(payload.createdAt || 0) > SERVICE_REFRESH_TTL_MS) {
+                sessionStorage.removeItem(SERVICE_REFRESH_KEY);
+                return null;
+            }
+            return {
+                serviceName: String(payload.serviceName),
+                action: String(payload.action),
+            };
+        } catch (_error) {
+            sessionStorage.removeItem(SERVICE_REFRESH_KEY);
+            return null;
+        }
+    }
+
+    function reloadWhenPendingServiceStateChanges(optionalServices) {
+        const pending = pendingServiceMenuRefresh();
+        if (!pending) {
+            return;
+        }
+        const service = optionalServices.find((item) => item.name === pending.serviceName);
+        const installed = Boolean(service && service.installed);
+        if (
+            (pending.action === "install" && installed) ||
+            (pending.action === "uninstall" && !installed)
+        ) {
+            sessionStorage.removeItem(SERVICE_REFRESH_KEY);
+            window.location.reload();
+        }
+    }
+
     async function pollServices() {
         if (loading) {
             return;
@@ -280,6 +327,7 @@
             }
             renderArmFirewallServices(services);
             renderOptionalServices(optionalServices);
+            reloadWhenPendingServiceStateChanges(optionalServices);
             setState("Live", summary.updated_at || "-");
             if (workRequestsPanel && !workRequestsPanel.hidden) {
                 loadWorkRequests();
@@ -335,6 +383,9 @@
             await HF.fetchJson(`/api/services/status/${encodeURIComponent(serviceName)}/${encodeURIComponent(action)}`, {
                 method: "POST",
             });
+            if (action === "install" || action === "uninstall") {
+                rememberPendingServiceRefresh(serviceName, action);
+            }
             closeOptionalServiceModal();
             showWorkRequests();
             await loadWorkRequests();

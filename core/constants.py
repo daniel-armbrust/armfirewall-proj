@@ -19,6 +19,7 @@ SERVICES_DB_PATH = DB_DIR / "services.db"
 DNSMASQ_DB_PATH = DB_DIR / "dnsmasq.db"
 LATENCY_DB_PATH = DB_DIR / "latency.db"
 LINKFAILOVER_DB_PATH = DB_DIR / "linkfailover.db"
+LIBRESWAN_DB_PATH = DB_DIR / "libreswan.db"
 POLICY_ROUTING_DB_PATH = DB_DIR / "policy-routing.db"
 POLICY_ROUTING_DDL_PATH = DB_DIR / "ddl" / "policy-routing.ddl"
 

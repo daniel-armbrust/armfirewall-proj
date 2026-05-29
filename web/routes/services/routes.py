@@ -10,6 +10,8 @@ from web.services.dnsmasq import api as services_dnsmasq_api
 from web.services.dnsmasq import views as services_dnsmasq_views
 from web.services.linkfailover import api as services_linkfailover_api
 from web.services.linkfailover import views as services_linkfailover_views
+from web.services.libreswan import api as services_libreswan_api
+from web.services.libreswan import views as services_libreswan_views
 from web.services.squid import views as services_squid_views
 from web.services import api as services_api
 from web.services import views as services_views
@@ -150,6 +152,71 @@ async def api_test_dnsmasq_config(request: Request) -> dict[str, Any]:
     return services_dnsmasq_api.test_dnsmasq_config(payload)
 
 
+@router.get("/api/services/libreswan")
+def api_libreswan_connections() -> dict[str, Any]:
+    """Return Libreswan connection inventory."""
+    return services_libreswan_api.list_connections()
+
+
+@router.get("/api/services/libreswan/work-requests")
+def api_libreswan_work_requests() -> dict[str, Any]:
+    """Return Libreswan configuration work requests."""
+    return services_libreswan_api.get_libreswan_work_requests()
+
+
+@router.get("/api/services/libreswan/logs")
+def api_libreswan_logs(limit: int = 200) -> dict[str, Any]:
+    """Return Libreswan daemon logs."""
+    return services_libreswan_api.list_logs(limit)
+
+
+@router.post("/api/services/libreswan/connections")
+async def api_create_libreswan_connection(request: Request) -> dict[str, Any]:
+    """Create one Libreswan connection."""
+    try:
+        payload = await request.json()
+        return services_libreswan_api.create_connection(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.put("/api/services/libreswan/connections/{connection_id}")
+async def api_update_libreswan_connection(connection_id: int, request: Request) -> dict[str, Any]:
+    """Update one Libreswan connection."""
+    try:
+        payload = await request.json()
+        return services_libreswan_api.update_connection(connection_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.put("/api/services/libreswan/connections/{connection_id}/enabled")
+async def api_set_libreswan_connection_enabled(connection_id: int, request: Request) -> dict[str, Any]:
+    """Enable or disable one Libreswan connection."""
+    try:
+        payload = await request.json()
+        return services_libreswan_api.set_connection_enabled(connection_id, bool(payload.get("enabled")))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.delete("/api/services/libreswan/connections/{connection_id}")
+def api_delete_libreswan_connection(connection_id: int) -> dict[str, Any]:
+    """Delete one Libreswan connection."""
+    try:
+        return services_libreswan_api.delete_connection(connection_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/services/status", response_class=HTMLResponse)
 def services_status(request: Request) -> HTMLResponse:
     """Render the Services / Status page."""
@@ -172,3 +239,9 @@ def services_linkfailover(request: Request) -> HTMLResponse:
 def services_squid(request: Request) -> HTMLResponse:
     """Render the Squid service page."""
     return services_squid_views.render_squid(request)
+
+
+@router.get("/services/libreswan", response_class=HTMLResponse)
+def services_libreswan(request: Request) -> HTMLResponse:
+    """Render the Libreswan service page."""
+    return services_libreswan_views.render_libreswan(request)

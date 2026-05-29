@@ -28,7 +28,9 @@ pip-wheel-metadata/
 *.pfx
 
 # ArmFirewall runtime configuration generated on target hosts
+conf/armfw.conf
 conf/dnsmasq.conf
+conf/libreswan/
 conf/supervisord.conf
 conf/*.local
 
