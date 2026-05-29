@@ -29,6 +29,7 @@ CONNECTION_FIELDS = (
     "auto",
     "mark",
     "vti_interface",
+    "vti_addr",
     "vti_routing",
     "ikev2",
     "ike",

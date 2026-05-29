@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS libreswan_connections (
      auto TEXT NOT NULL DEFAULT 'start' CHECK (auto IN ('add', 'ondemand', 'route', 'start', 'ignore')),
      mark TEXT NOT NULL,
      vti_interface TEXT NOT NULL,
+     vti_addr TEXT NOT NULL DEFAULT '',
      vti_routing TEXT NOT NULL DEFAULT 'no' CHECK (vti_routing IN ('yes', 'no')),
      ikev2 TEXT NOT NULL DEFAULT 'no' CHECK (ikev2 IN ('no', 'never', 'permit', 'propose', 'insist', 'yes')),
      ike TEXT NOT NULL DEFAULT 'aes_cbc256-sha2_384;modp1536',

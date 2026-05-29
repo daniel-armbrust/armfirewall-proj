@@ -38,6 +38,7 @@ class LibreswanConnection:
     auto: str
     mark: str
     vti_interface: str
+    vti_addr: str
     vti_routing: str
     ikev2: str
     ike: str
@@ -63,6 +64,7 @@ class LibreswanConnection:
             auto=str(row["auto"] or "start"),
             mark=str(row["mark"]),
             vti_interface=str(row["vti_interface"]),
+            vti_addr=str(row.get("vti_addr") or ""),
             vti_routing=str(row["vti_routing"] or "no"),
             ikev2=str(row["ikev2"] or "no"),
             ike=str(row["ike"]),

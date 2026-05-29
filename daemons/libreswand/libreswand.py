@@ -69,8 +69,18 @@ def left_secret_identity(conn: LibreswanConnection) -> str:
     return conn.left_id.strip() or conn.left_addr
 
 
+def ensure_libreswan_schema() -> None:
+    """Apply lightweight Libreswan schema compatibility fixes."""
+    with db.transaction(LIBRESWAN_DB_PATH) as conn:
+        columns = {str(row["name"]) for row in db.execute_on(conn, "PRAGMA table_info(libreswan_connections)").fetchall()}
+        if "vti_addr" not in columns:
+            db.execute_on(conn, "ALTER TABLE libreswan_connections ADD COLUMN vti_addr TEXT NOT NULL DEFAULT ''")
+
+
 def load_connections() -> list[LibreswanConnection]:
     """Return persisted Libreswan tunnel definitions."""
+    ensure_libreswan_schema()
+
     rows = db.fetch_all(
         """
         SELECT *
@@ -210,6 +220,18 @@ def run_ipsec(command: list[str], *, check: bool = True) -> None:
     run_command([IPSEC_COMMAND, "auto", "--config", str(LIBRESWAN_IPSEC_CONF), *command], check=check, timeout=IPSEC_TIMEOUT_SECONDS)
 
 
+def configure_vti_address(conn: LibreswanConnection) -> None:
+    """Apply the configured IP address to the Libreswan VTI interface."""
+    if not conn.vti_addr.strip():
+        return
+
+    if not command_exists("ip"):
+        raise RuntimeError("ip command was not found.")
+
+    run_command(["ip", "addr", "replace", conn.vti_addr, "dev", conn.vti_interface], timeout=IPSEC_TIMEOUT_SECONDS)
+    run_command(["ip", "link", "set", "dev", conn.vti_interface, "up"], timeout=IPSEC_TIMEOUT_SECONDS)
+
+
 def deactivate_previous_connection(request: LibreswanWorkRequest) -> None:
     """Ask Libreswan to unload a removed or renamed connection."""
     previous_name = str(request.payload.get("previous_conn_name") or "").strip()
@@ -231,6 +253,7 @@ def activate_connections(connections: list[LibreswanConnection], request: Libres
             run_ipsec(["--up", conn.conn_name])
         elif conn.auto in {"route", "ondemand"}:
             run_ipsec(["--route", conn.conn_name])
+        configure_vti_address(conn)
 
 
 def supervisorctl(command: str, *args: str, check: bool = True) -> str:
