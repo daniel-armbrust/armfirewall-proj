@@ -70,9 +70,14 @@ def script_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
+def bin_dir() -> Path:
+    """Return the ArmFirewall bin directory for this CLI."""
+    return script_dir().parents[1]
+
+
 def globals_path() -> Path:
     """Return the path to the ArmFirewall shell globals file."""
-    return script_dir() / "scripts" / "common" / "globals.sh"
+    return bin_dir() / "scripts" / "common" / "globals.sh"
 
 
 def load_shell_globals() -> dict[str, str]:
@@ -287,16 +292,16 @@ def build_parser() -> argparse.ArgumentParser:
     examples = textwrap.dedent(
         """\
         Examples:
-          firewall.py filter add --chain INPUT --iface-in enp0s6 \\
+          firewall.sh filter add --chain INPUT --iface-in enp0s6 \\
             --protocol-name tcp --dst-port 22 --action ACCEPT --conntrack-mode new
 
-          firewall.py filter apply --family IPV4 --chain INPUT
-          firewall.py nat add --chain POSTROUTING --iface-out enp0s6 --nat-action MASQUERADE
-          firewall.py mangle list --family IPV4 --chain PREROUTING
+          firewall.sh filter apply --family IPV4 --chain INPUT
+          firewall.sh nat add --chain POSTROUTING --iface-out enp0s6 --nat-action MASQUERADE
+          firewall.sh mangle list --family IPV4 --chain PREROUTING
         """
     )
     root = argparse.ArgumentParser(
-        prog="firewall.py",
+        prog="firewall.sh",
         description="Create and manage ArmFirewall firewall rules.",
         epilog=examples,
         formatter_class=argparse.RawDescriptionHelpFormatter,

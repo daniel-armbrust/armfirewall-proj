@@ -49,6 +49,21 @@ def script_dir() -> Path:
     """
     return Path(__file__).resolve().parent
 
+def bin_dir() -> Path:
+    """Return the ArmFirewall bin directory for this CLI.
+
+    How it works:
+        Resolves the script path under bin/scripts/py and walks two levels up
+        to reach the bin directory, where shared shell scripts live.
+
+    Parameters:
+        None.
+
+    Returns:
+        Path: absolute ArmFirewall bin directory.
+    """
+    return script_dir().parents[1]
+
 def globals_path() -> Path:
     """Build the path to the ArmFirewall global constants file.
 
@@ -63,7 +78,7 @@ def globals_path() -> Path:
     Returns:
         Path: expected absolute path to globals.sh.
     """
-    return script_dir() / "scripts" / "common" / "globals.sh"
+    return bin_dir() / "scripts" / "common" / "globals.sh"
 
 def load_shell_globals() -> dict[str, str]:
     """Load constants defined in bin/scripts/common/globals.sh.
@@ -86,12 +101,12 @@ def load_shell_globals() -> dict[str, str]:
     if not path.exists():
         raise RuntimeError(f"ArmFirewall globals file was not found: {path}")
 
-    command = r"""
+    command = """
 source "$1" >/dev/null
-printf 'ROOT_DIR=%s\n' "$ROOT_DIR"
-printf 'DB_DIR=%s\n' "$DB_DIR"
-printf 'CONF_DIR=%s\n' "$CONF_DIR"
-printf 'SUPERVISORD_CONF=%s\n' "$SUPERVISORD_CONF"
+printf "%s=%s\\n" ROOT_DIR "$ROOT_DIR"
+printf "%s=%s\\n" DB_DIR "$DB_DIR"
+printf "%s=%s\\n" CONF_DIR "$CONF_DIR"
+printf "%s=%s\\n" SUPERVISORD_CONF "$SUPERVISORD_CONF"
 """
 
     completed = subprocess.run(
@@ -248,7 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     examples = textwrap.dedent(
         """\
         Examples:
-          libreswan.py add \\
+          libreswan.sh add \\
             --conn-name oracle-1 \\
             --left 10.100.10.3 \\
             --right 129.148.17.5 \\
@@ -257,13 +272,13 @@ def build_parser() -> argparse.ArgumentParser:
             --ikev2 insist \\
             --vti-addr 169.254.10.2/30
 
-          libreswan.py update --id 1 --ikev2 insist --vti-routing yes
-          libreswan.py list
-          libreswan.py show --id 1
+          libreswan.sh update --id 1 --ikev2 insist --vti-routing yes
+          libreswan.sh list
+          libreswan.sh show --id 1
         """
     )
     root = argparse.ArgumentParser(
-        prog="libreswan.py",
+        prog="libreswan.sh",
         description="Create and manage ArmFirewall Libreswan VPN connections.",
         epilog=examples,
         formatter_class=argparse.RawDescriptionHelpFormatter,
