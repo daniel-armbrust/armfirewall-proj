@@ -80,20 +80,55 @@ def rule_table_columns(conn: db.Connection, table: str, iface_select: str) -> st
     )
 
 
+def table_exists(conn: db.Connection, table: str) -> bool:
+    """Return whether a table exists in the current SQLite database."""
+    row = db.fetch_one_on(
+        conn,
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table,),
+    )
+    return row is not None
+
+
+def recover_interrupted_esp_protocol_migration(conn: db.Connection) -> None:
+    """Clean temporary tables left by an interrupted ESP protocol migration."""
+    if table_exists(conn, "protocols_old"):
+        protocol_count = db.fetch_one_on(conn, "SELECT COUNT(*) AS total FROM protocols")
+        old_protocol_count = db.fetch_one_on(conn, "SELECT COUNT(*) AS total FROM protocols_old")
+        if int(protocol_count["total"]) == 0 and int(old_protocol_count["total"]) > 0:
+            db.execute_on(conn, "DROP TABLE IF EXISTS protocols")
+            db.execute_on(conn, "ALTER TABLE protocols_old RENAME TO protocols")
+        else:
+            db.execute_on(conn, "INSERT OR IGNORE INTO protocols (name, description) SELECT name, description FROM protocols_old")
+            db.execute_on(conn, "DROP TABLE protocols_old")
+
+    for table in FILTER_RULE_TABLES:
+        old_table = f"{table}_old"
+        if table_exists(conn, old_table):
+            if table_exists(conn, table):
+                db.execute_on(conn, f"DROP TABLE {old_table}")
+            else:
+                db.execute_on(conn, f"ALTER TABLE {old_table} RENAME TO {table}")
+
+
 def ensure_esp_protocol_support(conn: db.Connection) -> None:
     """Upgrade older filter rule databases so ESP can be stored."""
+    db.execute_on(conn, "PRAGMA foreign_keys = OFF")
+    recover_interrupted_esp_protocol_migration(conn)
+
     row = db.fetch_one_on(
         conn,
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'filter_input_rules'",
     )
 
     if row is None or "'esp'" in str(row["sql"]):
+        db.execute_on(conn, "PRAGMA foreign_keys = ON")
+        conn.commit()
         return
 
     protocol_row = db.fetch_one_on(conn, "SELECT name FROM protocols WHERE name IN ('icmp', 'icmpv6') LIMIT 1")
     icmp_protocol = str(protocol_row["name"] if protocol_row else "icmp")
 
-    db.execute_on(conn, "PRAGMA foreign_keys = OFF")
     db.execute_on(conn, "ALTER TABLE protocols RENAME TO protocols_old")
     db.execute_on(
         conn,
@@ -104,7 +139,7 @@ def ensure_esp_protocol_support(conn: db.Connection) -> None:
         )
         """,
     )
-    db.execute_on(conn, "INSERT INTO protocols (name, description) SELECT name, description FROM protocols_old")
+    db.execute_on(conn, "INSERT OR IGNORE INTO protocols (name, description) SELECT name, description FROM protocols_old")
     db.execute_on(conn, "INSERT OR IGNORE INTO protocols (name, description) VALUES ('esp', 'Encapsulating Security Payload')")
     db.execute_on(conn, "DROP TABLE protocols_old")
 
@@ -116,6 +151,7 @@ def ensure_esp_protocol_support(conn: db.Connection) -> None:
         db.execute_on(conn, f"DROP TABLE {table}_old")
 
     db.execute_on(conn, "PRAGMA foreign_keys = ON")
+    conn.commit()
 
 
 def require_filter_chain_policies(conn: db.Connection) -> None:
