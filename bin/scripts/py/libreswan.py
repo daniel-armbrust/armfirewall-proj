@@ -178,21 +178,22 @@ def reexec_with_venv_python(root_dir: Path) -> None:
         None: this function does not return a value. On successful re-exec, the
         current process is replaced.
     """
-    venv_python = root_dir / ".venv" / "bin" / "python"
+    venv_dir = root_dir / ".venv"
+    venv_python = venv_dir / "bin" / "python"
 
     if not venv_python.exists():
         return
 
     try:
-        current = Path(sys.executable).resolve()
-        target = venv_python.resolve()
+        current_prefix = Path(sys.prefix).resolve()
+        target_prefix = venv_dir.resolve()
     except OSError:
         return
 
-    if current == target:
+    if current_prefix == target_prefix:
         return
 
-    os.execve(str(target), [str(target), str(Path(__file__).resolve()), *sys.argv[1:]], os.environ)
+    os.execve(str(venv_python), [str(venv_python), str(Path(__file__).resolve()), *sys.argv[1:]], os.environ)
 
 
 GLOBALS = load_shell_globals()
@@ -505,7 +506,7 @@ def main() -> int:
     """
     try:
         run(build_parser().parse_args())
-    except (RuntimeError, ValueError, db.DatabaseError, subprocess.CalledProcessError) as exc:
+    except (RuntimeError, ValueError, FileNotFoundError, db.DatabaseError, subprocess.CalledProcessError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0

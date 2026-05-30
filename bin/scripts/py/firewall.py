@@ -92,6 +92,14 @@ printf "%s=%s\\n" ROOT_DIR "$ROOT_DIR"
 printf "%s=%s\\n" DB_DIR "$DB_DIR"
 printf "%s=%s\\n" CONF_DIR "$CONF_DIR"
 printf "%s=%s\\n" SUPERVISORD_CONF "$SUPERVISORD_CONF"
+printf "%s=%s\\n" IPV4_FILTER_RULES_DB "$IPV4_FILTER_RULES_DB"
+printf "%s=%s\\n" IPV6_FILTER_RULES_DB "$IPV6_FILTER_RULES_DB"
+printf "%s=%s\\n" IPV4_FILTER_FALLBACK_DB "$IPV4_FILTER_FALLBACK_DB"
+printf "%s=%s\\n" IPV6_FILTER_FALLBACK_DB "$IPV6_FILTER_FALLBACK_DB"
+printf "%s=%s\\n" IPV4_NAT_RULES_DB "$IPV4_NAT_RULES_DB"
+printf "%s=%s\\n" IPV6_NAT_RULES_DB "$IPV6_NAT_RULES_DB"
+printf "%s=%s\\n" IPV4_MANGLE_RULES_DB "$IPV4_MANGLE_RULES_DB"
+printf "%s=%s\\n" IPV6_MANGLE_RULES_DB "$IPV6_MANGLE_RULES_DB"
 """
     completed = subprocess.run(
         ["bash", "-c", command, "armfw-globals", str(path)],
@@ -108,6 +116,19 @@ printf "%s=%s\\n" SUPERVISORD_CONF "$SUPERVISORD_CONF"
     return values
 
 
+def configured_db_path(globals_values: dict[str, str], key: str, default_path: Path, fallback_key: str | None = None) -> str:
+    """Return the configured database path, preferring an existing fallback when needed."""
+    configured = Path(os.environ.get(key, globals_values.get(key, str(default_path))))
+    if configured.exists() or fallback_key is None:
+        return str(configured)
+
+    fallback = Path(os.environ.get(fallback_key, globals_values.get(fallback_key, "")))
+    if fallback.exists():
+        return str(fallback)
+
+    return str(configured)
+
+
 def configure_environment(globals_values: dict[str, str]) -> Path:
     """Configure Python imports and default database paths from globals.sh."""
     root_dir = Path(globals_values["ROOT_DIR"])
@@ -116,12 +137,18 @@ def configure_environment(globals_values: dict[str, str]) -> Path:
     os.environ["ROOT_DIR"] = str(root_dir)
     os.environ["DB_DIR"] = str(db_dir)
     os.environ.setdefault("ARMFW_WORK_REQUEST_DB_PATH", str(db_dir / "work-requests.db"))
-    os.environ.setdefault("ARMFW_IPV4_FILTER_RULES_DB", str(db_dir / "ipv4-firewall-rules.db"))
-    os.environ.setdefault("ARMFW_IPV6_FILTER_RULES_DB", str(db_dir / "ipv6-firewall-rules.db"))
-    os.environ.setdefault("ARMFW_IPV4_NAT_RULES_DB", str(db_dir / "ipv4-nat-rules.db"))
-    os.environ.setdefault("ARMFW_IPV6_NAT_RULES_DB", str(db_dir / "ipv6-nat-rules.db"))
-    os.environ.setdefault("ARMFW_IPV4_MANGLE_RULES_DB", str(db_dir / "ipv4-mangle-rules.db"))
-    os.environ.setdefault("ARMFW_IPV6_MANGLE_RULES_DB", str(db_dir / "ipv6-mangle-rules.db"))
+    os.environ.setdefault(
+        "ARMFW_IPV4_FILTER_RULES_DB",
+        configured_db_path(globals_values, "IPV4_FILTER_RULES_DB", db_dir / "ipv4-filter-rules.db", "IPV4_FILTER_FALLBACK_DB"),
+    )
+    os.environ.setdefault(
+        "ARMFW_IPV6_FILTER_RULES_DB",
+        configured_db_path(globals_values, "IPV6_FILTER_RULES_DB", db_dir / "ipv6-filter-rules.db", "IPV6_FILTER_FALLBACK_DB"),
+    )
+    os.environ.setdefault("ARMFW_IPV4_NAT_RULES_DB", configured_db_path(globals_values, "IPV4_NAT_RULES_DB", db_dir / "ipv4-nat-rules.db"))
+    os.environ.setdefault("ARMFW_IPV6_NAT_RULES_DB", configured_db_path(globals_values, "IPV6_NAT_RULES_DB", db_dir / "ipv6-nat-rules.db"))
+    os.environ.setdefault("ARMFW_IPV4_MANGLE_RULES_DB", configured_db_path(globals_values, "IPV4_MANGLE_RULES_DB", db_dir / "ipv4-mangle-rules.db"))
+    os.environ.setdefault("ARMFW_IPV6_MANGLE_RULES_DB", configured_db_path(globals_values, "IPV6_MANGLE_RULES_DB", db_dir / "ipv6-mangle-rules.db"))
 
     root_text = str(root_dir)
     if root_text not in sys.path:
@@ -344,6 +371,8 @@ def payload_from_args(args: argparse.Namespace, table: str) -> dict[str, Any]:
     values = vars(args)
     fields: dict[str, str] = TABLE_APIS[table]["fields"]  # type: ignore[assignment]
     payload = {payload_name: values[option_name] for option_name, payload_name in fields.items() if values.get(option_name) is not None}
+    normalize_interface_payload(payload)
+    apply_default_interfaces(payload, table)
 
     mode = values.get("conntrack_mode")
     if mode:
@@ -357,6 +386,38 @@ def payload_from_args(args: argparse.Namespace, table: str) -> dict[str, Any]:
             payload["ct_invalid"] = 1
 
     return payload
+
+
+def normalize_interface_payload(payload: dict[str, Any]) -> None:
+    """Normalize CLI aliases for interface fields."""
+    for key in ("iface_in", "iface_out"):
+        value = payload.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text.lower() in {"any", "all", "*"}:
+            payload[key] = "ANY"
+        else:
+            payload[key] = text
+
+
+def apply_default_interfaces(payload: dict[str, Any], table: str) -> None:
+    """Fill required chain interface fields with ANY when omitted by the CLI."""
+    chain = str(payload.get("chain") or "").upper()
+    if table == "filter":
+        needs_in = chain in {"INPUT", "FORWARD"}
+        needs_out = chain in {"FORWARD", "OUTPUT"}
+    elif table == "nat":
+        needs_in = chain in {"PREROUTING", "INPUT"}
+        needs_out = chain in {"OUTPUT", "POSTROUTING"}
+    else:
+        needs_in = chain in {"PREROUTING", "INPUT", "FORWARD"}
+        needs_out = chain in {"FORWARD", "OUTPUT", "POSTROUTING"}
+
+    if needs_in and not payload.get("iface_in"):
+        payload["iface_in"] = "ANY"
+    if needs_out and not payload.get("iface_out"):
+        payload["iface_out"] = "ANY"
 
 
 def merged_update_payload(args: argparse.Namespace, table: str) -> dict[str, Any]:
@@ -448,7 +509,7 @@ def main() -> int:
     except HTTPException as exc:
         print(f"error: {exc.detail}", file=sys.stderr)
         return 1
-    except (RuntimeError, ValueError, db.DatabaseError, subprocess.CalledProcessError) as exc:
+    except (RuntimeError, ValueError, FileNotFoundError, db.DatabaseError, subprocess.CalledProcessError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0
