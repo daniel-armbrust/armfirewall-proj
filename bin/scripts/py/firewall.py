@@ -307,6 +307,11 @@ def add_rule_options(parser: argparse.ArgumentParser, table: str, include_identi
         add_conntrack_options(parser)
 
 
+def add_apply_control_option(parser: argparse.ArgumentParser) -> None:
+    """Add the option that disables automatic apply after write commands."""
+    parser.add_argument("--no-apply", action="store_true", help="Only save the rule; do not queue an iptables apply.")
+
+
 def add_rule_identity_options(parser: argparse.ArgumentParser) -> None:
     """Add options that identify one persisted firewall rule."""
     parser.add_argument("--family", choices=("IPV4", "IPV6"), required=True)
@@ -341,10 +346,12 @@ def build_parser() -> argparse.ArgumentParser:
 
         add_parser = command_parsers.add_parser("add", aliases=("create",), help=f"Create a {table} rule.")
         add_rule_options(add_parser, table)
+        add_apply_control_option(add_parser)
 
         update_parser = command_parsers.add_parser("update", help=f"Update a {table} rule.")
         add_rule_identity_options(update_parser)
         add_rule_options(update_parser, table, include_identity=False)
+        add_apply_control_option(update_parser)
 
         list_parser = command_parsers.add_parser("list", help=f"List {table} rules.")
         list_parser.add_argument("--family", choices=("IPV4", "IPV6"))
@@ -356,6 +363,7 @@ def build_parser() -> argparse.ArgumentParser:
         for command in ("enable", "disable", "delete"):
             command_parser = command_parsers.add_parser(command, help=f"{command.title()} one {table} rule.")
             add_rule_identity_options(command_parser)
+            add_apply_control_option(command_parser)
 
         apply_parser = command_parsers.add_parser("apply", help=f"Queue apply for one {table} chain.")
         apply_parser.add_argument("--chain", required=True)
@@ -472,6 +480,24 @@ def list_rules(args: argparse.Namespace, table: str) -> None:
         )
 
 
+def apply_after_write(args: argparse.Namespace, table_api: dict[str, Any]) -> Any:
+    """Queue an apply for the changed chain unless the user disabled it."""
+    if getattr(args, "no_apply", False):
+        return None
+
+    family = getattr(args, "family", None)
+    return table_api["apply"](args.chain, {"family": family} if family else {})  # type: ignore[operator]
+
+
+def print_write_result(result: Any, apply_result: Any) -> None:
+    """Print write results and any automatically queued apply request."""
+    if apply_result is None:
+        print_json(result)
+        return
+
+    print_json({"result": result, "apply": apply_result})
+
+
 def run(args: argparse.Namespace) -> None:
     """Dispatch the requested table command to the corresponding web API."""
     table = args.table
@@ -479,17 +505,22 @@ def run(args: argparse.Namespace) -> None:
     table_api = TABLE_APIS[table]
 
     if command == "add":
-        print_json(table_api["create"](payload_from_args(args, table)))  # type: ignore[operator]
+        result = table_api["create"](payload_from_args(args, table))  # type: ignore[operator]
+        print_write_result(result, apply_after_write(args, table_api))
     elif command == "update":
         if table_api["update"] is None:
             raise RuntimeError(f"{table} rule update is not supported.")
-        print_json(table_api["update"](args.family, args.chain, args.id, merged_update_payload(args, table)))  # type: ignore[operator]
+        result = table_api["update"](args.family, args.chain, args.id, merged_update_payload(args, table))  # type: ignore[operator]
+        print_write_result(result, apply_after_write(args, table_api))
     elif command == "delete":
-        print_json(table_api["delete"](args.family, args.chain, args.id))  # type: ignore[operator]
+        result = table_api["delete"](args.family, args.chain, args.id)  # type: ignore[operator]
+        print_write_result(result, apply_after_write(args, table_api))
     elif command == "enable":
-        print_json(table_api["enable"](args.family, args.chain, args.id, {"enabled": 1}))  # type: ignore[operator]
+        result = table_api["enable"](args.family, args.chain, args.id, {"enabled": 1})  # type: ignore[operator]
+        print_write_result(result, apply_after_write(args, table_api))
     elif command == "disable":
-        print_json(table_api["enable"](args.family, args.chain, args.id, {"enabled": 0}))  # type: ignore[operator]
+        result = table_api["enable"](args.family, args.chain, args.id, {"enabled": 0})  # type: ignore[operator]
+        print_write_result(result, apply_after_write(args, table_api))
     elif command == "show":
         print_json(table_api["show"](args.family, args.chain, args.id))  # type: ignore[operator]
     elif command == "list":
