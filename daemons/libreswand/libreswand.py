@@ -118,6 +118,7 @@ def render_connection_config(conn: LibreswanConnection) -> str:
             f"     mark={conn.mark}",
             f"     vti-interface={conn.vti_interface}",
             f"     vti-routing={conn.vti_routing}",
+            f"     leftupdown={connection_updown_path(conn)}",
             f"     ikev2={conn.ikev2}",
             f"     ike={conn.ike}",
             f"     phase2alg={conn.phase2alg}",
@@ -129,6 +130,56 @@ def render_connection_config(conn: LibreswanConnection) -> str:
     if conn.vti_addr:
         lines.append(f"     leftvti={conn.vti_addr}")
     lines.append("")
+    return "\n".join(lines)
+
+
+def shell_quote(value: str) -> str:
+    """Return one shell single-quoted value."""
+    return "'" + value.replace("'", "'\"'\"'") + "'"
+
+
+def render_updown_script(conn: LibreswanConnection) -> str:
+    """Render a Libreswan updown hook that keeps managed VTI settings stable."""
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -u",
+        "",
+        "DEFAULT_UPDOWN=/usr/libexec/ipsec/_updown",
+        "status=0",
+        'if [[ -x "${DEFAULT_UPDOWN}" ]]; then',
+        '    "${DEFAULT_UPDOWN}" "$@"',
+        "    status=$?",
+        "fi",
+        "",
+        'case "${PLUTO_VERB:-}" in',
+        "    up-client|up-host|route-client|route-host|prepare-client|prepare-host) ;;",
+        "    *) exit ${status} ;;",
+        "esac",
+        "",
+        "command -v ip >/dev/null 2>&1 || exit ${status}",
+        f"vti_interface={shell_quote(conn.vti_interface)}",
+        f"vti_addr={shell_quote(conn.vti_addr.strip())}",
+        f"vti_mtu={conn.vti_mtu}",
+        "",
+        "for attempt in $(seq 1 30); do",
+        '    if ip link show dev "${vti_interface}" >/dev/null 2>&1; then',
+        '        if [[ -n "${vti_addr}" ]]; then',
+        '            ip addr replace "${vti_addr}" dev "${vti_interface}" || true',
+        "        fi",
+        '        if [[ "${vti_mtu}" -gt 0 ]]; then',
+        '            ip link set dev "${vti_interface}" mtu "${vti_mtu}" || true',
+        "        fi",
+        '        ip link set dev "${vti_interface}" up || true',
+        '        if [[ "${vti_mtu}" -le 0 ]] || ip -o link show dev "${vti_interface}" | grep -q " mtu ${vti_mtu} "; then',
+        "            exit ${status}",
+        "        fi",
+        "    fi",
+        "    sleep 0.5",
+        "done",
+        "",
+        "exit ${status}",
+        "",
+    ]
     return "\n".join(lines)
 
 
@@ -159,6 +210,11 @@ def render_secrets(connections: list[LibreswanConnection]) -> str:
 def connection_config_path(conn: LibreswanConnection) -> Path:
     """Return the managed per-connection ipsec.conf path."""
     return connection_config_dir(conn) / "ipsec.conf"
+
+
+def connection_updown_path(conn: LibreswanConnection) -> Path:
+    """Return the managed per-connection Libreswan updown hook path."""
+    return connection_config_dir(conn) / "updown.sh"
 
 
 def connection_config_dir(conn: LibreswanConnection) -> Path:
@@ -204,7 +260,11 @@ def remove_stale_connection_files(active_paths: set[Path]) -> None:
 def render_files(connections: list[LibreswanConnection]) -> list[LibreswanConnection]:
     """Render all managed Libreswan files and return enabled connections."""
     active_connections = enabled_connections(connections)
-    active_paths = {connection_config_path(conn) for conn in active_connections}
+    active_paths = {
+        path
+        for conn in active_connections
+        for path in (connection_config_path(conn), connection_updown_path(conn))
+    }
 
     LIBRESWAN_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     remove_stale_connection_files(active_paths)
@@ -213,6 +273,7 @@ def render_files(connections: list[LibreswanConnection]) -> list[LibreswanConnec
         if not conn.shared_secret.strip():
             raise RuntimeError(f"Connection {conn.conn_name} has no shared secret.")
         write_atomic(connection_config_path(conn), render_connection_config(conn), mode=0o600)
+        write_atomic(connection_updown_path(conn), render_updown_script(conn), mode=0o700)
 
     write_atomic(LIBRESWAN_IPSEC_CONF, render_main_config(active_connections), mode=0o600)
     write_atomic(LIBRESWAN_SECRETS, render_secrets(active_connections), mode=0o600)
