@@ -373,6 +373,7 @@ record_install_filter_apply_work_request() {
     sqlite_table_exists "$WORK_REQUEST_DB" "work_requests" || return 0
     sqlite_table_exists "$WORK_REQUEST_DB" "work_request_events" || return 0
     sqlite_table_exists "$db_path" "$table_name" || return 0
+    ensure_pending_delete_column "$db_path" "$table_name"
 
     rule_ids="$(filter_rule_ids_json "$db_path" "$table_name")"
     policy="$(filter_policy_for_chain "$db_path" "$chain_name" "$policy_fallback")"
