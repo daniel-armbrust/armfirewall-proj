@@ -7,6 +7,62 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # shellcheck source=../common/globals.sh
 . "$ROOT_DIR/bin/scripts/common/globals.sh"
 
+NSS_DIR="/etc/ipsec.d"
+
+# Libreswan requires a valid NSS database before pluto can start. Keep this
+# repair local to pre-start so installed/enabled Libreswan survives reboots.
+initialize_nss_db() {
+    log "Initializing Libreswan NSS database in ${NSS_DIR}."
+    if command -v ipsec >/dev/null 2>&1 && ipsec initnss --nssdir "$NSS_DIR" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if command -v certutil >/dev/null 2>&1; then
+        certutil -N -d "sql:${NSS_DIR}" --empty-password >/dev/null 2>&1 && return 0
+    fi
+
+    return 1
+}
+
+nss_db_files_exist() {
+    compgen -G "${NSS_DIR}/cert*.db" >/dev/null || \
+    compgen -G "${NSS_DIR}/key*.db" >/dev/null || \
+    [[ -f "${NSS_DIR}/pkcs11.txt" || -f "${NSS_DIR}/secmod.db" ]]
+}
+
+backup_nss_db_files() {
+    local backup_dir
+    local file
+    local moved=0
+
+    backup_dir="${NSS_DIR}.armfw-backup-$(date +%Y%m%d%H%M%S)"
+    mkdir -p "$backup_dir"
+    for file in "$NSS_DIR"/cert*.db "$NSS_DIR"/key*.db "$NSS_DIR"/pkcs11.txt "$NSS_DIR"/secmod.db; do
+        [[ -e "$file" ]] || continue
+        mv "$file" "$backup_dir/"
+        moved=1
+    done
+    [[ "$moved" -eq 0 ]] || log "Backed up invalid Libreswan NSS database files to ${backup_dir}."
+}
+
+ensure_nss_db() {
+    mkdir -p "$NSS_DIR"
+
+    if command -v certutil >/dev/null 2>&1 && certutil -L -d "sql:${NSS_DIR}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if ! nss_db_files_exist; then
+        initialize_nss_db || fatal "Could not initialize Libreswan NSS database in ${NSS_DIR}."
+        return 0
+    fi
+
+    command -v certutil >/dev/null 2>&1 || \
+        fatal "certutil is required to validate existing Libreswan NSS database files in ${NSS_DIR}."
+    backup_nss_db_files
+    initialize_nss_db || fatal "Could not repair Libreswan NSS database in ${NSS_DIR}."
+}
+
 # Render managed Libreswan files from the persisted SQLite state before
 # supervisord starts the Libreswan program.
 main() {
@@ -31,6 +87,7 @@ main() {
     log "Rendering persisted Libreswan configuration."
     export PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
     (cd "$ROOT_DIR" && "$python_bin" -m daemons.libreswand.libreswand --render-only)
+    ensure_nss_db
 }
 
 main "$@"

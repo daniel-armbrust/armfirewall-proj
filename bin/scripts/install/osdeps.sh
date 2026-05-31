@@ -227,7 +227,7 @@ install_system_deps() {
         dnf)
             run_dnf_transaction upgrade
             run_dnf_transaction install ethtool net-tools \
-                                supervisor sqlite tar perl curl openssl rrdtool \
+                                supervisor sqlite tar perl curl openssl nss-tools rrdtool \
                                 traceroute mtr tcpdump dnsmasq
             install_python_runtime
             ;;
@@ -235,7 +235,7 @@ install_system_deps() {
             apt-get update
             run_apt_transaction_without_service_start upgrade
             run_apt_transaction_without_service_start install ethtool net-tools iproute2 iptables \
-                                                  supervisor sqlite3 tar perl curl openssl \
+                                                  supervisor sqlite3 tar perl curl openssl libnss3-tools \
                                                   rrdtool traceroute mtr tcpdump dnsmasq
             disable_packaged_armfirewall_services
             install_python_runtime
