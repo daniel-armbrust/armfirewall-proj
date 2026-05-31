@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from pathlib import Path
 
 from core import db
@@ -123,9 +124,11 @@ def render_connection_config(conn: LibreswanConnection) -> str:
             f"     encapsulation={conn.encapsulation}",
             f"     ikelifetime={conn.ikelifetime}",
             f"     salifetime={conn.salifetime}",
-            "",
         ]
     )
+    if conn.vti_addr:
+        lines.append(f"     leftvti={conn.vti_addr}")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -232,11 +235,25 @@ def configure_vti_interface(conn: LibreswanConnection) -> None:
     if not command_exists("ip"):
         raise RuntimeError("ip command was not found.")
 
-    if has_addr:
-        run_command(["ip", "addr", "replace", conn.vti_addr, "dev", conn.vti_interface], timeout=IPSEC_TIMEOUT_SECONDS)
-    if has_mtu:
-        run_command(["ip", "link", "set", "dev", conn.vti_interface, "mtu", str(conn.vti_mtu)], timeout=IPSEC_TIMEOUT_SECONDS)
-    run_command(["ip", "link", "set", "dev", conn.vti_interface, "up"], timeout=IPSEC_TIMEOUT_SECONDS)
+    interface_ready = False
+    for attempt in range(10):
+        show_result = run_command(["ip", "link", "show", "dev", conn.vti_interface], check=False, timeout=IPSEC_TIMEOUT_SECONDS)
+        if show_result.returncode == 0:
+            interface_ready = True
+            break
+        time.sleep(0.5)
+
+    if not interface_ready:
+        raise RuntimeError(f"VTI interface {conn.vti_interface} was not found.")
+
+    for attempt in range(3):
+        if has_addr:
+            run_command(["ip", "addr", "replace", conn.vti_addr, "dev", conn.vti_interface], timeout=IPSEC_TIMEOUT_SECONDS)
+        if has_mtu:
+            run_command(["ip", "link", "set", "dev", conn.vti_interface, "mtu", str(conn.vti_mtu)], timeout=IPSEC_TIMEOUT_SECONDS)
+        run_command(["ip", "link", "set", "dev", conn.vti_interface, "up"], timeout=IPSEC_TIMEOUT_SECONDS)
+        if attempt < 2:
+            time.sleep(0.5)
 
 
 def deactivate_previous_connection(request: LibreswanWorkRequest) -> None:
@@ -256,18 +273,23 @@ def activate_connections(connections: list[LibreswanConnection], request: Libres
 
     for conn in connections:
         run_ipsec(["--replace", conn.conn_name])
+        activation_error: Exception | None = None
         try:
             if conn.auto == "start":
                 run_ipsec(["--up", conn.conn_name])
             elif conn.auto in {"route", "ondemand"}:
                 run_ipsec(["--route", conn.conn_name])
+        except Exception as exc:
+            activation_error = exc
         finally:
             try:
                 configure_vti_interface(conn)
             except Exception as exc:
                 logger.error(f"Could not configure VTI interface {conn.vti_interface}: {exc}", source=LOG_SOURCE)
-                if sys.exc_info()[0] is None:
+                if activation_error is None:
                     raise
+        if activation_error is not None:
+            raise activation_error
 
 
 def supervisorctl(command: str, *args: str, check: bool = True) -> str:
