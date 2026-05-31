@@ -29,7 +29,8 @@ main() {
     [[ -n "$python_bin" ]] || fatal "python3 is required to render persisted Libreswan state."
 
     log "Rendering persisted Libreswan configuration."
-    "$python_bin" -m daemons.libreswand.libreswand --render-only
+    export PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+    (cd "$ROOT_DIR" && "$python_bin" -m daemons.libreswand.libreswand --render-only)
 }
 
 main "$@"
