@@ -405,11 +405,243 @@ a {
 .content {
     min-width: 0;
     min-height: 0;
-    padding: 0 0 24px;
+    padding: 0 0 132px;
     overflow-y: auto;
     overscroll-behavior: contain;
+    scroll-padding-bottom: 132px;
     scrollbar-color: var(--accent) var(--scroll-track);
     scrollbar-width: thin;
+}
+
+.fw-copilot {
+    --copilot-eye-x: 0px;
+    --copilot-eye-y: 0px;
+    --copilot-glow: 0.55;
+    position: fixed;
+    z-index: 60;
+    right: 18px;
+    bottom: 18px;
+    width: 92px;
+    height: 92px;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    padding: 0;
+    border: 0;
+    color: var(--accent);
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+}
+
+.fw-copilot-head {
+    position: relative;
+    width: 86px;
+    height: 86px;
+    display: grid;
+    place-items: center;
+    overflow: visible;
+    background: transparent;
+}
+
+.fw-copilot-name {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 4px);
+    min-width: 48px;
+    padding: 4px 8px;
+    border: 1px solid color-mix(in srgb, var(--accent) 58%, transparent);
+    background: color-mix(in srgb, var(--page) 92%, transparent);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+    text-transform: uppercase;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 4px);
+    transition: opacity 120ms ease, transform 120ms ease;
+    box-shadow: 0 0 14px var(--shadow);
+}
+
+.fw-copilot:hover .fw-copilot-name,
+.fw-copilot:focus-visible .fw-copilot-name {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.fw-copilot-portrait {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center;
+    filter: saturate(1.05) contrast(1.08);
+    position: relative;
+    z-index: 2;
+}
+
+.fw-copilot-eye {
+    position: absolute;
+    top: calc(51.4% - 4px);
+    width: 8px;
+    height: 8px;
+    display: block;
+    border-radius: 50%;
+    background: #34f28a;
+    box-shadow:
+        0 0 calc(7px * var(--copilot-glow)) rgba(52, 242, 138, 0.78),
+        0 0 calc(13px * var(--copilot-glow)) rgba(52, 242, 138, 0.32);
+    opacity: 0.86;
+    transform: translate(var(--copilot-eye-x), var(--copilot-eye-y)) scaleY(1);
+    transform-origin: center;
+    transition: transform 110ms ease-out, box-shadow 110ms ease-out;
+    animation: fw-copilot-eye-blink 6.4s ease-in-out infinite;
+    z-index: 1;
+}
+
+.fw-copilot[data-tracking="true"] .fw-copilot-eye {
+    animation: none;
+}
+
+.fw-copilot-eye.left {
+    left: calc(40.8% - 4px);
+}
+
+.fw-copilot-eye.right {
+    right: calc(40.8% - 4px);
+}
+
+.fw-copilot-cranium,
+.fw-copilot-face,
+.fw-copilot-plate,
+.fw-copilot-brow,
+.fw-copilot-nose,
+.fw-copilot-mouth,
+.fw-copilot-jaw,
+.fw-copilot-eye {
+    display: block;
+}
+
+.fw-copilot-cranium {
+    inset: 0 5px 20px;
+    border: 1px solid var(--line-hot);
+    border-bottom: 0;
+    border-radius: 24px 24px 13px 13px;
+    background:
+        linear-gradient(115deg, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 36%),
+        linear-gradient(180deg, color-mix(in srgb, var(--ink) 11%, transparent), var(--panel));
+    box-shadow: inset 0 0 18px color-mix(in srgb, var(--accent) 12%, transparent), 0 0 18px var(--shadow);
+}
+
+.fw-copilot-face {
+    left: 8px;
+    right: 8px;
+    top: 16px;
+    height: 42px;
+    border: 1px solid color-mix(in srgb, var(--accent) 72%, #ffffff 10%);
+    border-radius: 11px 11px 18px 18px;
+    background:
+        linear-gradient(90deg, transparent 0 44%, color-mix(in srgb, var(--accent-2) 35%, transparent) 45% 48%, transparent 49%),
+        linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 82%, #ffffff 8%), var(--page));
+    clip-path: polygon(10% 0, 90% 0, 100% 55%, 72% 100%, 28% 100%, 0 55%);
+}
+
+.fw-copilot-brow {
+    left: 8px;
+    right: 8px;
+    top: 9px;
+    height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 calc(7px * var(--copilot-glow)) var(--accent);
+}
+
+.fw-copilot-nose {
+    left: 50%;
+    top: 25px;
+    width: 10px;
+    height: 9px;
+    border-left: 1px solid color-mix(in srgb, var(--accent-2) 70%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent-2) 55%, transparent);
+    transform: translateX(-50%) skewX(-10deg);
+}
+
+.fw-copilot-mouth {
+    left: 15px;
+    right: 15px;
+    bottom: 9px;
+    height: 2px;
+    background: var(--line-hot);
+    opacity: 0.82;
+    box-shadow: 0 0 7px var(--shadow);
+}
+
+.fw-copilot-jaw {
+    left: 16px;
+    right: 16px;
+    bottom: 0;
+    height: 10px;
+    border: 1px solid color-mix(in srgb, var(--accent) 62%, transparent);
+    border-top: 0;
+    clip-path: polygon(0 0, 100% 0, 74% 100%, 26% 100%);
+    background: color-mix(in srgb, var(--panel) 88%, var(--accent) 12%);
+}
+
+.fw-copilot-plate {
+    top: 28px;
+    width: 8px;
+    height: 22px;
+    border: 1px solid color-mix(in srgb, var(--accent-2) 60%, transparent);
+    background: var(--panel);
+}
+
+.fw-copilot-plate.left {
+    left: 1px;
+    transform: skewY(14deg);
+}
+
+.fw-copilot-plate.right {
+    right: 1px;
+    transform: skewY(-14deg);
+}
+
+.fw-copilot:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 4px;
+}
+
+@keyframes fw-copilot-idle {
+    0%,
+    100% {
+        transform: perspective(220px) rotateY(-7deg) rotateX(0deg);
+    }
+    50% {
+        transform: perspective(220px) rotateY(7deg) rotateX(-2deg);
+    }
+}
+
+@keyframes fw-copilot-eye-blink {
+    0%,
+    88%,
+    94%,
+    100% {
+        transform: translate(var(--copilot-eye-x), var(--copilot-eye-y)) scaleY(1);
+    }
+    91% {
+        transform: translate(var(--copilot-eye-x), var(--copilot-eye-y)) scaleY(0.16);
+    }
+}
+
+@keyframes fw-copilot-pulse {
+    0% {
+        transform: scale(0.86);
+        opacity: 0.98;
+    }
+    100% {
+        transform: scale(1.32);
+        opacity: 0;
+    }
 }
 
 .page-head {
@@ -1850,7 +2082,20 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
     .content {
         overflow: visible;
-        padding-bottom: 0;
+        padding-bottom: 92px;
+        scroll-padding-bottom: 92px;
+    }
+
+    .fw-copilot {
+        right: 10px;
+        bottom: 10px;
+        width: 72px;
+        height: 72px;
+    }
+
+    .fw-copilot-head {
+        width: 66px;
+        height: 66px;
     }
 
     .page-head {
@@ -1992,5 +2237,16 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
     .routing-router-id {
         grid-column: 1 / -1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fw-copilot-eye,
+    .fw-copilot.is-pulsing .fw-copilot-head {
+        animation: none;
+    }
+
+    .fw-copilot-eye {
+        transition: none;
     }
 }

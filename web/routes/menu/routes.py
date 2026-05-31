@@ -10,7 +10,7 @@ from web.services.routingprotocols import views as routingprotocols_views
 router = APIRouter()
 
 PAGES = {
-    "/armfirewall/ia": "FW Copilot",
+    "/armfirewall/ia": "Adam (IA)",
     "/settings/users": "Users",
     "/settings/system": "Settings",
     "/network/interfaces": "Interfaces",
