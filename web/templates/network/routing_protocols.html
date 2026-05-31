@@ -1,38 +1,179 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if bird_installed %}
 <section class="page-head">
     <div>
-        <p class="eyebrow">network</p>
+        <p class="eyebrow">network/routing-protocols</p>
         <h1>Routing Protocols</h1>
     </div>
-    <div class="refresh-state">Ready</div>
 </section>
 
-{% if bird_installed %}
-<nav class="local-tabs routing-protocols-tabs" aria-label="Routing protocols menu">
-    <button class="local-tab active" type="button">RIP</button>
-    <button class="local-tab" type="button">OSPF</button>
-    <button class="local-tab" type="button">BGP</button>
-    <button class="local-tab" type="button">WORK REQUESTS</button>
-</nav>
-{% endif %}
+<section class="summary-grid compact" aria-label="Routing protocol summary">
+    <div class="metric">
+        <span class="metric-label">Daemon</span>
+        <strong id="routing-bird-state">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">BIRD Version</span>
+        <strong id="routing-bird-version">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">PID</span>
+        <strong id="routing-bird-pid">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Uptime</span>
+        <strong id="routing-bird-uptime">-</strong>
+    </div>
+</section>
 
-<section class="panel module-panel">
+<div class="routing-tabs-row">
+    <nav class="local-tabs routing-protocol-tabs" aria-label="Routing protocols menu">
+        <button class="local-tab active" type="button" data-routing-view="global-config">GLOBAL CONFIG</button>
+        <button class="local-tab" type="button" data-routing-view="rip">RIP</button>
+        <button class="local-tab" type="button" data-routing-view="ospf">OSPF</button>
+        <button class="local-tab" type="button" data-routing-view="bgp">BGP</button>
+    </nav>
+</div>
+
+<nav class="local-tabs service-action-tabs" aria-label="BIRD service controls">
+    <button class="local-tab" type="button" data-bird-service-action="start-restart">START / RESTART</button>
+    <button class="local-tab" type="button" data-bird-service-action="stop">STOP</button>
+    <button class="local-tab" type="button" data-routing-view="work-requests">WORK REQUESTS</button>
+</nav>
+
+<section id="routing-global-config-panel">
+    <form id="bird-global-settings-form">
+        <section class="panel" id="bird-daemon-settings-panel">
+            <div class="panel-head">
+                <h2>Daemon Settings</h2>
+                <span>bird.conf</span>
+            </div>
+            <div class="edit-form">
+            <div class="form-grid routing-settings-grid">
+                <label class="field routing-router-id">
+                    <span>Router ID</span>
+                    <input id="bird-router-id" name="router_id" type="text" placeholder="192.0.2.1" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>Device scan time</span>
+                    <input id="bird-device-scan-time" name="device_scan_time" type="number" min="1" max="3600" step="1">
+                </label>
+                <label class="field">
+                    <span>Kernel scan time</span>
+                    <input id="bird-kernel-scan-time" name="kernel_scan_time" type="number" min="1" max="3600" step="1">
+                </label>
+                <label class="field">
+                    <span>Kernel import</span>
+                    <select id="bird-kernel-import" name="kernel_import">
+                        <option value="all">all</option>
+                        <option value="none">none</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Kernel export</span>
+                    <select id="bird-kernel-export" name="kernel_export">
+                        <option value="all">all</option>
+                        <option value="none">none</option>
+                    </select>
+                </label>
+            </div>
+            <label class="check-line wide routing-check-start">
+                <input id="bird-kernel-learn" name="kernel_learn" type="checkbox">
+                <span>Learn kernel routes</span>
+            </label>
+            <label class="check-line wide">
+                <input id="bird-kernel-persist" name="kernel_persist" type="checkbox">
+                <span>Persist kernel routes</span>
+            </label>
+            <div class="form-actions">
+                <button class="text-button compact primary" type="submit">Apply</button>
+            </div>
+            <div class="form-status" id="bird-global-settings-status" hidden></div>
+            </div>
+        </section>
+    </form>
+</section>
+
+<section class="panel" id="bird-work-requests-panel" hidden>
     <div class="panel-head">
-        <h2>BIRD Routing Daemon</h2>
-        <span>service=bird</span>
+        <h2>Work Requests</h2>
+        <span id="bird-work-requests-count">requests=0</span>
     </div>
-    {% if bird_installed %}
-    <div class="terminal-empty compact">
-        <span class="prompt">$</span>
-        <span>Select a routing protocol to manage its BIRD configuration.</span>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                    <th>Updated</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="bird-work-requests-body">
+                <tr>
+                    <td colspan="5">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no BIRD work requests</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
-    {% else %}
+</section>
+
+<section class="panel" id="routing-rip-panel" hidden>
+    <div class="panel-head">
+        <h2>RIP</h2>
+        <span>protocol rip</span>
+    </div>
     <div class="terminal-empty">
         <span class="prompt">$</span>
-        <span>BIRD is not installed. Install it from Services / Status to enable routing protocols.</span>
+        <span>RIP configuration will be managed here.</span>
     </div>
-    {% endif %}
 </section>
+
+<section class="panel" id="routing-ospf-panel" hidden>
+    <div class="panel-head">
+        <h2>OSPF</h2>
+        <span>protocol ospf</span>
+    </div>
+    <div class="terminal-empty">
+        <span class="prompt">$</span>
+        <span>OSPF configuration will be managed here.</span>
+    </div>
+</section>
+
+<section class="panel" id="routing-bgp-panel" hidden>
+    <div class="panel-head">
+        <h2>BGP</h2>
+        <span>protocol bgp</span>
+    </div>
+    <div class="terminal-empty">
+        <span class="prompt">$</span>
+        <span>BGP configuration will be managed here.</span>
+    </div>
+</section>
+
+<div class="modal-backdrop" id="bird-action-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="bird-action-title">
+        <div class="modal-head">
+            <h2 id="bird-action-title">Confirm action</h2>
+            <button class="icon-button" type="button" data-bird-modal-cancel aria-label="Close">x</button>
+        </div>
+        <p class="modal-copy" id="bird-action-message">Run selected BIRD action?</p>
+        <div class="form-actions">
+            <button class="text-button compact" type="button" data-bird-modal-cancel>Cancel</button>
+            <button class="text-button compact primary" type="button" data-bird-modal-confirm>Confirm</button>
+        </div>
+    </section>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if bird_installed %}
+<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260608-work-requests-by-stop" defer></script>
+{% endif %}
 {% endblock %}

@@ -19,6 +19,7 @@ from web.routes.settings import routes as settings_routes
 from web.routes.services import routes as service_routes
 from web.routes.tools import routes as tools_routes
 from web.routes.workrequests import routes as workrequest_routes
+from web.services.api import service_installed
 
 
 app = FastAPI(title="ArmFirewall")
@@ -29,6 +30,7 @@ app.middleware("http")(auth.enforce_authentication)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/rrd-img", StaticFiles(directory=RRD_IMG_DIR), name="rrd_img")
 
+app.state.service_installed = service_installed
 
 app.include_router(login_routes.router)
 app.include_router(dashboard_routes.router)

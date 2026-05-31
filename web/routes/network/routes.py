@@ -8,6 +8,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from web.network import kernel_params as kernel_params_views
 from web.network import neighbor_table as neighbor_table_views
 from web.network import policy_routing as policy_routing_views
+from web.services.routingprotocols import api as routing_protocols_api
+from web.services.routingprotocols import views as routing_protocols_views
 
 
 router = APIRouter()
@@ -42,6 +44,19 @@ async def api_update_kernel_param_current_value(request: Request) -> dict[str, A
     """Update the runtime value for one allowed global kernel parameter."""
     payload = await request.json()
     return kernel_params_views.update_kernel_param_current_value(payload)
+
+
+@router.get("/api/network/routing-protocols/bird/global-settings")
+def api_bird_global_settings() -> dict[str, Any]:
+    """Return BIRD global daemon settings."""
+    return routing_protocols_api.get_global_settings()
+
+
+@router.put("/api/network/routing-protocols/bird/global-settings")
+async def api_save_bird_global_settings(request: Request) -> dict[str, Any]:
+    """Save BIRD global daemon settings."""
+    payload = await request.json()
+    return routing_protocols_api.save_global_settings(payload)
 
 
 @router.post("/api/network/policy-routing/tables")
@@ -106,3 +121,9 @@ def network_kernel_params(request: Request) -> HTMLResponse:
 def network_policy_routing(request: Request) -> HTMLResponse:
     """Render the policy routing page."""
     return policy_routing_views.render_policy_routing(request)
+
+
+@router.get("/network/routing-protocols", response_class=HTMLResponse)
+def network_routing_protocols(request: Request) -> HTMLResponse:
+    """Render the routing protocols page."""
+    return routing_protocols_views.render_routing_protocols(request)
