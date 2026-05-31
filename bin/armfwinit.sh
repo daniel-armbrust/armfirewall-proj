@@ -50,6 +50,9 @@ main() {
     # Reapply persisted policy routing tables, routes, and rules.
     "$ROOT_DIR/bin/scripts/startpre/routetable.sh" || fatal "Could not apply persisted policy routing state."
 
+    # Re-render persisted Libreswan configuration before supervisord starts it.
+    "$ROOT_DIR/bin/scripts/startpre/libreswan.sh" || fatal "Could not render persisted Libreswan configuration."
+
     log "ArmFirewall pre-start completed successfully."
 }
 

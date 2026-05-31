@@ -19,6 +19,7 @@ export DB_DIR="$ROOT_DIR/db"
 export IFACE_DB="$DB_DIR/iface.db"
 export PROC_DB="${PROC_DB:-$DB_DIR/proc.db}"
 export POLICY_ROUTING_DB="${POLICY_ROUTING_DB:-$DB_DIR/policy-routing.db}"
+export LIBRESWAN_DB="${LIBRESWAN_DB:-$DB_DIR/libreswan.db}"
 export LAN_IFACE="${LAN_IFACE:-}"
 export WAN_IFACE="${WAN_IFACE:-}"
 export ROUTER_MODE="${ROUTER_MODE:-0}"
@@ -141,38 +142,6 @@ sqlite_query() {
     sqlite3 -noheader -separator "$SQLITE_QUERY_SEPARATOR" "$db_path" "$sql"
 }
 
-# Record that an install-time apply already reached the operating system.
-record_install_apply_work_request() {
-    local category_name="$1"
-    local applied_by="$2"
-    local work_db="$DB_DIR/work-requests.db"
-    local request_uid="install-${category_name}"
-    local payload
-
-    [[ -f "$work_db" ]] || fatal "SQLite database was not found: ${work_db}."
-
-    payload="{\"source\":\"install\",\"applied_by\":\"${applied_by}\"}"
-
-    sqlite_exec "$work_db" "
-        INSERT INTO work_requests (
-            request_uid, source, category_name, action_name,
-            target_rule_id, priority, status, payload_json,
-            error_message, created_at, updated_at
-        ) VALUES (
-            $(sql_quote "$request_uid"), 'system', $(sql_quote "$category_name"), 'apply',
-            NULL, 999, 'success', $(sql_quote "$payload"),
-            NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        )
-        ON CONFLICT(request_uid) DO UPDATE SET
-            source = 'system',
-            action_name = 'apply',
-            status = 'success',
-            payload_json = excluded.payload_json,
-            error_message = NULL,
-            updated_at = CURRENT_TIMESTAMP;
-    "
-}
-
 # Return whether one table exists in a SQLite database.
 sqlite_table_exists() {
     local db_path="$1"
@@ -210,8 +179,6 @@ filter_db_for_family() {
         fallback="$IPV4_FILTER_FALLBACK_DB"
     fi
 
-    sqlite_table_exists "$preferred" "filter_chain_policies" && printf '%s\n' "$preferred" && return 0
-    sqlite_table_exists "$fallback" "filter_chain_policies" && printf '%s\n' "$fallback" && return 0
     [[ -f "$preferred" ]] && printf '%s\n' "$preferred" && return 0
     [[ -f "$fallback" ]] && printf '%s\n' "$fallback" && return 0
     printf '%s\n' "$preferred"

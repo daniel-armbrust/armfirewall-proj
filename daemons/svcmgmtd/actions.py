@@ -15,6 +15,7 @@ from .supervisor import (
     register_supervisor_program,
     remove_supervisor_program,
     reread_and_update,
+    set_supervisor_program_autostart,
     sync_supervisor_statuses,
     supervisor_command,
     supervisor_program_exists,
@@ -51,21 +52,9 @@ def restart_service(service_name: str) -> None:
         raise RuntimeError(f"Service {service_name} did not return to RUNNING after restart: {state}")
 
 
-def initialize_libreswan_nss() -> None:
-    """Ensure the Libreswan NSS database exists before Pluto is started."""
-    run_bounded_command(["ipsec", "checknss"], timeout=60)
-
-
-def run_post_install_tasks(service: OptionalService) -> None:
-    """Run service-specific initialization after package installation."""
-    if service.name == "libreswan":
-        initialize_libreswan_nss()
-
-
 def install_service(service: OptionalService) -> None:
     """Install a package and register its supervisor program."""
     install_package(service.package)
-    run_post_install_tasks(service)
     register_supervisor_program(service)
     reread_and_update()
     sync_supervisor_statuses()
@@ -95,22 +84,29 @@ def control_service(service: ControllableService, action: str) -> None:
     
     if action == "start":
         if state == "RUNNING":
+            set_supervisor_program_autostart(service_name, True)
             logger.log(f"Service {service_name} is already running.", source=LOG_SOURCE)
             return
         supervisor_command("start", service_name, timeout=60)
+        set_supervisor_program_autostart(service_name, True)
     elif action == "stop":
         if state != "RUNNING":
+            set_supervisor_program_autostart(service_name, False)
             logger.log(f"Service {service_name} is already stopped.", source=LOG_SOURCE)
             return
         supervisor_command("stop", service_name, timeout=60)
+        set_supervisor_program_autostart(service_name, False)
     elif action == "restart":
         if service_name == "armfirewall-api":
             validate_api_restart_readiness(state)
             restart_service(service_name)
+            set_supervisor_program_autostart(service_name, True)
         elif state == "RUNNING":
             restart_service(service_name)
+            set_supervisor_program_autostart(service_name, True)
         else:
             supervisor_command("start", service_name, timeout=60)
+            set_supervisor_program_autostart(service_name, True)
     else:
         raise RuntimeError(f"Unsupported service control action: {action}")
 

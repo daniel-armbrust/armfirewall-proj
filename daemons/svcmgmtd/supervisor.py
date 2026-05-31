@@ -61,6 +61,48 @@ def remove_supervisor_program(service_name: str) -> None:
         SUPERVISOR_CONF.write_text("\n".join(output).rstrip() + "\n", encoding="utf-8")
 
 
+def set_supervisor_program_autostart(service_name: str, enabled: bool) -> None:
+    """Persist the autostart setting for one registered supervisor program."""
+    if not SUPERVISOR_CONF.exists():
+        raise RuntimeError(f"ArmFirewall supervisord.conf was not found: {SUPERVISOR_CONF}")
+
+    lines = SUPERVISOR_CONF.read_text(encoding="utf-8").splitlines()
+    section = f"[program:{service_name}]"
+    target_value = f"autostart={'true' if enabled else 'false'}"
+    output: list[str] = []
+    in_section = False
+    section_found = False
+    autostart_found = False
+
+    for line in lines:
+        if line.strip() == section:
+            in_section = True
+            section_found = True
+            autostart_found = False
+            output.append(line)
+            continue
+
+        if in_section and line.startswith("[") and line.endswith("]"):
+            if not autostart_found:
+                output.append(target_value)
+            in_section = False
+
+        if in_section and line.strip().startswith("autostart="):
+            output.append(target_value)
+            autostart_found = True
+            continue
+
+        output.append(line)
+
+    if in_section and not autostart_found:
+        output.append(target_value)
+
+    if not section_found:
+        raise RuntimeError(f"Supervisor program is not registered: {service_name}")
+
+    SUPERVISOR_CONF.write_text("\n".join(output).rstrip() + "\n", encoding="utf-8")
+
+
 def reread_and_update() -> None:
     """Refresh supervisord program definitions."""
     supervisor_command("reread", check=False)

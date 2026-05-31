@@ -404,24 +404,42 @@ def apply_config(request: LibreswanWorkRequest) -> None:
     logger.log("Libreswan configuration files were rendered, service was restarted, and enabled tunnels were loaded.", source=LOG_SOURCE)
 
 
+def render_config_only() -> None:
+    """Render SQLite Libreswan settings without touching running services."""
+    connections = load_connections()
+    active_connections = render_files(connections)
+    logger.log(f"Rendered Libreswan configuration for {len(active_connections)} enabled tunnel(s).", source=LOG_SOURCE)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the work request executor argument parser."""
     parser = argparse.ArgumentParser(description="ArmFirewall Libreswan configuration executor.")
-    parser.add_argument("--work-request-id", required=True)
-    parser.add_argument("--request-uid", required=True)
-    parser.add_argument("--category-name", required=True)
-    parser.add_argument("--category", required=True)
+    parser.add_argument("--render-only", action="store_true", help="Only render files from SQLite state.")
+    parser.add_argument("--work-request-id")
+    parser.add_argument("--request-uid")
+    parser.add_argument("--category-name")
+    parser.add_argument("--category")
     parser.add_argument("--family", required=False)
-    parser.add_argument("--target-name", required=True)
-    parser.add_argument("--action-name", required=True)
+    parser.add_argument("--target-name")
+    parser.add_argument("--action-name")
     parser.add_argument("--target-rule-id", required=False)
-    parser.add_argument("--payload-json", required=True)
+    parser.add_argument("--payload-json")
     return parser
 
 
 def main() -> int:
     """Execute one Libreswan work request."""
     args = build_parser().parse_args()
+    if args.render_only:
+        db.verify_database(LIBRESWAN_DB_PATH)
+        render_config_only()
+        return 0
+
+    required_args = ("work_request_id", "request_uid", "category_name", "category", "target_name", "action_name", "payload_json")
+    missing = [f"--{name.replace('_', '-')}" for name in required_args if not getattr(args, name)]
+    if missing:
+        raise RuntimeError(f"Missing required argument(s): {', '.join(missing)}")
+
     request = request_from_args(args)
     validate_request(request)
     db.verify_databases(LIBRESWAN_DB_PATH, WORK_REQUEST_DB_PATH)
