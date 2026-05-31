@@ -246,7 +246,8 @@ def configure_vti_interface(conn: LibreswanConnection) -> None:
     if not interface_ready:
         raise RuntimeError(f"VTI interface {conn.vti_interface} was not found.")
 
-    mtu_applied = not has_mtu
+    stable_checks = 0
+    required_stable_checks = 5
     for attempt in range(30):
         if has_addr:
             run_command(["ip", "addr", "replace", conn.vti_addr, "dev", conn.vti_interface], timeout=IPSEC_TIMEOUT_SECONDS)
@@ -254,16 +255,19 @@ def configure_vti_interface(conn: LibreswanConnection) -> None:
             run_command(["ip", "link", "set", "dev", conn.vti_interface, "mtu", str(conn.vti_mtu)], timeout=IPSEC_TIMEOUT_SECONDS)
         run_command(["ip", "link", "set", "dev", conn.vti_interface, "up"], timeout=IPSEC_TIMEOUT_SECONDS)
 
-        if has_mtu:
+        if not has_mtu:
+            stable_checks += 1
+        else:
             link_result = run_command(["ip", "-o", "link", "show", "dev", conn.vti_interface], check=False, timeout=IPSEC_TIMEOUT_SECONDS)
             mtu_applied = f" mtu {conn.vti_mtu} " in f" {link_result.stdout.strip()} "
+            stable_checks = stable_checks + 1 if mtu_applied else 0
 
-        if mtu_applied:
+        if stable_checks >= required_stable_checks:
             break
         if attempt < 29:
             time.sleep(0.5)
 
-    if not mtu_applied:
+    if stable_checks < required_stable_checks:
         raise RuntimeError(f"VTI interface {conn.vti_interface} did not keep MTU {conn.vti_mtu}.")
 
 
