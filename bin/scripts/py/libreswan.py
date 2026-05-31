@@ -25,6 +25,7 @@ FIELD_OPTIONS = {
     "mark": "mark",
     "vti_interface": "vti_interface",
     "vti_addr": "vti_addr",
+    "vti_mtu": "vti_mtu",
     "vti_routing": "vti_routing",
     "ikev2": "ikev2",
     "ike": "ike",
@@ -237,6 +238,7 @@ def add_connection_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--mark")
     parser.add_argument("--vti-interface")
     parser.add_argument("--vti-addr")
+    parser.add_argument("--vti-mtu")
     parser.add_argument("--vti-routing", choices=sorted(api.YES_NO_VALUES))
     parser.add_argument("--ikev2", choices=sorted(api.IKEV2_VALUES))
     parser.add_argument("--ike")
@@ -271,9 +273,10 @@ def build_parser() -> argparse.ArgumentParser:
             --left-id 137.131.222.14 \\
             --shared-secret secret \\
             --ikev2 insist \\
-            --vti-addr 169.254.10.2/30
+            --vti-addr 169.254.10.2/30 \\
+            --vti-mtu 1400
 
-          libreswan.sh update --id 1 --ikev2 insist --vti-routing yes
+          libreswan.sh update --id 1 --ikev2 insist --vti-routing yes --vti-mtu 1400
           libreswan.sh list
           libreswan.sh show --id 1
         """
@@ -422,7 +425,7 @@ def list_connections() -> None:
         Uses the same API as the GUI to retrieve connections and IPsec status,
         prints a message when no connections exist, or renders a compact table
         with ID, name, enabled flag, IPsec state, left/right endpoints, and VTI
-        interface/address.
+        interface/address and MTU.
 
     Parameters:
         None.
@@ -441,6 +444,7 @@ def list_connections() -> None:
     
     for row in rows:
         vti_addr = f"/{row['vti_addr']}" if row.get("vti_addr") else ""
+        vti_mtu = f" mtu={row['vti_mtu']}" if int(row.get("vti_mtu") or 0) > 0 else ""
         
         print(
             f"{row['id']:<3} "
@@ -449,7 +453,7 @@ def list_connections() -> None:
             f"{str(row.get('ipsec_status', 'down')).upper():<6} "
             f"{str(row['left_addr'])[:20]:<20} "
             f"{str(row['right_addr'])[:20]:<20} "
-            f"{row['vti_interface']}{vti_addr}"
+            f"{row['vti_interface']}{vti_addr}{vti_mtu}"
         )
 
 

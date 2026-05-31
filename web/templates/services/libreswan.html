@@ -101,6 +101,10 @@
                 <input id="libreswan-vti-addr" name="vti_addr" type="text" autocomplete="off" inputmode="decimal" placeholder="169.254.10.2/30" maxlength="18" data-ipv4-cidr>
             </label>
             <label class="field libreswan-field-half">
+                <span>VTI MTU</span>
+                <input id="libreswan-vti-mtu" name="vti_mtu" type="number" autocomplete="off" inputmode="numeric" placeholder="1400" min="576" max="9000">
+            </label>
+            <label class="field libreswan-field-half">
                 <span>VTI routing</span>
                 <select id="libreswan-vti-routing" name="vti_routing">
                     <option value="no">no</option>
@@ -214,5 +218,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_libreswan.js') }}?v=20260530-libreswan-vti-cidr" defer></script>
+<script src="{{ url_for('static', path='/js/services_libreswan.js') }}?v=20260605-libreswan-vti-mtu" defer></script>
 {% endblock %}

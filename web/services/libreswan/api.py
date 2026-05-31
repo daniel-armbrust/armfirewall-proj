@@ -35,6 +35,8 @@ def ensure_libreswan_schema() -> None:
         columns = {str(row["name"]) for row in db.execute_on(conn, "PRAGMA table_info(libreswan_connections)").fetchall()}
         if "vti_addr" not in columns:
             db.execute_on(conn, "ALTER TABLE libreswan_connections ADD COLUMN vti_addr TEXT NOT NULL DEFAULT ''")
+        if "vti_mtu" not in columns:
+            db.execute_on(conn, "ALTER TABLE libreswan_connections ADD COLUMN vti_mtu INTEGER NOT NULL DEFAULT 0")
 
 
 def get_libreswan_work_requests(limit: int = 50) -> dict[str, Any]:
@@ -201,6 +203,25 @@ def cidr_value(payload: dict[str, Any], name: str) -> str:
         raise ValueError(f"{name} must be an IPv4 address and mask, for example 169.254.10.2/30.")
 
     return value
+
+
+def mtu_value(payload: dict[str, Any], name: str) -> int:
+    """Return a validated optional interface MTU value."""
+    value = text_value(payload, name)
+    if not value:
+        return 0
+
+    try:
+        mtu = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number between 576 and 9000.") from exc
+
+    if mtu == 0:
+        return 0
+    if mtu < 576 or mtu > 9000:
+        raise ValueError(f"{name} must be a number between 576 and 9000.")
+
+    return mtu
 
 
 def vti_number(name: str) -> int:
@@ -385,6 +406,7 @@ def connection_payload(payload: dict[str, Any], *, connection_id: int | None = N
     mark = text_value(payload, "mark")
     vti_interface = text_value(payload, "vti_interface")
     vti_addr = cidr_value(payload, "vti_addr")
+    vti_mtu = mtu_value(payload, "vti_mtu")
 
     if not left_addr:
         raise ValueError("Left address is required.")
@@ -432,6 +454,7 @@ def connection_payload(payload: dict[str, Any], *, connection_id: int | None = N
         "mark": mark,
         "vti_interface": vti_interface,
         "vti_addr": vti_addr,
+        "vti_mtu": vti_mtu,
         "vti_routing": choice_value(payload, "vti_routing", YES_NO_VALUES, "no"),
         "ikev2": choice_value(payload, "ikev2", IKEV2_VALUES, "no"),
         "ike": text_value(payload, "ike", "aes_cbc256-sha2_384;modp1536") or "aes_cbc256-sha2_384;modp1536",
@@ -484,9 +507,9 @@ def create_connection(payload: dict[str, Any]) -> dict[str, Any]:
                 INSERT INTO libreswan_connections (
                     conn_name, description, enabled, left_addr, left_id, right_addr,
                     authby, shared_secret, leftsubnet, rightsubnet, auto, mark, vti_interface,
-                    vti_addr, vti_routing, ikev2, ike, phase2alg, encapsulation,
+                    vti_addr, vti_mtu, vti_routing, ikev2, ike, phase2alg, encapsulation,
                     ikelifetime, salifetime
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 tuple(item[name] for name in CONNECTION_FIELDS),
             )
@@ -538,6 +561,7 @@ def update_connection(connection_id: int, payload: dict[str, Any]) -> dict[str, 
                    mark = ?,
                    vti_interface = ?,
                    vti_addr = ?,
+                   vti_mtu = ?,
                    vti_routing = ?,
                    ikev2 = ?,
                    ike = ?,

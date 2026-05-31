@@ -349,6 +349,7 @@
             mark: field("libreswan-mark").value,
             vti_interface: field("libreswan-vti-interface").value,
             vti_addr: field("libreswan-vti-addr").value,
+            vti_mtu: field("libreswan-vti-mtu").value,
             vti_routing: field("libreswan-vti-routing").value,
             ikev2: field("libreswan-ikev2").value,
             ike: field("libreswan-ike").value,
@@ -384,6 +385,7 @@
         setNextMark();
         setNextVtiInterface();
         field("libreswan-vti-addr").value = "";
+        field("libreswan-vti-mtu").value = "";
         field("libreswan-vti-routing").value = "no";
         field("libreswan-ikev2").value = "no";
         field("libreswan-ike").value = "aes_cbc256-sha2_384;modp1536";
@@ -427,6 +429,7 @@
         field("libreswan-mark").value = item.mark || "";
         field("libreswan-vti-interface").value = item.vti_interface || "";
         field("libreswan-vti-addr").value = item.vti_addr || "";
+        field("libreswan-vti-mtu").value = Number(item.vti_mtu || 0) > 0 ? String(item.vti_mtu) : "";
         field("libreswan-vti-routing").value = item.vti_routing || "no";
         field("libreswan-ikev2").value = item.ikev2 || "no";
         setSelectValue("libreswan-ike", item.ike || "aes_cbc256-sha2_384;modp1536");
@@ -477,7 +480,7 @@
                     <strong>${HF.escapeHtml(item.right_addr)}</strong>
                 </td>
                 <td>${HF.escapeHtml(item.leftsubnet)} -> ${HF.escapeHtml(item.rightsubnet)}</td>
-                <td>${HF.escapeHtml(item.vti_interface)}${item.vti_addr ? `<br><span class="muted">${HF.escapeHtml(item.vti_addr)}</span>` : ""}<br><span class="muted">mark=${HF.escapeHtml(item.mark)}</span></td>
+                <td>${HF.escapeHtml(item.vti_interface)}${item.vti_addr ? `<br><span class="muted">${HF.escapeHtml(item.vti_addr)}</span>` : ""}${Number(item.vti_mtu || 0) > 0 ? `<br><span class="muted">mtu=${HF.escapeHtml(item.vti_mtu)}</span>` : ""}<br><span class="muted">mark=${HF.escapeHtml(item.mark)}</span></td>
                 <td>${HF.escapeHtml(item.ikev2)}<br><span class="muted">${HF.escapeHtml(item.ike)}</span></td>
                 <td class="table-actions">
                     <button class="text-button compact" type="button" data-libreswan-edit="${HF.escapeHtml(item.id)}">Edit</button>
