@@ -319,21 +319,97 @@ record_default_filter_policies() {
     record_filter_policy ipv6 FORWARD DROP
 }
 
-# Record successful system apply state for firewall rules created during install.
-record_initial_filter_apply_state() {
-    local category_name
+# Return a JSON array with enabled rule ids for one filter table.
+filter_rule_ids_json() {
+    local db_path="$1"
+    local table_name="$2"
 
-    for category_name in \
-        FIREWALL_RULES.IPV4.filter_input_rules \
-        FIREWALL_RULES.IPV4.filter_forward_rules \
-        FIREWALL_RULES.IPV4.filter_output_rules \
-        FIREWALL_RULES.IPV6.filter_input_rules \
-        FIREWALL_RULES.IPV6.filter_forward_rules \
-        FIREWALL_RULES.IPV6.filter_output_rules; do
-        record_install_apply_work_request "$category_name" "fwrules.sh"
-    done
+    sqlite_query "$db_path" "
+        SELECT '[' || COALESCE(group_concat(id), '') || ']'
+        FROM (
+            SELECT id
+            FROM ${table_name}
+            WHERE enabled = 1 AND COALESCE(pending_delete, 0) = 0
+            ORDER BY rule_order, id
+        );
+    "
 }
 
+# Return the persisted policy for one filter chain.
+filter_policy_for_chain() {
+    local db_path="$1"
+    local chain_name="$2"
+    local fallback="$3"
+    local policy
+
+    policy="$(sqlite_query "$db_path" "SELECT policy FROM filter_chain_policies WHERE chain_name=$(sql_quote "$chain_name") LIMIT 1;")"
+    [[ -n "$policy" ]] && printf '%s\n' "$policy" || printf '%s\n' "$fallback"
+}
+
+# Return a generated request UID.
+new_request_uid() {
+    if [[ -r /proc/sys/kernel/random/uuid ]]; then
+        cat /proc/sys/kernel/random/uuid
+    elif command -v uuidgen >/dev/null 2>&1; then
+        uuidgen
+    else
+        printf 'install-%s-%s\n' "$(date +%s)" "$RANDOM"
+    fi
+}
+
+# Record one install-time firewall apply work request when the queue exists.
+record_install_filter_apply_work_request() {
+    local family="$1"
+    local chain_name="$2"
+    local table_name="$3"
+    local policy_fallback="$4"
+    local db_path family_upper category_name rule_ids policy request_uid payload
+
+    db_path="$(filter_rules_db "$family")"
+    family_upper="${family^^}"
+    category_name="FIREWALL_RULES.${family_upper}.${table_name}"
+
+    [[ -f "$WORK_REQUEST_DB" ]] || return 0
+    sqlite_table_exists "$WORK_REQUEST_DB" "work_requests" || return 0
+    sqlite_table_exists "$WORK_REQUEST_DB" "work_request_events" || return 0
+    sqlite_table_exists "$db_path" "$table_name" || return 0
+
+    rule_ids="$(filter_rule_ids_json "$db_path" "$table_name")"
+    policy="$(filter_policy_for_chain "$db_path" "$chain_name" "$policy_fallback")"
+    request_uid="$(new_request_uid)"
+    payload="{\"family\":\"${family_upper}\",\"chain\":\"${chain_name}\",\"table\":\"${table_name}\",\"policy\":\"${policy}\",\"rule_ids\":${rule_ids:-[]},\"delete_rule_ids\":[]}"
+
+    sqlite_exec "$WORK_REQUEST_DB" "
+        INSERT INTO work_requests (
+            request_uid, source, category_name, action_name,
+            target_rule_id, priority, status, payload_json
+        ) VALUES (
+            $(sql_quote "$request_uid"),
+            'system',
+            $(sql_quote "$category_name"),
+            'apply',
+            NULL,
+            90,
+            'queue',
+            $(sql_quote "$payload")
+        );
+
+        INSERT INTO work_request_events (work_request_id, event_type, message)
+        VALUES (
+            last_insert_rowid(),
+            'queue',
+            $(sql_quote "Queued install-time apply for ${category_name}.")
+        );
+    "
+}
+
+# Record install-time apply requests for the default filter chains.
+record_install_apply_work_request() {
+    record_install_filter_apply_work_request ipv4 INPUT filter_input_rules DROP
+    record_install_filter_apply_work_request ipv4 FORWARD filter_forward_rules DROP
+    record_install_filter_apply_work_request ipv6 INPUT filter_input_rules DROP
+    record_install_filter_apply_work_request ipv6 FORWARD filter_forward_rules DROP
+}
 
 # Set restrictive default policies for IPv4 and IPv6 filter chains.
 set_default_filter_policies() {
@@ -373,13 +449,13 @@ allow_lan_services() {
 main() {
     [[ -n "${LAN_IFACE:-}" ]] || fatal "LAN_IFACE is not set."
 
+    allow_lan_services "$LAN_IFACE"
     record_conntrack_base_rules
     apply_conntrack_base_rules
-    allow_lan_services "$LAN_IFACE"
     allow_required_icmpv6
     record_default_filter_policies
     set_default_filter_policies
-    record_initial_filter_apply_state
+    record_install_apply_work_request
 }
 
 main "$@"
