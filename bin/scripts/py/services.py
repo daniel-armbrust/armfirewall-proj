@@ -4,11 +4,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import textwrap
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 
 def script_dir() -> Path:
@@ -107,6 +108,83 @@ services_catalog.SERVICES_DB_PATH = core_constants.SERVICES_DB_PATH
 workrequests_api.WORK_REQUEST_DB_PATH = core_constants.WORK_REQUEST_DB_PATH
 
 
+def parse_supervisor_status_line(line: str) -> Optional[dict[str, str]]:
+    """Parse one supervisorctl status line."""
+    parts = line.split(None, 2)
+    if len(parts) < 2:
+        return None
+
+    details = parts[2] if len(parts) > 2 else ""
+    pid = "-"
+    uptime = "-"
+
+    if "pid " in details:
+        pid = details.split("pid ", 1)[1].split(",", 1)[0].strip()
+    if "uptime " in details:
+        uptime = details.split("uptime ", 1)[1].strip()
+
+    return {
+        "name": parts[0],
+        "state": parts[1],
+        "pid": pid,
+        "uptime": uptime,
+        "details": details or "-",
+    }
+
+
+def live_supervisor_statuses() -> Optional[dict[str, dict[str, str]]]:
+    """Return current supervisor statuses, or None when supervisorctl is unavailable."""
+    supervisorctl = shutil.which("supervisorctl")
+    supervisor_conf = GLOBALS.get("SUPERVISORD_CONF")
+
+    if not supervisorctl or not supervisor_conf or not Path(supervisor_conf).exists():
+        return None
+
+    completed = subprocess.run(
+        [supervisorctl, "-c", supervisor_conf, "status"],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    output = completed.stdout or completed.stderr
+    if not output.strip():
+        return None
+
+    rows: dict[str, dict[str, str]] = {}
+    for line in output.splitlines():
+        row = parse_supervisor_status_line(line)
+        if row:
+            rows[row["name"]] = row
+    return rows
+
+
+def apply_live_status(data: dict[str, Any]) -> dict[str, Any]:
+    """Overlay service status payloads with fresh supervisorctl state."""
+    supervisor_rows = live_supervisor_statuses()
+    if supervisor_rows is None:
+        return data
+
+    for group_name in ("services", "optional_services"):
+        for service in data.get(group_name, []):
+            live = supervisor_rows.get(str(service.get("name") or ""))
+            if live is None:
+                service["installed"] = False
+                service["state"] = "NOT INSTALLED"
+                service["pid"] = "-"
+                service["uptime"] = "-"
+                service["details"] = "Missing from supervisord.conf"
+                continue
+
+            service["installed"] = True
+            service["state"] = live["state"]
+            service["pid"] = live["pid"]
+            service["uptime"] = live["uptime"]
+            service["details"] = live["details"]
+
+    return data
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser for service management."""
     examples = textwrap.dedent(
@@ -176,7 +254,7 @@ def service_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 def list_services(as_json: bool = False) -> None:
     """Print service status in a table or as JSON."""
-    data = services_api.services_status()
+    data = apply_live_status(services_api.services_status())
     if as_json:
         print_json(data)
         return
