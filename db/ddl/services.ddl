@@ -154,17 +154,4 @@ stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 ',
         130
-    ),
-    (
-        'adam-copilot',
-        'Adam Firewall CoPilot',
-        'ai-assistant',
-        'ArmFirewall virtual assistant for firewall analysis and operations.',
-        'optional',
-        0,
-        0,
-        NULL,
-        NULL,
-        NULL,
-        140
     );
