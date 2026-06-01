@@ -1546,6 +1546,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     outline: none;
 }
 
+.field select[multiple] {
+    min-height: 124px;
+}
+
 .field input:focus,
 .field select:focus {
     border-color: var(--line-hot);
@@ -2444,6 +2448,27 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     grid-column: 1 / -1;
 }
 
+.password-field-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 30px;
+    align-items: center;
+    gap: 6px;
+}
+
+.password-field-control input {
+    min-width: 0;
+}
+
+.password-visibility-toggle {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+}
+
+.routing-rip-interfaces {
+    grid-column: 1;
+}
+
 .routing-check-start {
     margin-top: 14px;
 }
@@ -2500,6 +2525,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     }
 
     .routing-router-id {
+        grid-column: 1 / -1;
+    }
+
+    .routing-rip-interfaces {
         grid-column: 1 / -1;
     }
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import re
 import shutil
 import subprocess
@@ -502,6 +503,7 @@ def default_rip_settings() -> dict[str, Any]:
         "enabled": False,
         "version": "2",
         "mode": "multicast",
+        "iface_names": [BIRD_ANY_INTERFACE],
         "multicast_addr": "224.0.0.9",
         "passive": False,
         "port": 520,
@@ -521,10 +523,19 @@ def rip_settings_from_db() -> dict[str, Any]:
         row = db.fetch_one_on(conn, "SELECT * FROM proto_rip ORDER BY id LIMIT 1")
     if row is None:
         return settings
+    iface_names = [BIRD_ANY_INTERFACE]
+    if "iface_names" in row.keys():
+        try:
+            loaded_iface_names = json.loads(str(row["iface_names"] or "[]"))
+        except json.JSONDecodeError:
+            loaded_iface_names = []
+        if isinstance(loaded_iface_names, list):
+            iface_names = [str(item) for item in loaded_iface_names if str(item).strip()] or [BIRD_ANY_INTERFACE]
     return {
         "enabled": bool(row["enabled"]),
         "version": str(row["version"]),
         "mode": str(row["mode"]),
+        "iface_names": iface_names,
         "multicast_addr": str(row["multicast_addr"]),
         "passive": bool(row["passive"]),
         "port": int(row["port"]),
@@ -534,6 +545,31 @@ def rip_settings_from_db() -> dict[str, Any]:
         "authentication": str(row["authentication"]),
         "password": str(row["password"] or ""),
     }
+
+
+def rip_iface_names_setting(value: Any) -> list[str]:
+    """Normalize RIP interface selection."""
+    if isinstance(value, str):
+        items = [value]
+    elif isinstance(value, list):
+        items = value
+    else:
+        items = []
+    selected = []
+    for item in items:
+        iface_name = str(item or "").strip()
+        if not iface_name:
+            continue
+        if iface_name.lower() == "all" or iface_name == BIRD_ANY_INTERFACE:
+            return [BIRD_ANY_INTERFACE]
+        selected.append(iface_name)
+    if not selected:
+        return [BIRD_ANY_INTERFACE]
+    valid_names = {str(item.get("name") or "") for item in interfaces()}
+    unknown = [item for item in selected if item not in valid_names]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown RIP interface: {unknown[0]}.")
+    return list(dict.fromkeys(selected))
 
 
 def normalize_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
@@ -546,7 +582,7 @@ def normalize_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
         choices=BIRD_RIP_AUTHENTICATIONS,
         default="none",
     )
-    default_addr = "ff02::9" if version == "ng" else "255.255.255.255" if version == "1" else "224.0.0.9"
+    default_addr = "ff02::9" if version == "ng" else "255.255.255.255" if version == "1" or mode == "broadcast" else "224.0.0.9"
     default_port = 521 if version == "ng" else 520
     multicast_addr = ip_address_setting(payload.get("multicast_addr") or default_addr, field="multicast_addr")
     port = int_setting(payload.get("port"), default=default_port, minimum=1, maximum=65535, field="port")
@@ -561,8 +597,12 @@ def normalize_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
         mode = "broadcast"
         multicast_addr = "255.255.255.255"
         port = 520
-    elif multicast_addr != "224.0.0.9" or port != 520:
-        raise HTTPException(status_code=400, detail="RIPv2 must use multicast address 224.0.0.9 and port 520.")
+    elif version == "2":
+        port = 520
+        if mode == "broadcast":
+            multicast_addr = "255.255.255.255"
+        elif multicast_addr != "224.0.0.9":
+            raise HTTPException(status_code=400, detail="RIPv2 multicast mode must use multicast address 224.0.0.9.")
     if authentication != "none" and not password:
         raise HTTPException(status_code=400, detail="password is required when authentication is enabled.")
     if authentication == "none":
@@ -571,6 +611,7 @@ def normalize_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
         "enabled": bool_setting(payload.get("enabled", True)),
         "version": version,
         "mode": mode,
+        "iface_names": rip_iface_names_setting(payload.get("iface_names")),
         "multicast_addr": multicast_addr,
         "passive": bool_setting(payload.get("passive", False)),
         "port": port,
@@ -588,7 +629,8 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
     with db.transaction(BIRD_DB_PATH) as conn:
         existing = db.fetch_one_on(conn, "SELECT id FROM proto_rip ORDER BY id LIMIT 1")
         values = (
-            settings["version"], settings["mode"], settings["multicast_addr"], 1 if settings["passive"] else 0,
+            settings["version"], settings["mode"], json.dumps(settings["iface_names"], sort_keys=True),
+            settings["multicast_addr"], 1 if settings["passive"] else 0,
             settings["port"], settings["update_time_secs"], settings["timeout_time_secs"], settings["garbage_time_secs"],
             settings["authentication"], settings["password"] or None, 1 if settings["enabled"] else 0,
         )
@@ -597,10 +639,10 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
                 conn,
                 """
                 INSERT INTO proto_rip (
-                    version, mode, multicast_addr, passive, port, update_time_secs,
+                    version, mode, iface_names, multicast_addr, passive, port, update_time_secs,
                     timeout_time_secs, garbage_time_secs, authentication, password, enabled
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -609,7 +651,7 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
             conn,
             """
             UPDATE proto_rip
-               SET version = ?, mode = ?, multicast_addr = ?, passive = ?, port = ?,
+               SET version = ?, mode = ?, iface_names = ?, multicast_addr = ?, passive = ?, port = ?,
                    update_time_secs = ?, timeout_time_secs = ?, garbage_time_secs = ?,
                    authentication = ?, password = ?, enabled = ?
              WHERE id = ?
@@ -640,7 +682,9 @@ def render_rip_config(settings: dict[str, Any]) -> str:
         return ""
     version_line = "  version 2;" if settings["version"] == "2" else "  version 1;" if settings["version"] == "1" else "  ipv6;"
     passive_line = "    passive yes;" if settings["passive"] else "    passive no;"
-    multicast_line = "" if settings["version"] == "1" else f"    multicast address {settings['multicast_addr']};\n"
+    multicast_line = "" if settings["version"] == "1" or settings["mode"] == "broadcast" else f"    multicast address {settings['multicast_addr']};\n"
+    iface_names = settings.get("iface_names") or [BIRD_ANY_INTERFACE]
+    iface_pattern = '", "'.join(str(item).replace('"', '\\"') for item in iface_names)
     auth_lines = ""
     if settings["authentication"] != "none":
         auth_lines = (
@@ -654,7 +698,7 @@ def render_rip_config(settings: dict[str, Any]) -> str:
         f"  update time {settings['update_time_secs']};\n"
         f"  timeout time {settings['timeout_time_secs']};\n"
         f"  garbage time {settings['garbage_time_secs']};\n"
-        "  interface \"*\" {\n"
+        f"  interface \"{iface_pattern}\" {{\n"
         f"    mode {settings['mode']};\n"
         f"{multicast_line}"
         f"{passive_line}\n"

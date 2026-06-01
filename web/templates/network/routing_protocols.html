@@ -277,9 +277,16 @@
                             <option value="cryptographic">cryptographic</option>
                         </select>
                     </label>
-                    <label class="field routing-router-id">
+                    <label class="field">
                         <span>Password</span>
-                        <input id="bird-rip-password" name="password" type="password" autocomplete="new-password">
+                        <div class="password-field-control">
+                            <input id="bird-rip-password" name="password" type="password" autocomplete="new-password">
+                            <button class="icon-button password-visibility-toggle" type="button" id="bird-rip-password-toggle" title="Show password" aria-label="Show password" aria-pressed="false">◉</button>
+                        </div>
+                    </label>
+                    <label class="field routing-rip-interfaces">
+                        <span>Interfaces</span>
+                        <select id="bird-rip-iface-names" name="iface_names" multiple size="5"></select>
                     </label>
                 </div>
                 <label class="check-line wide routing-check-start">
@@ -339,6 +346,6 @@
 
 {% block scripts %}
 {% if bird_installed %}
-<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260609-bird-apply-button" defer></script>
+<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260610-rip-auth-password-rules" defer></script>
 {% endif %}
 {% endblock %}

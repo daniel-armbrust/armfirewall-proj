@@ -7,6 +7,7 @@
     const status = document.querySelector("#bird-global-settings-status");
     const ripForm = document.querySelector("#bird-rip-settings-form");
     const ripStatus = document.querySelector("#bird-rip-settings-status");
+    const ripPasswordToggle = document.querySelector("#bird-rip-password-toggle");
     const actionModal = document.querySelector("#bird-action-modal");
     const actionTitle = document.querySelector("#bird-action-title");
     const actionMessage = document.querySelector("#bird-action-message");
@@ -55,6 +56,7 @@
             enabled: document.querySelector("#bird-rip-enabled"),
             version: document.querySelector("#bird-rip-version"),
             mode: document.querySelector("#bird-rip-mode"),
+            iface_names: document.querySelector("#bird-rip-iface-names"),
             address_label: document.querySelector("#bird-rip-address-label"),
             multicast_addr: document.querySelector("#bird-rip-multicast-addr"),
             passive: document.querySelector("#bird-rip-passive"),
@@ -101,6 +103,49 @@
         document.documentElement.scrollTo({top: 0, behavior: "smooth"});
         document.body.scrollTo({top: 0, behavior: "smooth"});
         window.scrollTo({top: 0, behavior: "smooth"});
+    }
+
+    function setRipPasswordVisible(visible) {
+        if (!fields.rip.password || !ripPasswordToggle) {
+            return;
+        }
+        fields.rip.password.type = visible ? "text" : "password";
+        ripPasswordToggle.setAttribute("aria-pressed", visible ? "true" : "false");
+        ripPasswordToggle.setAttribute("aria-label", visible ? "Hide password" : "Show password");
+        ripPasswordToggle.setAttribute("title", visible ? "Hide password" : "Show password");
+        ripPasswordToggle.textContent = visible ? "◌" : "◉";
+    }
+
+    function syncRipAuthenticationPassword(source) {
+        const auth = fields.rip.authentication;
+        const password = fields.rip.password;
+        if (!auth || !password) {
+            return;
+        }
+        const noneOption = Array.from(auth.options).find((option) => option.value === "none");
+        if (source === "authentication" && auth.value === "none") {
+            password.value = "";
+            if (noneOption) {
+                noneOption.disabled = false;
+            }
+            return;
+        }
+
+        const hasPassword = password.value.trim() !== "";
+        if (noneOption) {
+            noneOption.disabled = hasPassword;
+        }
+        if (hasPassword && auth.value === "none") {
+            auth.value = "cryptographic";
+        }
+    }
+
+    function handleRipAuthenticationChange() {
+        syncRipAuthenticationPassword("authentication");
+    }
+
+    function handleRipPasswordInput() {
+        syncRipAuthenticationPassword("password");
     }
 
     function setActiveView(viewName) {
@@ -212,6 +257,55 @@
         });
         setFieldValue(fields.device.iface_name, deviceIface || "");
         setFieldValue(fields.direct.iface_name, directIface || "");
+        renderRipInterfaceOptions(interfaces || []);
+    }
+
+    function selectedRipInterfaces() {
+        const select = fields.rip.iface_names;
+        if (!select) {
+            return ["*"];
+        }
+        const selected = Array.from(select.selectedOptions).map((option) => option.value).filter(Boolean);
+        return selected.length ? selected : ["*"];
+    }
+
+    function setSelectedRipInterfaces(values) {
+        const select = fields.rip.iface_names;
+        if (!select) {
+            return;
+        }
+        const selected = new Set((Array.isArray(values) && values.length ? values : ["*"]).map(String));
+        Array.from(select.options).forEach((option) => {
+            option.selected = selected.has(option.value);
+        });
+    }
+
+    function normalizeRipInterfaceSelection() {
+        const select = fields.rip.iface_names;
+        if (!select) {
+            return;
+        }
+        const selected = selectedRipInterfaces();
+        if (selected.includes("*") && selected.length > 1) {
+            setSelectedRipInterfaces(["*"]);
+        }
+    }
+
+    function renderRipInterfaceOptions(interfaces) {
+        const select = fields.rip.iface_names;
+        if (!select) {
+            return;
+        }
+        const selected = selectedRipInterfaces();
+        select.innerHTML = "";
+        select.appendChild(option("all - all interfaces", "*"));
+        interfaces.forEach((iface) => {
+            const description = HF.text(iface.description || "-");
+            const label = `${HF.text(iface.name)} - ${description}`;
+            select.appendChild(option(label, iface.name));
+        });
+        setSelectedRipInterfaces(selected);
+        normalizeRipInterfaceSelection();
     }
 
     function populateForm(settings, data) {
@@ -280,8 +374,11 @@
         if (fields.rip.mode) {
             fields.rip.mode.disabled = false;
         }
-        setText(fields.rip.address_label, readFieldValue(fields.rip.mode) === "broadcast" ? "Broadcast Address" : "Multicast Address");
-        if (!readFieldValue(fields.rip.multicast_addr) || ["ff02::9", "255.255.255.255"].includes(readFieldValue(fields.rip.multicast_addr))) {
+        const mode = readFieldValue(fields.rip.mode);
+        setText(fields.rip.address_label, mode === "broadcast" ? "Broadcast Address" : "Multicast Address");
+        if (mode === "broadcast") {
+            setFieldValue(fields.rip.multicast_addr, "255.255.255.255");
+        } else if (!readFieldValue(fields.rip.multicast_addr) || ["ff02::9", "255.255.255.255"].includes(readFieldValue(fields.rip.multicast_addr))) {
             setFieldValue(fields.rip.multicast_addr, "224.0.0.9");
         }
         if (!readFieldValue(fields.rip.port) || readFieldValue(fields.rip.port) === "521") {
@@ -291,11 +388,13 @@
 
     function populateRipForm(settings) {
         Object.entries(fields.rip).forEach(([name, element]) => {
-            if (name !== "address_label") {
+            if (name !== "address_label" && name !== "iface_names") {
                 setFieldValue(element, settings[name]);
             }
         });
+        setSelectedRipInterfaces(settings.iface_names);
         applyRipVersionDefaults();
+        syncRipAuthenticationPassword();
     }
 
     function readRipForm() {
@@ -303,6 +402,7 @@
             enabled: readFieldValue(fields.rip.enabled),
             version: readFieldValue(fields.rip.version),
             mode: readFieldValue(fields.rip.mode),
+            iface_names: selectedRipInterfaces(),
             multicast_addr: readFieldValue(fields.rip.multicast_addr),
             passive: readFieldValue(fields.rip.passive),
             port: readFieldValue(fields.rip.port),
@@ -534,6 +634,20 @@
     }
     if (fields.rip.mode) {
         fields.rip.mode.addEventListener("change", applyRipVersionDefaults);
+    }
+    if (fields.rip.iface_names) {
+        fields.rip.iface_names.addEventListener("change", normalizeRipInterfaceSelection);
+    }
+    if (fields.rip.authentication) {
+        fields.rip.authentication.addEventListener("change", handleRipAuthenticationChange);
+    }
+    if (fields.rip.password) {
+        fields.rip.password.addEventListener("input", handleRipPasswordInput);
+    }
+    if (ripPasswordToggle) {
+        ripPasswordToggle.addEventListener("click", () => {
+            setRipPasswordVisible(fields.rip.password?.type === "password");
+        });
     }
     document.addEventListener("click", (event) => {
         const actionButton = event.target.closest("[data-bird-service-action]");

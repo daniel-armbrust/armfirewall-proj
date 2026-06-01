@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS proto_rip (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      version TEXT NOT NULL DEFAULT '2' CHECK (version IN ('1', '2', 'ng')),
      mode TEXT NOT NULL DEFAULT 'multicast' CHECK (mode IN ('multicast', 'broadcast')),
+     iface_names TEXT NOT NULL DEFAULT '["*"]',
      multicast_addr TEXT NOT NULL DEFAULT '224.0.0.9',
      passive INTEGER NOT NULL DEFAULT 0 CHECK (passive IN (0, 1)),
      port INTEGER NOT NULL DEFAULT 520 CHECK (port IN (520, 521)),
@@ -87,7 +88,9 @@ CREATE TABLE IF NOT EXISTS proto_rip (
      CHECK (
           (version = '1' AND mode = 'broadcast' AND multicast_addr = '255.255.255.255' AND port = 520)
           OR
-          (version = '2' AND multicast_addr = '224.0.0.9' AND port = 520)
+          (version = '2' AND mode = 'multicast' AND multicast_addr = '224.0.0.9' AND port = 520)
+          OR
+          (version = '2' AND mode = 'broadcast' AND multicast_addr = '255.255.255.255' AND port = 520)
           OR
           (version = 'ng' AND multicast_addr = 'ff02::9' AND port = 521 AND mode = 'multicast')
      ),
