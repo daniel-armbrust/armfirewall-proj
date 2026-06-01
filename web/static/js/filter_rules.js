@@ -17,9 +17,37 @@
         FORWARD: document.querySelector("[data-chain-policy='FORWARD']"),
         OUTPUT: document.querySelector("[data-chain-policy='OUTPUT']"),
     };
+    const familyFilterSelects = {
+        INPUT: document.querySelector("[data-chain-family-filter='INPUT']"),
+        FORWARD: document.querySelector("[data-chain-family-filter='FORWARD']"),
+        OUTPUT: document.querySelector("[data-chain-family-filter='OUTPUT']"),
+    };
+    const chainButtons = Array.from(document.querySelectorAll("[data-filter-chain-tab]"));
+    const chainPanels = Array.from(document.querySelectorAll("[data-filter-chain-panel]"));
+    const pageStatusLabels = {
+        INPUT: document.querySelector("[data-filter-page-status='INPUT']"),
+        FORWARD: document.querySelector("[data-filter-page-status='FORWARD']"),
+        OUTPUT: document.querySelector("[data-filter-page-status='OUTPUT']"),
+    };
+    const pagePrevButtons = {
+        INPUT: document.querySelector("[data-filter-page-prev='INPUT']"),
+        FORWARD: document.querySelector("[data-filter-page-prev='FORWARD']"),
+        OUTPUT: document.querySelector("[data-filter-page-prev='OUTPUT']"),
+    };
+    const pageNextButtons = {
+        INPUT: document.querySelector("[data-filter-page-next='INPUT']"),
+        FORWARD: document.querySelector("[data-filter-page-next='FORWARD']"),
+        OUTPUT: document.querySelector("[data-filter-page-next='OUTPUT']"),
+    };
+    const pageSizeSelects = {
+        INPUT: document.querySelector("[data-filter-page-size='INPUT']"),
+        FORWARD: document.querySelector("[data-filter-page-size='FORWARD']"),
+        OUTPUT: document.querySelector("[data-filter-page-size='OUTPUT']"),
+    };
     const workRequestsBody = document.querySelector("#filter-work-requests-body");
     const workRequestsCount = document.querySelector("#filter-work-requests-count");
     const submitButton = document.querySelector("#filter-submit-button");
+    const createButtons = Array.from(document.querySelectorAll("[data-filter-create-for]"));
     const applyModal = document.querySelector("#filter-apply-modal");
     const applyChainLabel = document.querySelector("#filter-apply-chain");
     const applyMessage = document.querySelector("#filter-apply-message");
@@ -38,14 +66,20 @@
     const srcAddr = document.querySelector("#filter-src-addr");
     const dstAddr = document.querySelector("#filter-dst-addr");
     let currentRulesByKey = new Map();
+    let currentChains = {};
     let currentPolicies = {};
-    let currentRulesData = null;
-    let selectedRuleFamily = "IPV4";
     let editingRule = null;
     let pendingApplyChain = "";
     let pendingDeleteButton = null;
     let workRequestsPoller = null;
     let workRequestsLoading = false;
+    let activeChain = "INPUT";
+    let activeTab = "rules";
+    const chainPagination = {
+        INPUT: {page: 1, pageSize: 25},
+        FORWARD: {page: 1, pageSize: 25},
+        OUTPUT: {page: 1, pageSize: 25},
+    };
     const WORK_REQUESTS_POLL_MS = 3000;
     const ICMP_TYPES = {
         IPV4: [
@@ -207,13 +241,36 @@
         select.value = nextValue;
     }
 
+    function setActiveChain(chain) {
+        activeChain = chain || "INPUT";
+        chainButtons.forEach((button) => {
+            button.classList.toggle("active", activeTab === "rules" && button.dataset.filterChainTab === activeChain);
+        });
+        chainPanels.forEach((panel) => {
+            panel.hidden = panel.dataset.filterChainPanel !== activeChain;
+        });
+    }
+
+    function createContextForTab(tabName) {
+        if (tabName === "new-rule") {
+            return "rules";
+        }
+        return tabName;
+    }
+
     function setActiveTab(tabName, refreshData = false) {
+        const createContext = createContextForTab(tabName);
+        activeTab = createContext === "rules" ? "rules" : tabName;
         document.querySelectorAll("[data-filter-tab]").forEach((tab) => {
             tab.classList.toggle("active", tab.dataset.filterTab === tabName);
         });
         document.querySelectorAll("[data-filter-view]").forEach((view) => {
             view.hidden = view.dataset.filterView !== tabName;
         });
+        createButtons.forEach((button) => {
+            button.hidden = button.dataset.filterCreateFor !== createContext;
+        });
+        setActiveChain(activeChain);
         if (tabName !== "work-requests") {
             stopWorkRequestsPolling();
         }
@@ -224,6 +281,9 @@
             loadRules();
         } else if (tabName === "new-rule") {
             loadInterfaceChoices();
+            if (!editingRule) {
+                setSelectValue(chainSelect, activeChain);
+            }
             updateFormShape();
         } else if (tabName === "work-requests") {
             startWorkRequestsPolling();
@@ -355,35 +415,66 @@
         `;
     }
 
+    function familyLabel(family) {
+        return family === "IPV4" ? "IPv4" : "IPv6";
+    }
+
     function renderChain(chain, rules) {
         const body = rulesBodies[chain];
         const count = ruleCounts[chain];
-        const allChainRules = rules || [];
-        const chainRules = allChainRules.filter((rule) => rule.family === selectedRuleFamily);
+        const chainRules = rules || [];
+        const activeFamily = familyFilterSelects[chain] ? familyFilterSelects[chain].value : "IPV4";
+        const filteredRules = chainRules.filter((rule) => rule.family === activeFamily);
+        const pagination = chainPagination[chain] || {page: 1, pageSize: 25};
+        const totalItems = filteredRules.length;
+        const totalPages = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
+        pagination.page = Math.min(Math.max(1, pagination.page), totalPages);
+        const startIndex = totalItems ? (pagination.page - 1) * pagination.pageSize : 0;
+        const endIndex = Math.min(startIndex + pagination.pageSize, totalItems);
+        const visibleRules = filteredRules.slice(startIndex, endIndex);
 
         if (count) {
-            count.textContent = `rules=${chainRules.length}`;
+            count.textContent = `${familyLabel(activeFamily)} rules=${filteredRules.length}`;
         }
+        updatePagination(chain, pagination.page, totalPages, totalItems, startIndex, endIndex);
         if (!body) {
             return;
         }
-        if (!chainRules.length) {
+        if (!visibleRules.length) {
             body.innerHTML = `
                 <tr>
                     <td colspan="10">
-                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${HF.escapeHtml(selectedRuleFamily)} ${HF.escapeHtml(chain)} rules</span></div>
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${familyLabel(activeFamily)} ${HF.escapeHtml(chain)} rules</span></div>
                     </td>
                 </tr>
             `;
             return;
         }
-        body.innerHTML = chainRules.map(ruleRow).join("");
+        body.innerHTML = visibleRules.map(ruleRow).join("");
     }
 
-    function policyValueForChain(policies, chain, family = selectedRuleFamily) {
+    function updatePagination(chain, page, totalPages, totalItems, startIndex, endIndex) {
+        const status = pageStatusLabels[chain];
+        const prev = pagePrevButtons[chain];
+        const next = pageNextButtons[chain];
+        const firstItem = totalItems ? startIndex + 1 : 0;
+        const lastItem = totalItems ? endIndex : 0;
+        if (status) {
+            status.textContent = `Page ${page} of ${totalPages} (${firstItem} - ${lastItem} of ${totalItems} total items)`;
+        }
+        if (prev) {
+            prev.disabled = page <= 1;
+        }
+        if (next) {
+            next.disabled = page >= totalPages;
+        }
+    }
+
+    function policyValueForChain(policies, chain) {
         const chainPolicies = policies && policies[chain] ? policies[chain] : {};
-        const familyPolicy = chainPolicies[family] ? chainPolicies[family].policy : "";
-        return familyPolicy || "DROP";
+        const ipv4Policy = chainPolicies.IPV4 ? chainPolicies.IPV4.policy : "";
+        const ipv6Policy = chainPolicies.IPV6 ? chainPolicies.IPV6.policy : "";
+        return ipv4Policy || ipv6Policy || "DROP";
     }
 
     function renderPolicies(policies) {
@@ -397,16 +488,15 @@
 
     function renderRules(data) {
         const chains = data.chains || {};
-        const selectedRules = (data.rules || []).filter((rule) => rule.family === selectedRuleFamily);
+        currentChains = chains;
         currentRulesByKey = new Map();
-        currentRulesData = data;
         (data.rules || []).forEach((rule) => {
             currentRulesByKey.set(ruleKey(rule.family, rule.chain, rule.id), rule);
         });
-        updateMetric("#filter-summary-total", selectedRules.length);
-        updateMetric("#filter-summary-enabled", selectedRules.filter((rule) => HF.number(rule.enabled) === 1).length);
-        updateMetric("#filter-summary-disabled", selectedRules.filter((rule) => HF.number(rule.enabled) !== 1).length);
-        updateMetric("#filter-summary-protected", selectedRules.filter((rule) => HF.number(rule.protected) === 1).length);
+        updateMetric("#filter-summary-total", data.summary.total);
+        updateMetric("#filter-summary-enabled", data.summary.enabled);
+        updateMetric("#filter-summary-disabled", data.summary.disabled);
+        updateMetric("#filter-summary-protected", data.summary.protected);
         renderPolicies(data.policies || {});
         ["INPUT", "FORWARD", "OUTPUT"].forEach((chain) => renderChain(chain, chains[chain] || []));
     }
@@ -454,23 +544,14 @@
     }
 
     function renderInterfaceChoices(interfaces) {
-        const ifaceInOptions = [
-            {value: "", label: "select interface"},
-            {value: "ANY", label: "ANY"},
-        ].concat(
+        const options = [{value: "", label: "select interface"}].concat(
             interfaces.map((iface) => ({
                 value: iface.name,
                 label: interfaceOptionLabel(iface),
             })),
         );
-        const ifaceOutOptions = [{value: "", label: "select interface"}].concat(
-            interfaces.map((iface) => ({
-                value: iface.name,
-                label: interfaceOptionLabel(iface),
-            })),
-        );
-        replaceOptions(ifaceInSelect, ifaceInOptions);
-        replaceOptions(ifaceOutSelect, ifaceOutOptions);
+        replaceOptions(ifaceInSelect, options);
+        replaceOptions(ifaceOutSelect, options);
     }
 
     async function loadInterfaceChoices() {
@@ -505,7 +586,6 @@
         const protocol = protocolSelect ? protocolSelect.value : "tcp";
         const isIcmp = protocol === "icmp";
         const isAll = protocol === "all";
-        const hasPorts = ["tcp", "udp"].includes(protocol);
         const wildcard = family === "IPV6" ? "::/0" : "0.0.0.0/0";
 
         if (srcAddr && (srcAddr.value === "" || srcAddr.value === "0.0.0.0/0" || srcAddr.value === "::/0")) {
@@ -522,7 +602,7 @@
             setFieldHidden(field, chain === "INPUT");
         });
         document.querySelectorAll("[data-port-field]").forEach((field) => {
-            setFieldHidden(field, !hasPorts);
+            setFieldHidden(field, isIcmp || isAll);
         });
         document.querySelectorAll("[data-icmp-field]").forEach((field) => {
             setFieldHidden(field, !isIcmp);
@@ -555,7 +635,7 @@
     function setFormMode(rule) {
         editingRule = rule;
         if (submitButton) {
-            submitButton.textContent = rule ? "Save rule" : "Queue rule";
+            submitButton.textContent = rule ? "Save rule" : "Apply";
         }
         setFormStatus(rule ? `editing=${rule.family}/${rule.chain}/${rule.id}` : "queue=idle");
     }
@@ -592,6 +672,7 @@
         updateIcmpChoices();
         setSelectValue(icmpCodeSelect, rule.protocol_code);
         setFormMode(rule);
+        setActiveChain(rule.chain);
         setActiveTab("new-rule");
     }
 
@@ -601,15 +682,15 @@
 
     function openApplyModal(chain) {
         pendingApplyChain = chain;
-        const chainRules = Array.from(currentRulesByKey.values()).filter((rule) => rule.chain === chain && rule.family === selectedRuleFamily);
+        const chainRules = Array.from(currentRulesByKey.values()).filter((rule) => rule.chain === chain);
         const enabledCount = chainRules.filter((rule) => HF.number(rule.enabled) === 1).length;
         const policy = policyValueForChain(currentPolicies, chain);
 
         if (applyChainLabel) {
-            applyChainLabel.textContent = `family=${selectedRuleFamily} chain=${chain}`;
+            applyChainLabel.textContent = `chain=${chain}`;
         }
         if (applyMessage) {
-            applyMessage.textContent = `Are you sure you want to apply ${enabledCount} enabled ${selectedRuleFamily} rule(s) from the ${chain} chain with policy=${policy}?`;
+            applyMessage.textContent = `Are you sure you want to apply ${enabledCount} enabled rule(s) from the ${chain} chain with policy=${policy}?`;
         }
         if (applyModal) {
             applyModal.hidden = false;
@@ -699,12 +780,14 @@
         try {
             setFormStatus("queue=writing");
             const target = submitUrlAndMethod();
+            const payload = payloadFromForm();
             const result = await HF.fetchJson(target.url, {
                 method: target.method,
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payloadFromForm()),
+                body: JSON.stringify(payload),
             });
             setFormStatus(`saved=${result.rule_id}`);
+            setActiveChain(payload.chain);
             ruleForm.reset();
             clearEditMode();
             updateFormShape();
@@ -726,8 +809,6 @@
             const chain = pendingApplyChain;
             const result = await HF.fetchJson(`/api/firewall/filter-rules/${chain}/apply`, {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({family: selectedRuleFamily}),
             });
             setFormStatus(`queued=${result.work_request_count}`);
             closeApplyModal();
@@ -771,9 +852,9 @@
             const result = await HF.fetchJson(`/api/firewall/filter-rules/${chain}/policy`, {
                 method: "PUT",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({family: selectedRuleFamily, policy}),
+                body: JSON.stringify({policy}),
             });
-            setFormStatus(`policy=${result.family}/${result.policy}`);
+            setFormStatus(`policy=${result.policy}`);
             await loadRules();
         } catch (error) {
             setFormStatus(`error=${error.message}`);
@@ -815,26 +896,54 @@
         tab.addEventListener("click", () => setActiveTab(tab.dataset.filterTab, true));
     });
 
-    document.querySelectorAll("[data-filter-family-tab]").forEach((tab) => {
-        tab.addEventListener("click", () => {
-            selectedRuleFamily = tab.dataset.filterFamilyTab || "IPV4";
-            document.querySelectorAll("[data-filter-family-tab]").forEach((item) => {
-                item.classList.toggle("active", item.dataset.filterFamilyTab === selectedRuleFamily);
-            });
-            if (currentRulesData) {
-                renderRules(currentRulesData);
-            }
-        });
-    });
-
     Object.values(policySelects).forEach((select) => {
         if (select) {
             select.addEventListener("change", () => saveChainPolicy(select));
         }
     });
 
-    document.querySelectorAll("[data-chain-apply]").forEach((button) => {
-        button.addEventListener("click", () => openApplyModal(button.dataset.chainApply));
+    Object.entries(familyFilterSelects).forEach(([chain, select]) => {
+        if (select) {
+            select.addEventListener("change", () => {
+                chainPagination[chain].page = 1;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pageSizeSelects).forEach(([chain, select]) => {
+        if (select) {
+            select.addEventListener("change", () => {
+                chainPagination[chain].page = 1;
+                chainPagination[chain].pageSize = Number(select.value) || 25;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pagePrevButtons).forEach(([chain, button]) => {
+        if (button) {
+            button.addEventListener("click", () => {
+                chainPagination[chain].page = Math.max(1, chainPagination[chain].page - 1);
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pageNextButtons).forEach(([chain, button]) => {
+        if (button) {
+            button.addEventListener("click", () => {
+                chainPagination[chain].page += 1;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    chainButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setActiveChain(button.dataset.filterChainTab);
+            setActiveTab("rules", true);
+        });
     });
 
     document.querySelectorAll("[data-apply-cancel]").forEach((button) => {
@@ -915,6 +1024,7 @@
     });
 
     updateFormShape();
+    setActiveChain("INPUT");
     setActiveTab("rules");
     loadInterfaceChoices();
     loadRules();

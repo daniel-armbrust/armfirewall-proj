@@ -21,14 +21,20 @@
     const srcAddr = document.querySelector("#nat-src-addr");
     const dstAddr = document.querySelector("#nat-dst-addr");
     const submitButton = document.querySelector("#nat-submit-button");
+    const createButtons = Array.from(document.querySelectorAll("[data-nat-create-for]"));
+    const chainButtons = Array.from(document.querySelectorAll("[data-nat-chain-tab]"));
+    const chainPanels = Array.from(document.querySelectorAll("[data-nat-chain-panel]"));
+    const NAT_CHAINS = ["PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"];
     let pendingApplyChain = "";
     let pendingDeleteButton = null;
     let editingRule = null;
     let currentRulesByKey = new Map();
-    let currentRulesData = null;
-    let selectedRuleFamily = "IPV4";
+    let currentChains = {};
     let workRequestsPoller = null;
     let workRequestsLoading = false;
+    let activeChain = "PREROUTING";
+    let activeTab = "rules";
+    const chainPagination = Object.fromEntries(NAT_CHAINS.map((chain) => [chain, {page: 1, pageSize: 25}]));
     const WORK_REQUESTS_POLL_MS = 3000;
     const rulesBodies = {
         PREROUTING: document.querySelector("#nat-prerouting-body"),
@@ -42,6 +48,11 @@
         OUTPUT: document.querySelector("#nat-output-count"),
         POSTROUTING: document.querySelector("#nat-postrouting-count"),
     };
+    const familyFilterSelects = Object.fromEntries(NAT_CHAINS.map((chain) => [chain, document.querySelector(`[data-nat-family-filter='${chain}']`)]));
+    const pageStatusLabels = Object.fromEntries(NAT_CHAINS.map((chain) => [chain, document.querySelector(`[data-nat-page-status='${chain}']`)]));
+    const pagePrevButtons = Object.fromEntries(NAT_CHAINS.map((chain) => [chain, document.querySelector(`[data-nat-page-prev='${chain}']`)]));
+    const pageNextButtons = Object.fromEntries(NAT_CHAINS.map((chain) => [chain, document.querySelector(`[data-nat-page-next='${chain}']`)]));
+    const pageSizeSelects = Object.fromEntries(NAT_CHAINS.map((chain) => [chain, document.querySelector(`[data-nat-page-size='${chain}']`)]));
 
     function setState(value) {
         if (stateLabel) {
@@ -55,13 +66,33 @@
         }
     }
 
+    function setActiveChain(chain) {
+        activeChain = chain || "PREROUTING";
+        chainButtons.forEach((button) => {
+            button.classList.toggle("active", activeTab === "rules" && button.dataset.natChainTab === activeChain);
+        });
+        chainPanels.forEach((panel) => {
+            panel.hidden = panel.dataset.natChainPanel !== activeChain;
+        });
+    }
+
+    function createContextForTab(tabName) {
+        return tabName === "new-rule" ? "rules" : tabName;
+    }
+
     function setActiveTab(tabName, refreshData = false) {
+        const createContext = createContextForTab(tabName);
+        activeTab = createContext === "rules" ? "rules" : tabName;
         document.querySelectorAll("[data-nat-tab]").forEach((tab) => {
             tab.classList.toggle("active", tab.dataset.natTab === tabName);
         });
         document.querySelectorAll("[data-nat-view]").forEach((view) => {
             view.hidden = view.dataset.natView !== tabName;
         });
+        createButtons.forEach((button) => {
+            button.hidden = button.dataset.natCreateFor !== createContext;
+        });
+        setActiveChain(activeChain);
         if (tabName !== "work-requests") {
             stopWorkRequestsPolling();
         }
@@ -72,6 +103,9 @@
             loadRules();
         } else if (tabName === "new-rule") {
             loadInterfaceChoices();
+            if (!editingRule) {
+                setSelectValue(chainSelect, activeChain);
+            }
             updateFormShape();
         } else if (tabName === "work-requests") {
             startWorkRequestsPolling();
@@ -219,7 +253,7 @@
     function setFormMode(rule) {
         editingRule = rule;
         if (submitButton) {
-            submitButton.textContent = rule ? "Save rule" : "Queue rule";
+            submitButton.textContent = rule ? "Save rule" : "Apply";
         }
         setFormStatus(rule ? `editing=${rule.family}/${rule.chain}/${rule.id}` : "queue=idle");
     }
@@ -259,6 +293,7 @@
 
         updateFormShape();
         setFormMode(rule);
+        setActiveChain(rule.chain);
         setActiveTab("new-rule");
     }
 
@@ -356,44 +391,73 @@
         `;
     }
 
+    function familyLabel(family) {
+        return family === "IPV4" ? "IPv4" : "IPv6";
+    }
+
     function renderChain(chain, rules) {
         const body = rulesBodies[chain];
         const count = ruleCounts[chain];
-        const allChainRules = rules || [];
-        const chainRules = allChainRules.filter((rule) => rule.family === selectedRuleFamily);
+        const chainRules = rules || [];
+        const activeFamily = familyFilterSelects[chain] ? familyFilterSelects[chain].value : "IPV4";
+        const filteredRules = chainRules.filter((rule) => rule.family === activeFamily);
+        const pagination = chainPagination[chain] || {page: 1, pageSize: 25};
+        const totalItems = filteredRules.length;
+        const totalPages = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
+        pagination.page = Math.min(Math.max(1, pagination.page), totalPages);
+        const startIndex = totalItems ? (pagination.page - 1) * pagination.pageSize : 0;
+        const endIndex = Math.min(startIndex + pagination.pageSize, totalItems);
+        const visibleRules = filteredRules.slice(startIndex, endIndex);
 
         if (count) {
-            count.textContent = `rules=${chainRules.length}`;
+            count.textContent = `${familyLabel(activeFamily)} rules=${filteredRules.length}`;
         }
+        updatePagination(chain, pagination.page, totalPages, totalItems, startIndex, endIndex);
         if (!body) {
             return;
         }
-        if (!chainRules.length) {
+        if (!visibleRules.length) {
             body.innerHTML = `
                 <tr>
                     <td colspan="10">
-                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${HF.escapeHtml(selectedRuleFamily)} ${HF.escapeHtml(chain)} NAT rules</span></div>
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${familyLabel(activeFamily)} ${HF.escapeHtml(chain)} NAT rules</span></div>
                     </td>
                 </tr>
             `;
             return;
         }
-        body.innerHTML = chainRules.map(ruleRow).join("");
+        body.innerHTML = visibleRules.map(ruleRow).join("");
+    }
+
+    function updatePagination(chain, page, totalPages, totalItems, startIndex, endIndex) {
+        const status = pageStatusLabels[chain];
+        const prev = pagePrevButtons[chain];
+        const next = pageNextButtons[chain];
+        const firstItem = totalItems ? startIndex + 1 : 0;
+        const lastItem = totalItems ? endIndex : 0;
+        if (status) {
+            status.textContent = `Page ${page} of ${totalPages} (${firstItem} - ${lastItem} of ${totalItems} total items)`;
+        }
+        if (prev) {
+            prev.disabled = page <= 1;
+        }
+        if (next) {
+            next.disabled = page >= totalPages;
+        }
     }
 
     function renderRules(data) {
         const chains = data.chains || {};
-        const selectedRules = (data.rules || []).filter((rule) => rule.family === selectedRuleFamily);
+        currentChains = chains;
         currentRulesByKey = new Map();
-        currentRulesData = data;
         (data.rules || []).forEach((rule) => {
             currentRulesByKey.set(ruleKey(rule.family, rule.chain, rule.id), rule);
         });
-        updateMetric("#nat-summary-total", selectedRules.length);
-        updateMetric("#nat-summary-enabled", selectedRules.filter((rule) => HF.number(rule.enabled) === 1).length);
-        updateMetric("#nat-summary-disabled", selectedRules.filter((rule) => HF.number(rule.enabled) !== 1).length);
-        updateMetric("#nat-summary-protected", selectedRules.filter((rule) => HF.number(rule.protected) === 1).length);
-        ["PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"].forEach((chain) => renderChain(chain, chains[chain] || []));
+        updateMetric("#nat-summary-total", data.summary.total);
+        updateMetric("#nat-summary-enabled", data.summary.enabled);
+        updateMetric("#nat-summary-disabled", data.summary.disabled);
+        updateMetric("#nat-summary-protected", data.summary.protected);
+        NAT_CHAINS.forEach((chain) => renderChain(chain, chains[chain] || []));
     }
 
     function renderWorkRequests(data) {
@@ -433,13 +497,13 @@
 
     function openApplyModal(chain) {
         pendingApplyChain = chain;
-        const chainRules = Array.from(currentRulesByKey.values()).filter((rule) => rule.chain === chain && rule.family === selectedRuleFamily).length;
+        const chainRules = Array.from(document.querySelectorAll(`#nat-${chain.toLowerCase()}-body tr:not(.firewall-family-row)`)).length;
 
         if (applyChainLabel) {
-            applyChainLabel.textContent = `family=${selectedRuleFamily} chain=${chain}`;
+            applyChainLabel.textContent = `chain=${chain}`;
         }
         if (applyMessage) {
-            applyMessage.textContent = `Are you sure you want to apply ${chainRules} enabled NAT ${selectedRuleFamily} rule(s) from the ${chain} chain?`;
+            applyMessage.textContent = `Are you sure you want to apply ${chainRules} rule row(s) from the ${chain} chain?`;
         }
         if (applyModal) {
             applyModal.hidden = false;
@@ -536,8 +600,6 @@
             const chain = pendingApplyChain;
             const result = await HF.fetchJson(`/api/firewall/nat-rules/${chain}/apply`, {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({family: selectedRuleFamily}),
             });
             setFormStatus(`queued=${result.work_request_count}`);
             closeApplyModal();
@@ -556,12 +618,14 @@
         try {
             setFormStatus("queue=writing");
             const target = submitUrlAndMethod();
+            const payload = payloadFromForm();
             const result = await HF.fetchJson(target.url, {
                 method: target.method,
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payloadFromForm()),
+                body: JSON.stringify(payload),
             });
             setFormStatus(`saved=${result.rule_id}`);
+            setActiveChain(payload.chain);
             ruleForm.reset();
             clearEditMode();
             updateFormShape();
@@ -624,20 +688,48 @@
         tab.addEventListener("click", () => setActiveTab(tab.dataset.natTab, true));
     });
 
-    document.querySelectorAll("[data-nat-family-tab]").forEach((tab) => {
-        tab.addEventListener("click", () => {
-            selectedRuleFamily = tab.dataset.natFamilyTab || "IPV4";
-            document.querySelectorAll("[data-nat-family-tab]").forEach((item) => {
-                item.classList.toggle("active", item.dataset.natFamilyTab === selectedRuleFamily);
-            });
-            if (currentRulesData) {
-                renderRules(currentRulesData);
-            }
+    chainButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setActiveChain(button.dataset.natChainTab);
+            setActiveTab("rules", true);
         });
     });
 
-    document.querySelectorAll("[data-chain-apply]").forEach((button) => {
-        button.addEventListener("click", () => openApplyModal(button.dataset.chainApply));
+    Object.entries(familyFilterSelects).forEach(([chain, select]) => {
+        if (select) {
+            select.addEventListener("change", () => {
+                chainPagination[chain].page = 1;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pageSizeSelects).forEach(([chain, select]) => {
+        if (select) {
+            select.addEventListener("change", () => {
+                chainPagination[chain].page = 1;
+                chainPagination[chain].pageSize = Number(select.value) || 25;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pagePrevButtons).forEach(([chain, button]) => {
+        if (button) {
+            button.addEventListener("click", () => {
+                chainPagination[chain].page = Math.max(1, chainPagination[chain].page - 1);
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pageNextButtons).forEach(([chain, button]) => {
+        if (button) {
+            button.addEventListener("click", () => {
+                chainPagination[chain].page += 1;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
     });
 
     document.querySelectorAll("[data-apply-cancel]").forEach((button) => {
@@ -714,6 +806,7 @@
     });
 
     updateFormShape();
+    setActiveChain("PREROUTING");
     setActiveTab("rules");
     loadInterfaceChoices();
     loadRules();

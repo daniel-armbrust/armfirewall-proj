@@ -3,24 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from core import ipsec
 from web.constants import SERVICES_STATUS_ACTIONS
 from web.services.catalog import main_service_public_catalog, optional_service_public_catalog, service_by_name
-
-
-def libreswan_runtime_overlay(payload: dict[str, Any]) -> dict[str, Any]:
-    """Reflect active IPsec SAs in the Libreswan service status."""
-    if payload["name"] != "libreswan" or not payload["installed"]:
-        return payload
-
-    established_names = sorted(ipsec.established_connection_names())
-    if not established_names:
-        return payload
-
-    updated = dict(payload)
-    updated["state"] = "RUNNING"
-    updated["details"] = f"IPsec up: {', '.join(established_names)}"
-    return updated
 
 
 def service_status_payload(service: dict[str, Any], *, optional: bool = False) -> dict[str, Any]:
@@ -41,12 +25,12 @@ def service_status_payload(service: dict[str, Any], *, optional: bool = False) -
 
     if optional:
         payload["display_name"] = service["display_name"]
-        payload["can_install"] = not installed
+        payload["can_install"] = not installed and bool(service.get("package_name"))
     else:
         payload["protected"] = bool(service["protected"])
         payload["restart_allowed"] = bool(service.get("restart_allowed"))
 
-    return libreswan_runtime_overlay(payload)
+    return payload
 
 
 def expected_service_statuses() -> list[dict[str, Any]]:
@@ -161,6 +145,8 @@ def control_service(name: str, action: str) -> dict[str, Any]:
 def install_optional_service(name: str) -> dict[str, Any]:
     """Validate optional service installation and return the work request payload."""
     service = get_optional_service(name)
+    if not service.get("package_name"):
+        raise ValueError("Optional service does not have an installable package.")
 
     payload = {
         "service_name": service["name"],

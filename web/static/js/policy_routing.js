@@ -25,7 +25,9 @@
     const routeDevSelect = document.querySelector("#policy-route-dev");
     const ruleIifSelect = document.querySelector("#policy-rule-iif");
     const ruleOifSelect = document.querySelector("#policy-rule-oif");
+    const familyFilterSelect = document.querySelector("#policy-family-filter");
     const familyButtons = Array.from(document.querySelectorAll("[data-policy-family]"));
+    const createButtons = Array.from(document.querySelectorAll("[data-policy-create-for]"));
     let currentData = {tables: [], routes: [], rules: []};
     let pendingDelete = null;
     let workRequestsPoller = null;
@@ -211,6 +213,9 @@
         familyButtons.forEach((button) => {
             button.classList.toggle("active", button.dataset.policyFamily === activeFamily);
         });
+        if (familyFilterSelect) {
+            familyFilterSelect.value = activeFamily;
+        }
         setPolicyFormFamily(activeFamily);
         if (currentData.summary) {
             renderData(currentData);
@@ -438,12 +443,29 @@
         }
     }
 
+    function createContextForTab(tabName) {
+        if (tabName === "new-route") {
+            return "routes";
+        }
+        if (tabName === "new-rule") {
+            return "rules";
+        }
+        if (tabName === "new-table") {
+            return "tables";
+        }
+        return tabName;
+    }
+
     function setActiveTab(tabName, refreshData = false) {
+        const createContext = createContextForTab(tabName);
         document.querySelectorAll("[data-policy-tab]").forEach((tab) => {
             tab.classList.toggle("active", tab.dataset.policyTab === tabName);
         });
         document.querySelectorAll("[data-policy-view]").forEach((view) => {
             view.hidden = view.dataset.policyView !== tabName;
+        });
+        createButtons.forEach((button) => {
+            button.hidden = button.dataset.policyCreateFor !== createContext;
         });
         if (tabName !== "work-requests") {
             stopWorkRequestsPolling();
@@ -558,6 +580,9 @@
     familyButtons.forEach((button) => {
         button.addEventListener("click", () => setActiveFamily(button.dataset.policyFamily));
     });
+    if (familyFilterSelect) {
+        familyFilterSelect.addEventListener("change", () => setActiveFamily(familyFilterSelect.value));
+    }
     document.querySelectorAll("[data-policy-apply]").forEach((button) => {
         button.addEventListener("click", openApplyModal);
     });

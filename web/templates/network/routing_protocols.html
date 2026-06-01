@@ -37,63 +37,154 @@
     </nav>
 </div>
 
-<nav class="local-tabs service-action-tabs" aria-label="BIRD service controls">
-    <button class="local-tab" type="button" data-bird-service-action="start-restart">START / RESTART</button>
-    <button class="local-tab" type="button" data-bird-service-action="stop">STOP</button>
-    <button class="local-tab" type="button" data-routing-view="work-requests">WORK REQUESTS</button>
-</nav>
+<div class="routing-service-actions">
+    <nav class="local-tabs service-action-tabs" aria-label="BIRD service controls">
+        <button class="local-tab" type="button" data-bird-service-action="start-restart">START / RESTART</button>
+        <button class="local-tab" type="button" data-bird-service-action="stop">STOP</button>
+    </nav>
+    <nav class="local-tabs service-query-tabs" aria-label="BIRD service history">
+        <button class="local-tab" type="button" data-routing-view="logs">LOGS</button>
+        <button class="local-tab" type="button" data-routing-view="work-requests">WORK REQUESTS</button>
+    </nav>
+</div>
 
 <section id="routing-global-config-panel">
     <form id="bird-global-settings-form">
         <section class="panel" id="bird-daemon-settings-panel">
             <div class="panel-head">
-                <h2>Daemon Settings</h2>
+                <h2>Router Settings</h2>
                 <span>bird.conf</span>
             </div>
             <div class="edit-form">
-            <div class="form-grid routing-settings-grid">
-                <label class="field routing-router-id">
-                    <span>Router ID</span>
-                    <input id="bird-router-id" name="router_id" type="text" placeholder="192.0.2.1" autocomplete="off">
-                </label>
-                <label class="field">
-                    <span>Device scan time</span>
-                    <input id="bird-device-scan-time" name="device_scan_time" type="number" min="1" max="3600" step="1">
-                </label>
-                <label class="field">
-                    <span>Kernel scan time</span>
-                    <input id="bird-kernel-scan-time" name="kernel_scan_time" type="number" min="1" max="3600" step="1">
-                </label>
-                <label class="field">
-                    <span>Kernel import</span>
-                    <select id="bird-kernel-import" name="kernel_import">
-                        <option value="all">all</option>
-                        <option value="none">none</option>
-                    </select>
-                </label>
-                <label class="field">
-                    <span>Kernel export</span>
-                    <select id="bird-kernel-export" name="kernel_export">
-                        <option value="all">all</option>
-                        <option value="none">none</option>
-                    </select>
-                </label>
-            </div>
-            <label class="check-line wide routing-check-start">
-                <input id="bird-kernel-learn" name="kernel_learn" type="checkbox">
-                <span>Learn kernel routes</span>
-            </label>
-            <label class="check-line wide">
-                <input id="bird-kernel-persist" name="kernel_persist" type="checkbox">
-                <span>Persist kernel routes</span>
-            </label>
-            <div class="form-actions">
-                <button class="text-button compact primary" type="submit">Apply</button>
-            </div>
-            <div class="form-status" id="bird-global-settings-status" hidden></div>
+                <div class="form-grid routing-settings-grid">
+                    <label class="field routing-router-id">
+                        <span>Router ID</span>
+                        <input id="bird-router-id" name="router_id" type="text" placeholder="192.0.2.1" autocomplete="off">
+                    </label>
+                    <label class="field routing-router-id">
+                        <span>Hostname</span>
+                        <input id="bird-hostname" name="hostname" type="text" placeholder="armfirewall" autocomplete="off">
+                    </label>
+                </div>
             </div>
         </section>
+
+        <section class="panel routing-protocol-panel">
+            <div class="panel-head">
+                <h2>Kernel Protocol</h2>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid routing-settings-grid">
+                    <label class="field">
+                        <span>Route Table</span>
+                        <select id="bird-kernel-route-table" name="kernel_route_table"></select>
+                    </label>
+                    <label class="field">
+                        <span>Metric</span>
+                        <input id="bird-kernel-metric" name="kernel_metric" type="number" min="0" step="1">
+                    </label>
+                    <label class="field">
+                        <span>Scan Time</span>
+                        <input id="bird-kernel-scan-time-secs" name="kernel_scan_time_secs" type="number" min="1" max="86400" step="1">
+                    </label>
+                    <label class="field">
+                        <span>Family</span>
+                        <select id="bird-kernel-channel-family" name="kernel_channel_family">
+                            <option value="ipv4">ipv4</option>
+                            <option value="ipv6">ipv6</option>
+                            <option value="ipv4/ipv6">ipv4/ipv6</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Channel Table</span>
+                        <select id="bird-kernel-channel-table-name" name="kernel_channel_table_name"></select>
+                    </label>
+                    <label class="field">
+                        <span>Learn</span>
+                        <select id="bird-kernel-learn" name="kernel_learn">
+                            <option value="">none</option>
+                            <option value="all">all</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Import</span>
+                        <select id="bird-kernel-import-policy" name="kernel_import_policy">
+                            <option value="all">all</option>
+                            <option value="none">none</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Export</span>
+                        <select id="bird-kernel-export-policy" name="kernel_export_policy">
+                            <option value="all">all</option>
+                            <option value="none">none</option>
+                        </select>
+                    </label>
+                </div>
+                <label class="check-line wide routing-check-start">
+                    <input id="bird-kernel-enabled" name="kernel_enabled" type="checkbox">
+                    <span>Enabled</span>
+                </label>
+                <label class="check-line wide">
+                    <input id="bird-kernel-persist" name="kernel_persist" type="checkbox">
+                    <span>Persist kernel routes</span>
+                </label>
+            </div>
+        </section>
+
+        <section class="panel routing-protocol-panel">
+            <div class="panel-head">
+                <h2>Device Protocol</h2>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid routing-settings-grid">
+                    <label class="field">
+                        <span>Interface</span>
+                        <select id="bird-device-iface-name" name="device_iface_name"></select>
+                    </label>
+                    <label class="field">
+                        <span>Scan Time</span>
+                        <input id="bird-device-scan-time-secs" name="device_scan_time_secs" type="number" min="1" max="86400" step="1">
+                    </label>
+                </div>
+                <label class="check-line wide routing-check-start">
+                    <input id="bird-device-enabled" name="device_enabled" type="checkbox">
+                    <span>Enabled</span>
+                </label>
+            </div>
+        </section>
+
+        <section class="panel routing-protocol-panel">
+            <div class="panel-head">
+                <h2>Direct Protocol</h2>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid routing-settings-grid">
+                    <label class="field routing-router-id">
+                        <span>Interface</span>
+                        <select id="bird-direct-iface-name" name="direct_iface_name"></select>
+                    </label>
+                </div>
+                <label class="check-line wide routing-check-start">
+                    <input id="bird-direct-enabled" name="direct_enabled" type="checkbox">
+                    <span>Enabled</span>
+                </label>
+            </div>
+        </section>
+
+        <div class="form-actions routing-global-actions">
+            <button class="text-button primary routing-apply-button" type="submit">Apply</button>
+        </div>
+        <div class="form-status" id="bird-global-settings-status" hidden></div>
     </form>
+</section>
+
+<section class="panel" id="bird-logs-panel" hidden>
+    <div class="panel-head compact">
+        <h2>Logs</h2>
+        <span id="bird-logs-count">lines=0</span>
+    </div>
+    <pre class="tool-output" id="bird-logs-output">Waiting for bird.out.log...</pre>
 </section>
 
 <section class="panel" id="bird-work-requests-panel" hidden>
@@ -123,15 +214,77 @@
     </div>
 </section>
 
-<section class="panel" id="routing-rip-panel" hidden>
-    <div class="panel-head">
-        <h2>RIP</h2>
-        <span>protocol rip</span>
-    </div>
-    <div class="terminal-empty">
-        <span class="prompt">$</span>
-        <span>RIP configuration will be managed here.</span>
-    </div>
+<section id="routing-rip-panel" hidden>
+    <form id="bird-rip-settings-form">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>RIP Settings</h2>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid routing-settings-grid">
+                    <label class="field">
+                        <span>Version</span>
+                        <select id="bird-rip-version" name="version">
+                            <option value="1">RIPv1</option>
+                            <option value="2">RIPv2</option>
+                            <option value="ng">RIPng</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Mode</span>
+                        <select id="bird-rip-mode" name="mode">
+                            <option value="multicast">multicast</option>
+                            <option value="broadcast">broadcast</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Multicast Address</span>
+                        <input id="bird-rip-multicast-addr" name="multicast_addr" type="text" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span>Port</span>
+                        <input id="bird-rip-port" name="port" type="number" min="1" max="65535" step="1">
+                    </label>
+                    <label class="field">
+                        <span>Update Time</span>
+                        <input id="bird-rip-update-time-secs" name="update_time_secs" type="number" min="1" max="86400" step="1">
+                    </label>
+                    <label class="field">
+                        <span>Timeout Time</span>
+                        <input id="bird-rip-timeout-time-secs" name="timeout_time_secs" type="number" min="1" max="86400" step="1">
+                    </label>
+                    <label class="field">
+                        <span>Garbage Time</span>
+                        <input id="bird-rip-garbage-time-secs" name="garbage_time_secs" type="number" min="1" max="86400" step="1">
+                    </label>
+                    <label class="field">
+                        <span>Authentication</span>
+                        <select id="bird-rip-authentication" name="authentication">
+                            <option value="none">none</option>
+                            <option value="plaintext">plaintext</option>
+                            <option value="cryptographic">cryptographic</option>
+                        </select>
+                    </label>
+                    <label class="field routing-router-id">
+                        <span>Password</span>
+                        <input id="bird-rip-password" name="password" type="password" autocomplete="new-password">
+                    </label>
+                </div>
+                <label class="check-line wide routing-check-start">
+                    <input id="bird-rip-enabled" name="enabled" type="checkbox">
+                    <span>Enabled</span>
+                </label>
+                <label class="check-line wide">
+                    <input id="bird-rip-passive" name="passive" type="checkbox">
+                    <span>Passive</span>
+                </label>
+            </div>
+        </section>
+        <div class="form-actions routing-global-actions">
+            <button class="text-button primary routing-apply-button" type="submit">Apply</button>
+        </div>
+        <div class="form-status" id="bird-rip-settings-status" hidden></div>
+    </form>
 </section>
 
 <section class="panel" id="routing-ospf-panel" hidden>
@@ -174,6 +327,6 @@
 
 {% block scripts %}
 {% if bird_installed %}
-<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260608-work-requests-by-stop" defer></script>
+<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260609-bird-apply-button" defer></script>
 {% endif %}
 {% endblock %}

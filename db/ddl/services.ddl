@@ -113,19 +113,17 @@ stderr_logfile_backups=5
         '/usr/sbin/bird',
         '[program:bird]
 directory={root}
-command=/bin/sh -c ''if [ -f /etc/bird/bird.conf ]; then exec /usr/sbin/bird -f -c /etc/bird/bird.conf; else exec /usr/sbin/bird -f -c /etc/bird.conf; fi''
+command=/usr/sbin/bird -c {root}/conf/bird.conf -f -P {root}/conf/bird.pid
 autostart=false
 autorestart=true
 startsecs=3
 stopsignal=TERM
 stopasgroup=true
 killasgroup=true
+redirect_stderr=true
 stdout_logfile={root}/logs/bird.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=5
-stderr_logfile={root}/logs/bird.err.log
-stderr_logfile_maxbytes=10MB
-stderr_logfile_backups=5
 ',
         120
     ),
@@ -156,4 +154,17 @@ stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 ',
         130
+    ),
+    (
+        'adam-copilot',
+        'Adam Firewall CoPilot',
+        'ai-assistant',
+        'ArmFirewall virtual assistant for firewall analysis and operations.',
+        'optional',
+        0,
+        0,
+        NULL,
+        NULL,
+        NULL,
+        140
     );

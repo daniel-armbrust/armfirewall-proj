@@ -9,12 +9,6 @@
     <div class="refresh-state" id="nat-rules-state">Ready</div>
 </section>
 
-<nav class="local-tabs" aria-label="NAT rules menu">
-    <button class="local-tab active" type="button" data-nat-tab="rules">Rules</button>
-    <button class="local-tab" type="button" data-nat-tab="new-rule">New Rule</button>
-    <button class="local-tab" type="button" data-nat-tab="work-requests">Work Requests</button>
-</nav>
-
 <section class="summary-grid compact" aria-label="NAT rules summary">
     <div class="metric">
         <span class="metric-label">Rules</span>
@@ -34,22 +28,34 @@
     </div>
 </section>
 
-<section data-nat-view="rules">
-    <nav class="local-tabs compact" aria-label="NAT rule family">
-        <button class="local-tab active" type="button" data-nat-family-tab="IPV4">IPv4</button>
-        <button class="local-tab" type="button" data-nat-family-tab="IPV6">IPv6</button>
-    </nav>
+<nav class="local-tabs" aria-label="NAT rules menu">
+    <button class="local-tab active" type="button" data-nat-chain-tab="PREROUTING">PREROUTING</button>
+    <button class="local-tab" type="button" data-nat-chain-tab="INPUT">INPUT</button>
+    <button class="local-tab" type="button" data-nat-chain-tab="OUTPUT">OUTPUT</button>
+    <button class="local-tab" type="button" data-nat-chain-tab="POSTROUTING">POSTROUTING</button>
+    <button class="local-tab firewall-work-tab" type="button" data-nat-tab="work-requests">Work Requests</button>
+</nav>
 
+<div class="policy-create-actions">
+    <button class="local-tab policy-create-button" type="button" data-nat-tab="new-rule" data-nat-create-for="rules">New Rule</button>
+</div>
+
+<section class="filter-rules-view" data-nat-view="rules">
     {% for chain in ["PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"] %}
-    <section class="panel">
+    <section class="panel filter-chain-panel" data-nat-chain-panel="{{ chain }}" {% if chain != "PREROUTING" %}hidden{% endif %}>
         <div class="panel-head">
-            <h2>{{ chain }}</h2>
+            <h2 class="chain-title">
+                <span>{{ chain }}</span>
+                <select class="chain-policy-select" data-nat-family-filter="{{ chain }}" aria-label="{{ chain }} family filter">
+                    <option value="IPV4">ipv4</option>
+                    <option value="IPV6">ipv6</option>
+                </select>
+            </h2>
             <div class="panel-actions">
                 <span id="nat-{{ chain | lower }}-count">rules=-</span>
-                <button class="text-button compact" type="button" data-chain-apply="{{ chain }}">Apply</button>
             </div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap filter-rules-scroll">
             <table class="data-table firewall-rules-table">
                 <thead>
                     <tr>
@@ -77,17 +83,35 @@
                 </tbody>
             </table>
         </div>
+        <div class="table-pagination" data-nat-pagination="{{ chain }}">
+            <div class="table-pagination-nav">
+                <button class="text-button compact table-page-button" type="button" data-nat-page-prev="{{ chain }}" aria-label="{{ chain }} previous page">&lt;</button>
+                <button class="text-button compact table-page-button" type="button" data-nat-page-next="{{ chain }}" aria-label="{{ chain }} next page">&gt;</button>
+                <span class="table-page-status" data-nat-page-status="{{ chain }}">Page 1 of 1 (0 - 0 of 0 total items)</span>
+            </div>
+            <label class="table-page-size">
+                <span>Items per page</span>
+                <select data-nat-page-size="{{ chain }}" aria-label="{{ chain }} items per page">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </label>
+        </div>
     </section>
     {% endfor %}
 </section>
 
-<section class="panel" data-nat-view="new-rule" hidden>
-    <div class="panel-head">
-        <h2>New NAT rule</h2>
-        <span id="nat-form-status">queue=idle</span>
-    </div>
-    <form class="edit-form" id="nat-rule-form">
-        <div class="form-grid firewall-form-grid">
+<section data-nat-view="new-rule" hidden>
+    <form id="nat-rule-form">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>New Rule</h2>
+                <span id="nat-form-status">queue=idle</span>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid firewall-form-grid">
             <label class="field">
                 <span>Family</span>
                 <select name="family" id="nat-family">
@@ -160,10 +184,11 @@
                     <option value="0">disabled</option>
                 </select>
             </label>
-        </div>
-        <div class="form-actions">
-            <button class="text-button compact" type="reset">Reset</button>
-            <button class="text-button compact" type="submit" id="nat-submit-button">Queue rule</button>
+                </div>
+            </div>
+        </section>
+        <div class="form-actions policy-route-actions">
+            <button class="text-button primary policy-apply-button" type="submit" id="nat-submit-button">Apply</button>
         </div>
     </form>
 </section>
@@ -236,5 +261,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/nat_rules.js') }}" defer></script>
+<script src="{{ url_for('static', path='/js/nat_rules.js') }}?v=20260609-nat-filter-layout" defer></script>
 {% endblock %}

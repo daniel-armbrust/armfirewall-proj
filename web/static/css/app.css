@@ -419,7 +419,7 @@ a {
     --copilot-glow: 0.55;
     position: fixed;
     z-index: 60;
-    right: 18px;
+    right: 28px;
     bottom: 18px;
     width: 92px;
     height: 92px;
@@ -970,14 +970,20 @@ body.graph-modal-open {
 
 .chain-policy-select {
     width: 92px;
-    min-height: 26px;
+    min-height: 28px;
+    padding: 0 10px;
     border: 1px solid var(--line);
     border-radius: 2px;
-    color: var(--accent);
-    background: var(--panel);
+    color: var(--ink);
+    background: var(--panel-2);
     font: inherit;
-    font-size: 11px;
     font-weight: 900;
+    outline: none;
+}
+
+.chain-policy-select:focus {
+    border-color: var(--line-hot);
+    box-shadow: 0 0 0 2px var(--shadow);
 }
 
 .table-wrap {
@@ -1477,6 +1483,72 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     gap: 10px;
 }
 
+.users-inventory-actions {
+    margin: 14px 0 0;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.users-add-button {
+    min-width: 118px;
+    min-height: 36px;
+    padding: 0 18px;
+}
+
+.policy-route-actions {
+    justify-content: flex-start;
+}
+
+.policy-apply-button {
+    min-width: 118px;
+    min-height: 36px;
+    padding: 0 18px;
+}
+
+.policy-main-tabs {
+    margin-top: 12px;
+}
+
+.policy-routes-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.policy-routes-title select {
+    min-width: 72px;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    color: var(--ink);
+    background: var(--panel-2);
+    font: inherit;
+    font-weight: 900;
+    text-transform: lowercase;
+    outline: none;
+}
+
+.policy-routes-title select:focus {
+    border-color: var(--line-hot);
+    box-shadow: 0 0 0 2px var(--shadow);
+}
+
+.policy-create-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-start;
+}
+
+.policy-create-button {
+    min-width: 86px;
+}
+
+.filter-chain-tabs {
+    margin-bottom: 12px;
+}
+
 .service-inline-actions {
     display: flex;
     align-items: center;
@@ -1722,6 +1794,19 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     margin: 22px 0 14px;
 }
 
+.routing-service-actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+    margin: 22px 0 14px;
+    overflow-x: auto;
+}
+
+.routing-service-actions .local-tabs {
+    margin: 0;
+    overflow: visible;
+}
+
 .local-tab {
     min-height: 34px;
     padding: 0 13px;
@@ -1744,12 +1829,69 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     background: rgba(46, 242, 124, 0.08);
 }
 
+.firewall-work-tab {
+    margin-left: 12px;
+}
+
 .firewall-form-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .firewall-rules-table {
     min-width: 1180px;
+}
+
+.filter-chain-panel {
+    width: calc(100% - 28px);
+    max-width: calc(100% - 28px);
+}
+
+.filter-rules-scroll {
+    max-height: 340px;
+    overflow: auto;
+}
+
+.filter-rules-scroll .data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.table-pagination {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--line);
+    min-height: 58px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: rgba(1, 12, 9, 0.72);
+}
+
+.table-pagination-nav,
+.table-page-size {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.table-page-button {
+    width: 38px;
+    justify-content: center;
+}
+
+.table-page-status,
+.table-page-size span {
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.table-page-size select {
+    min-width: 74px;
+    min-height: 34px;
 }
 
 .firewall-family-row td {
@@ -2174,6 +2316,22 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .routing-settings-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.routing-protocol-panel {
+    margin-top: 14px;
+}
+
+.routing-global-actions {
+    justify-content: flex-start;
+    margin-top: 14px;
+    padding: 0 14px;
+}
+
+.routing-apply-button {
+    min-width: 118px;
+    min-height: 36px;
+    padding: 0 18px;
 }
 
 .routing-router-id {

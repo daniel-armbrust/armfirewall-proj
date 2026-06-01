@@ -19,13 +19,19 @@
     const ifaceOutSelect = document.querySelector("#mangle-iface-out");
     const srcAddr = document.querySelector("#mangle-src-addr");
     const dstAddr = document.querySelector("#mangle-dst-addr");
+    const createButtons = Array.from(document.querySelectorAll("[data-mangle-create-for]"));
+    const chainButtons = Array.from(document.querySelectorAll("[data-mangle-chain-tab]"));
+    const chainPanels = Array.from(document.querySelectorAll("[data-mangle-chain-panel]"));
+    const MANGLE_CHAINS = ["PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"];
     let pendingApplyChain = "";
     let pendingDeleteButton = null;
     let currentRulesByKey = new Map();
-    let currentRulesData = null;
-    let selectedRuleFamily = "IPV4";
+    let currentChains = {};
     let workRequestsPoller = null;
     let workRequestsLoading = false;
+    let activeChain = "PREROUTING";
+    let activeTab = "rules";
+    const chainPagination = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, {page: 1, pageSize: 25}]));
     const WORK_REQUESTS_POLL_MS = 3000;
     const rulesBodies = {
         PREROUTING: document.querySelector("#mangle-prerouting-body"),
@@ -41,6 +47,11 @@
         OUTPUT: document.querySelector("#mangle-output-count"),
         POSTROUTING: document.querySelector("#mangle-postrouting-count"),
     };
+    const familyFilterSelects = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-family-filter='${chain}']`)]));
+    const pageStatusLabels = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-page-status='${chain}']`)]));
+    const pagePrevButtons = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-page-prev='${chain}']`)]));
+    const pageNextButtons = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-page-next='${chain}']`)]));
+    const pageSizeSelects = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-page-size='${chain}']`)]));
 
     function setState(value) {
         if (stateLabel) {
@@ -54,13 +65,33 @@
         }
     }
 
+    function setActiveChain(chain) {
+        activeChain = chain || "PREROUTING";
+        chainButtons.forEach((button) => {
+            button.classList.toggle("active", activeTab === "rules" && button.dataset.mangleChainTab === activeChain);
+        });
+        chainPanels.forEach((panel) => {
+            panel.hidden = panel.dataset.mangleChainPanel !== activeChain;
+        });
+    }
+
+    function createContextForTab(tabName) {
+        return tabName === "new-rule" ? "rules" : tabName;
+    }
+
     function setActiveTab(tabName, refreshData = false) {
+        const createContext = createContextForTab(tabName);
+        activeTab = createContext === "rules" ? "rules" : tabName;
         document.querySelectorAll("[data-mangle-tab]").forEach((tab) => {
             tab.classList.toggle("active", tab.dataset.mangleTab === tabName);
         });
         document.querySelectorAll("[data-mangle-view]").forEach((view) => {
             view.hidden = view.dataset.mangleView !== tabName;
         });
+        createButtons.forEach((button) => {
+            button.hidden = button.dataset.mangleCreateFor !== createContext;
+        });
+        setActiveChain(activeChain);
         if (tabName !== "work-requests") {
             stopWorkRequestsPolling();
         }
@@ -71,6 +102,7 @@
             loadRules();
         } else if (tabName === "new-rule") {
             loadInterfaceChoices();
+            setSelectValue(chainSelect, activeChain);
             updateFormShape();
         } else if (tabName === "work-requests") {
             startWorkRequestsPolling();
@@ -102,6 +134,20 @@
             option.textContent = item.label;
             select.appendChild(option);
         });
+    }
+
+    function setSelectValue(select, value) {
+        if (!select) {
+            return;
+        }
+        const nextValue = value === null || value === undefined ? "" : String(value);
+        if (nextValue && !Array.from(select.options).some((option) => option.value === nextValue)) {
+            const option = document.createElement("option");
+            option.value = nextValue;
+            option.textContent = nextValue;
+            select.appendChild(option);
+        }
+        select.value = nextValue;
     }
 
     function setFieldHidden(field, shouldHide) {
@@ -276,44 +322,73 @@
         `;
     }
 
+    function familyLabel(family) {
+        return family === "IPV4" ? "IPv4" : "IPv6";
+    }
+
     function renderChain(chain, rules) {
         const body = rulesBodies[chain];
         const count = ruleCounts[chain];
-        const allChainRules = rules || [];
-        const chainRules = allChainRules.filter((rule) => rule.family === selectedRuleFamily);
+        const chainRules = rules || [];
+        const activeFamily = familyFilterSelects[chain] ? familyFilterSelects[chain].value : "IPV4";
+        const filteredRules = chainRules.filter((rule) => rule.family === activeFamily);
+        const pagination = chainPagination[chain] || {page: 1, pageSize: 25};
+        const totalItems = filteredRules.length;
+        const totalPages = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
+        pagination.page = Math.min(Math.max(1, pagination.page), totalPages);
+        const startIndex = totalItems ? (pagination.page - 1) * pagination.pageSize : 0;
+        const endIndex = Math.min(startIndex + pagination.pageSize, totalItems);
+        const visibleRules = filteredRules.slice(startIndex, endIndex);
 
         if (count) {
-            count.textContent = `rules=${chainRules.length}`;
+            count.textContent = `${familyLabel(activeFamily)} rules=${filteredRules.length}`;
         }
+        updatePagination(chain, pagination.page, totalPages, totalItems, startIndex, endIndex);
         if (!body) {
             return;
         }
-        if (!chainRules.length) {
+        if (!visibleRules.length) {
             body.innerHTML = `
                 <tr>
                     <td colspan="11">
-                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${HF.escapeHtml(selectedRuleFamily)} ${HF.escapeHtml(chain)} mangle rules</span></div>
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${familyLabel(activeFamily)} ${HF.escapeHtml(chain)} mangle rules</span></div>
                     </td>
                 </tr>
             `;
             return;
         }
-        body.innerHTML = chainRules.map(ruleRow).join("");
+        body.innerHTML = visibleRules.map(ruleRow).join("");
+    }
+
+    function updatePagination(chain, page, totalPages, totalItems, startIndex, endIndex) {
+        const status = pageStatusLabels[chain];
+        const prev = pagePrevButtons[chain];
+        const next = pageNextButtons[chain];
+        const firstItem = totalItems ? startIndex + 1 : 0;
+        const lastItem = totalItems ? endIndex : 0;
+        if (status) {
+            status.textContent = `Page ${page} of ${totalPages} (${firstItem} - ${lastItem} of ${totalItems} total items)`;
+        }
+        if (prev) {
+            prev.disabled = page <= 1;
+        }
+        if (next) {
+            next.disabled = page >= totalPages;
+        }
     }
 
     function renderRules(data) {
         const chains = data.chains || {};
-        const selectedRules = (data.rules || []).filter((rule) => rule.family === selectedRuleFamily);
+        currentChains = chains;
         currentRulesByKey = new Map();
-        currentRulesData = data;
         (data.rules || []).forEach((rule) => {
             currentRulesByKey.set(ruleKey(rule.family, rule.chain, rule.id), rule);
         });
-        updateMetric("#mangle-summary-total", selectedRules.length);
-        updateMetric("#mangle-summary-enabled", selectedRules.filter((rule) => HF.number(rule.enabled) === 1).length);
-        updateMetric("#mangle-summary-disabled", selectedRules.filter((rule) => HF.number(rule.enabled) !== 1).length);
-        updateMetric("#mangle-summary-protected", selectedRules.filter((rule) => HF.number(rule.protected) === 1).length);
-        ["PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"].forEach((chain) => renderChain(chain, chains[chain] || []));
+        updateMetric("#mangle-summary-total", data.summary.total);
+        updateMetric("#mangle-summary-enabled", data.summary.enabled);
+        updateMetric("#mangle-summary-disabled", data.summary.disabled);
+        updateMetric("#mangle-summary-protected", data.summary.protected);
+        MANGLE_CHAINS.forEach((chain) => renderChain(chain, chains[chain] || []));
     }
 
     function renderWorkRequests(data) {
@@ -353,13 +428,13 @@
 
     function openApplyModal(chain) {
         pendingApplyChain = chain;
-        const chainRules = Array.from(currentRulesByKey.values()).filter((rule) => rule.chain === chain && rule.family === selectedRuleFamily).length;
+        const chainRules = Array.from(document.querySelectorAll(`#mangle-${chain.toLowerCase()}-body tr:not(.firewall-family-row)`)).length;
 
         if (applyChainLabel) {
-            applyChainLabel.textContent = `family=${selectedRuleFamily} chain=${chain}`;
+            applyChainLabel.textContent = `chain=${chain}`;
         }
         if (applyMessage) {
-            applyMessage.textContent = `Are you sure you want to apply ${chainRules} enabled mangle ${selectedRuleFamily} rule(s) from the ${chain} chain?`;
+            applyMessage.textContent = `Are you sure you want to apply ${chainRules} rule row(s) from the ${chain} chain?`;
         }
         if (applyModal) {
             applyModal.hidden = false;
@@ -456,8 +531,6 @@
             const chain = pendingApplyChain;
             const result = await HF.fetchJson(`/api/firewall/mangle-rules/${chain}/apply`, {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({family: selectedRuleFamily}),
             });
             setFormStatus(`queued=${result.work_request_count}`);
             closeApplyModal();
@@ -475,12 +548,14 @@
         event.preventDefault();
         try {
             setFormStatus("queue=writing");
+            const payload = payloadFromForm();
             const result = await HF.fetchJson("/api/firewall/mangle-rules", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payloadFromForm()),
+                body: JSON.stringify(payload),
             });
             setFormStatus(`saved=${result.rule_id}`);
+            setActiveChain(payload.chain);
             ruleForm.reset();
             updateFormShape();
             setActiveTab("rules", true);
@@ -542,20 +617,48 @@
         tab.addEventListener("click", () => setActiveTab(tab.dataset.mangleTab, true));
     });
 
-    document.querySelectorAll("[data-mangle-family-tab]").forEach((tab) => {
-        tab.addEventListener("click", () => {
-            selectedRuleFamily = tab.dataset.mangleFamilyTab || "IPV4";
-            document.querySelectorAll("[data-mangle-family-tab]").forEach((item) => {
-                item.classList.toggle("active", item.dataset.mangleFamilyTab === selectedRuleFamily);
-            });
-            if (currentRulesData) {
-                renderRules(currentRulesData);
-            }
+    chainButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setActiveChain(button.dataset.mangleChainTab);
+            setActiveTab("rules", true);
         });
     });
 
-    document.querySelectorAll("[data-chain-apply]").forEach((button) => {
-        button.addEventListener("click", () => openApplyModal(button.dataset.chainApply));
+    Object.entries(familyFilterSelects).forEach(([chain, select]) => {
+        if (select) {
+            select.addEventListener("change", () => {
+                chainPagination[chain].page = 1;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pageSizeSelects).forEach(([chain, select]) => {
+        if (select) {
+            select.addEventListener("change", () => {
+                chainPagination[chain].page = 1;
+                chainPagination[chain].pageSize = Number(select.value) || 25;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pagePrevButtons).forEach(([chain, button]) => {
+        if (button) {
+            button.addEventListener("click", () => {
+                chainPagination[chain].page = Math.max(1, chainPagination[chain].page - 1);
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(pageNextButtons).forEach(([chain, button]) => {
+        if (button) {
+            button.addEventListener("click", () => {
+                chainPagination[chain].page += 1;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
     });
 
     document.querySelectorAll("[data-apply-cancel]").forEach((button) => {
@@ -623,6 +726,7 @@
     });
 
     updateFormShape();
+    setActiveChain("PREROUTING");
     setActiveTab("rules");
     loadInterfaceChoices();
     loadRules();

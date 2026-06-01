@@ -9,15 +9,6 @@
     <div class="refresh-state" id="policy-routing-state">Ready</div>
 </section>
 
-<nav class="local-tabs" aria-label="Policy routing menu">
-    <button class="local-tab active" type="button" data-policy-tab="routes">Routes</button>
-    <button class="local-tab" type="button" data-policy-tab="new-route">New Route</button>
-    <button class="local-tab" type="button" data-policy-tab="rules">Rules</button>
-    <button class="local-tab" type="button" data-policy-tab="new-rule">New Rule</button>
-    <button class="local-tab" type="button" data-policy-tab="tables">Tables</button>
-    <button class="local-tab" type="button" data-policy-tab="work-requests">Work Requests</button>
-</nav>
-
 <section class="summary-grid compact" aria-label="Policy routing summary">
     <div class="metric">
         <span class="metric-label">Tables</span>
@@ -37,17 +28,30 @@
     </div>
 </section>
 
-<nav class="local-tabs" aria-label="Policy routing family">
-    <button class="local-tab active" type="button" data-policy-family="ipv4">IPv4</button>
-    <button class="local-tab" type="button" data-policy-family="ipv6">IPv6</button>
+<nav class="local-tabs policy-main-tabs" aria-label="Policy routing menu">
+    <button class="local-tab active" type="button" data-policy-tab="routes">Routes</button>
+    <button class="local-tab" type="button" data-policy-tab="rules">Rules</button>
+    <button class="local-tab" type="button" data-policy-tab="tables">Tables</button>
+    <button class="local-tab" type="button" data-policy-tab="work-requests">Work Requests</button>
 </nav>
+
+<div class="policy-create-actions">
+    <button class="local-tab policy-create-button" type="button" data-policy-tab="new-route" data-policy-create-for="routes">New Route</button>
+    <button class="local-tab policy-create-button" type="button" data-policy-tab="new-rule" data-policy-create-for="rules" hidden>New Rule</button>
+    <button class="local-tab policy-create-button" type="button" data-policy-tab="new-table" data-policy-create-for="tables" hidden>New Table</button>
+</div>
 
 <section class="panel" data-policy-view="routes">
     <div class="panel-head">
-        <h2>Routes</h2>
+        <div class="policy-routes-title">
+            <h2>Routes</h2>
+            <select id="policy-family-filter" aria-label="Policy routing family filter">
+                <option value="ipv4">ipv4</option>
+                <option value="ipv6">ipv6</option>
+            </select>
+        </div>
         <div class="panel-actions">
             <span id="policy-routes-count">routes=0</span>
-            <button class="text-button compact" type="button" data-policy-apply>Apply</button>
         </div>
     </div>
     <div class="table-wrap">
@@ -76,95 +80,98 @@
     </div>
 </section>
 
-<section class="panel" data-policy-view="new-route" hidden>
-    <div class="panel-head">
-        <h2>New Route</h2>
-        <span id="policy-route-form-status">queue=idle</span>
-    </div>
-    <form class="edit-form" id="policy-route-form">
-        <div class="form-grid firewall-form-grid">
-            <label class="field">
-                <span>Family</span>
-                <select name="addr_family" id="policy-route-family">
-                    <option value="ipv4">IPv4</option>
-                    <option value="ipv6">IPv6</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Table</span>
-                <select name="table_id" id="policy-route-table"></select>
-            </label>
-            <label class="field">
-                <span>Type</span>
-                <select name="route_type">
-                    <option value="unicast">unicast</option>
-                    <option value="blackhole">blackhole</option>
-                    <option value="unreachable">unreachable</option>
-                    <option value="prohibit">prohibit</option>
-                    <option value="throw">throw</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Destination</span>
-                <input name="destination" type="text" value="default">
-            </label>
-            <label class="field">
-                <span>Gateway</span>
-                <input name="gateway" type="text" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>Device</span>
-                <select name="dev" id="policy-route-dev">
-                    <option value="">optional</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Preferred source</span>
-                <input name="preferred_source" type="text" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>Metric</span>
-                <input name="metric" type="number" min="0" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>Scope</span>
-                <select name="scope">
-                    <option value="">optional</option>
-                    <option value="global">global</option>
-                    <option value="link">link</option>
-                    <option value="host">host</option>
-                    <option value="nowhere">nowhere</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Protocol</span>
-                <select name="protocol">
-                    <option value="">optional</option>
-                    <option value="static">static</option>
-                    <option value="kernel">kernel</option>
-                    <option value="boot">boot</option>
-                    <option value="dhcp">dhcp</option>
-                    <option value="ra">ra</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Onlink</span>
-                <select name="onlink">
-                    <option value="0">no</option>
-                    <option value="1">yes</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Status</span>
-                <select name="enabled">
-                    <option value="1">enabled</option>
-                    <option value="0">disabled</option>
-                </select>
-            </label>
-        </div>
-        <div class="form-actions">
-            <button class="text-button compact" type="reset">Reset</button>
-            <button class="text-button compact" type="submit">Queue route</button>
+<section data-policy-view="new-route" hidden>
+    <form id="policy-route-form">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>New Route</h2>
+                <span id="policy-route-form-status">queue=idle</span>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid firewall-form-grid">
+                    <label class="field">
+                        <span>Family</span>
+                        <select name="addr_family" id="policy-route-family">
+                            <option value="ipv4">IPv4</option>
+                            <option value="ipv6">IPv6</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Table</span>
+                        <select name="table_id" id="policy-route-table"></select>
+                    </label>
+                    <label class="field">
+                        <span>Type</span>
+                        <select name="route_type">
+                            <option value="unicast">unicast</option>
+                            <option value="blackhole">blackhole</option>
+                            <option value="unreachable">unreachable</option>
+                            <option value="prohibit">prohibit</option>
+                            <option value="throw">throw</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Destination</span>
+                        <input name="destination" type="text" value="default">
+                    </label>
+                    <label class="field">
+                        <span>Gateway</span>
+                        <input name="gateway" type="text" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>Device</span>
+                        <select name="dev" id="policy-route-dev">
+                            <option value="">optional</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Preferred source</span>
+                        <input name="preferred_source" type="text" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>Metric</span>
+                        <input name="metric" type="number" min="0" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>Scope</span>
+                        <select name="scope">
+                            <option value="">optional</option>
+                            <option value="global">global</option>
+                            <option value="link">link</option>
+                            <option value="host">host</option>
+                            <option value="nowhere">nowhere</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Protocol</span>
+                        <select name="protocol">
+                            <option value="">optional</option>
+                            <option value="static">static</option>
+                            <option value="kernel">kernel</option>
+                            <option value="boot">boot</option>
+                            <option value="dhcp">dhcp</option>
+                            <option value="ra">ra</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Onlink</span>
+                        <select name="onlink">
+                            <option value="0">no</option>
+                            <option value="1">yes</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Status</span>
+                        <select name="enabled">
+                            <option value="1">enabled</option>
+                            <option value="0">disabled</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+        </section>
+        <div class="form-actions policy-route-actions">
+            <button class="text-button primary policy-apply-button" type="submit">Apply</button>
         </div>
     </form>
 </section>
@@ -174,7 +181,6 @@
         <h2>Rules</h2>
         <div class="panel-actions">
             <span id="policy-rules-count">rules=0</span>
-            <button class="text-button compact" type="button" data-policy-apply>Apply</button>
         </div>
     </div>
     <div class="table-wrap">
@@ -201,80 +207,83 @@
     </div>
 </section>
 
-<section class="panel" data-policy-view="new-rule" hidden>
-    <div class="panel-head">
-        <h2>New Rule</h2>
-        <span id="policy-rule-form-status">queue=idle</span>
-    </div>
-    <form class="edit-form" id="policy-rule-form">
-        <div class="form-grid firewall-form-grid">
-            <label class="field">
-                <span>Family</span>
-                <select name="addr_family" id="policy-rule-family">
-                    <option value="ipv4">IPv4</option>
-                    <option value="ipv6">IPv6</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Priority</span>
-                <input name="priority" type="number" min="0" required>
-            </label>
-            <label class="field">
-                <span>From</span>
-                <input name="source_addr" type="text" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>To</span>
-                <input name="destination_addr" type="text" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>Interface IN</span>
-                <select name="incoming_iface" id="policy-rule-iif">
-                    <option value="">optional</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>Interface OUT</span>
-                <select name="outgoing_iface" id="policy-rule-oif">
-                    <option value="">optional</option>
-                </select>
-            </label>
-            <label class="field">
-                <span>fwmark</span>
-                <input name="fwmark" type="text" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>fwmask</span>
-                <input name="fwmask" type="text" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>Action</span>
-                <select name="action" id="policy-rule-action">
-                    <option value="lookup">lookup</option>
-                    <option value="blackhole">blackhole</option>
-                    <option value="unreachable">unreachable</option>
-                    <option value="prohibit">prohibit</option>
-                </select>
-            </label>
-            <label class="field" data-rule-table-field>
-                <span>Table</span>
-                <select name="table_id" id="policy-rule-table"></select>
-            </label>
-            <label class="field">
-                <span>Protocol</span>
-                <input name="ip_proto" type="text" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>Status</span>
-                <select name="enabled">
-                    <option value="1">enabled</option>
-                    <option value="0">disabled</option>
-                </select>
-            </label>
-        </div>
-        <div class="form-actions">
-            <button class="text-button compact" type="reset">Reset</button>
-            <button class="text-button compact" type="submit">Queue rule</button>
+<section data-policy-view="new-rule" hidden>
+    <form id="policy-rule-form">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>New Rule</h2>
+                <span id="policy-rule-form-status">queue=idle</span>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid firewall-form-grid">
+                    <label class="field">
+                        <span>Family</span>
+                        <select name="addr_family" id="policy-rule-family">
+                            <option value="ipv4">IPv4</option>
+                            <option value="ipv6">IPv6</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Priority</span>
+                        <input name="priority" type="number" min="0" required>
+                    </label>
+                    <label class="field">
+                        <span>From</span>
+                        <input name="source_addr" type="text" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>To</span>
+                        <input name="destination_addr" type="text" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>Interface IN</span>
+                        <select name="incoming_iface" id="policy-rule-iif">
+                            <option value="">optional</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Interface OUT</span>
+                        <select name="outgoing_iface" id="policy-rule-oif">
+                            <option value="">optional</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>fwmark</span>
+                        <input name="fwmark" type="text" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>fwmask</span>
+                        <input name="fwmask" type="text" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>Action</span>
+                        <select name="action" id="policy-rule-action">
+                            <option value="lookup">lookup</option>
+                            <option value="blackhole">blackhole</option>
+                            <option value="unreachable">unreachable</option>
+                            <option value="prohibit">prohibit</option>
+                        </select>
+                    </label>
+                    <label class="field" data-rule-table-field>
+                        <span>Table</span>
+                        <select name="table_id" id="policy-rule-table"></select>
+                    </label>
+                    <label class="field">
+                        <span>Protocol</span>
+                        <input name="ip_proto" type="text" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>Status</span>
+                        <select name="enabled">
+                            <option value="1">enabled</option>
+                            <option value="0">disabled</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+        </section>
+        <div class="form-actions policy-route-actions">
+            <button class="text-button primary policy-apply-button" type="submit">Apply</button>
         </div>
     </form>
 </section>
@@ -284,37 +293,8 @@
         <h2>Tables</h2>
         <div class="panel-actions">
             <span id="policy-tables-count">tables=0</span>
-            <button class="text-button compact" type="button" data-policy-apply>Apply</button>
         </div>
     </div>
-    <form class="edit-form" id="policy-table-form">
-        <div class="form-grid firewall-form-grid">
-            <label class="field">
-                <span>Table ID</span>
-                <input name="table_id" type="number" min="1" required>
-            </label>
-            <label class="field">
-                <span>Name</span>
-                <input name="table_name" type="text" required>
-            </label>
-            <label class="field">
-                <span>Description</span>
-                <input name="description" type="text" placeholder="optional">
-            </label>
-            <label class="field">
-                <span>Status</span>
-                <select name="enabled">
-                    <option value="1">enabled</option>
-                    <option value="0">disabled</option>
-                </select>
-            </label>
-        </div>
-        <div class="form-actions">
-            <span id="policy-table-form-status">queue=idle</span>
-            <button class="text-button compact" type="reset">Reset</button>
-            <button class="text-button compact" type="submit">Add table</button>
-        </div>
-    </form>
     <div class="table-wrap">
         <table class="data-table">
             <thead>
@@ -329,6 +309,43 @@
             <tbody id="policy-tables-body"></tbody>
         </table>
     </div>
+</section>
+
+<section data-policy-view="new-table" hidden>
+    <form id="policy-table-form">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>New Table</h2>
+                <span id="policy-table-form-status">queue=idle</span>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid firewall-form-grid">
+                    <label class="field">
+                        <span>Table ID</span>
+                        <input name="table_id" type="number" min="1" required>
+                    </label>
+                    <label class="field">
+                        <span>Name</span>
+                        <input name="table_name" type="text" required>
+                    </label>
+                    <label class="field">
+                        <span>Description</span>
+                        <input name="description" type="text" placeholder="optional">
+                    </label>
+                    <label class="field">
+                        <span>Status</span>
+                        <select name="enabled">
+                            <option value="1">enabled</option>
+                            <option value="0">disabled</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+        </section>
+        <div class="form-actions policy-route-actions">
+            <button class="text-button primary policy-apply-button" type="submit">Apply</button>
+        </div>
+    </form>
 </section>
 
 <section class="panel" data-policy-view="work-requests" hidden>
@@ -395,5 +412,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/policy_routing.js') }}?v=20260530-policy-family-tabs" defer></script>
+<script src="{{ url_for('static', path='/js/policy_routing.js') }}?v=20260609-policy-create-visible" defer></script>
 {% endblock %}

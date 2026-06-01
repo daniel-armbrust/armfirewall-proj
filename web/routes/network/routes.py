@@ -59,6 +59,25 @@ async def api_save_bird_global_settings(request: Request) -> dict[str, Any]:
     return routing_protocols_api.save_global_settings(payload)
 
 
+@router.get("/api/network/routing-protocols/bird/logs")
+def api_bird_logs() -> dict[str, Any]:
+    """Return recent BIRD daemon logs."""
+    return routing_protocols_api.read_bird_logs()
+
+
+@router.get("/api/network/routing-protocols/bird/rip-settings")
+def api_bird_rip_settings() -> dict[str, Any]:
+    """Return BIRD RIP protocol settings."""
+    return routing_protocols_api.get_rip_settings()
+
+
+@router.put("/api/network/routing-protocols/bird/rip-settings")
+async def api_save_bird_rip_settings(request: Request) -> dict[str, Any]:
+    """Save BIRD RIP protocol settings."""
+    payload = await request.json()
+    return routing_protocols_api.save_rip_settings(payload)
+
+
 @router.post("/api/network/policy-routing/tables")
 async def api_create_policy_routing_table(request: Request) -> dict[str, Any]:
     """Create a policy routing table entry."""

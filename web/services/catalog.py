@@ -15,7 +15,8 @@ PUBLIC_SERVICE_COLUMNS = """
     description,
     service_group,
     protected,
-    restart_allowed
+    restart_allowed,
+    package_name
 """
 
 
