@@ -22,7 +22,6 @@ def graph_latency(rrdtool: str, target: LatencyTarget, rrd_path: Path) -> None:
     """Generate latency graphs for all standard periods."""
     base_path = image_path_for_target(target, "latency")
     title = f"{target.name} latency ({target.address})"
-    
     for period_name, period_label, period_start in GRAPH_PERIODS:
         run_command(
             [
@@ -41,6 +40,11 @@ def graph_latency(rrdtool: str, target: LatencyTarget, rrd_path: Path) -> None:
                 f"{title} - {period_label}",
                 "--vertical-label",
                 "Milliseconds",
+                "--upper-limit",
+                "200",
+                "--lower-limit",
+                "0",
+                "--rigid",
                 *MONITORIX_GRAPH_COLORS,
                 f"DEF:min={rrd_path}:min:AVERAGE",
                 f"DEF:avg={rrd_path}:avg:AVERAGE",
@@ -65,7 +69,6 @@ def graph_loss(rrdtool: str, target: LatencyTarget, rrd_path: Path) -> None:
     """Generate packet loss graphs for all standard periods."""
     base_path = image_path_for_target(target, "loss")
     title = f"{target.name} packet loss ({target.address})"
-    
     for period_name, period_label, period_start in GRAPH_PERIODS:
         run_command(
             [
@@ -88,6 +91,7 @@ def graph_loss(rrdtool: str, target: LatencyTarget, rrd_path: Path) -> None:
                 "100",
                 "--lower-limit",
                 "0",
+                "--rigid",
                 *MONITORIX_GRAPH_COLORS,
                 f"DEF:loss={rrd_path}:loss:AVERAGE",
                 "AREA:loss#EE4444:Packet loss",
