@@ -13,10 +13,16 @@
         <a class="menu-link child {% if current_path == '/network/kernel-params' %}active{% endif %}" href="/network/kernel-params">Kernel Params</a>
         <a class="menu-link child {% if current_path == '/network/neighbor-table' %}active{% endif %}" href="/network/neighbor-table">Neighbor Table</a>
         <a class="menu-link child {% if current_path == '/network/policy-routing' %}active{% endif %}" href="/network/policy-routing">Policy Routing</a>
-        {% if request.app.state.service_installed('bird') %}
-        <a class="menu-link child {% if current_path.startswith('/routing') or current_path == '/network/routing-protocols' %}active{% endif %}" href="/network/routing-protocols">Routing Protocols</a>
-        {% endif %}
         <a class="menu-link child {% if current_path == '/network/qos' %}active{% endif %}" href="/network/qos">QoS</a>
+
+        <div class="menu-group">Routing Protocols</div>
+        {% if request.app.state.service_installed('bird') %}
+        {% set routing_view = request.query_params.get('view', 'global-config') if current_path == '/network/routing-protocols' else '' %}
+        <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'global-config' %}active{% endif %}" href="/network/routing-protocols?view=global-config">BIRD Settings</a>
+        <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'rip' %}active{% endif %}" href="/network/routing-protocols?view=rip">RIP</a>
+        <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'ospf' %}active{% endif %}" href="/network/routing-protocols?view=ospf">OSPF</a>
+        <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'bgp' %}active{% endif %}" href="/network/routing-protocols?view=bgp">BGP</a>
+        {% endif %}
 
         <div class="menu-group">Firewall</div>
         <a class="menu-link child {% if current_path == '/firewall/filter-rules' %}active{% endif %}" href="/firewall/filter-rules">Filter Rules</a>

@@ -18,13 +18,24 @@
     const workRequestsPanel = document.querySelector("#bird-work-requests-panel");
     const workRequestsBody = document.querySelector("#bird-work-requests-body");
     const workRequestsCount = document.querySelector("#bird-work-requests-count");
+    const routingServiceActions = document.querySelector(".routing-service-actions");
+    const serviceActionTabs = document.querySelector(".service-action-tabs");
+    const contextButtons = Array.from(document.querySelectorAll("[data-routing-context-button]"));
+    const diagnosticsPanel = document.querySelector("#bird-diagnostics-panel");
+    const diagnosticsSummary = document.querySelector("#bird-diagnostics-summary");
+    const diagnosticsMeta = document.querySelector("#bird-diagnostics-meta");
+    const diagnosticsBody = document.querySelector("#bird-diagnostics-protocols-body");
+    const diagnosticsOutput = document.querySelector("#bird-diagnostics-output");
     const viewButtons = Array.from(document.querySelectorAll("[data-routing-view]"));
+    const WORK_REQUEST_REFRESH_MS = 3000;
+    const DIAGNOSTICS_REFRESH_MS = 5000;
     const panels = {
         "global-config": document.querySelector("#routing-global-config-panel"),
         rip: document.querySelector("#routing-rip-panel"),
         ospf: document.querySelector("#routing-ospf-panel"),
         bgp: document.querySelector("#routing-bgp-panel"),
         logs: logsPanel,
+        diagnostics: diagnosticsPanel,
         "work-requests": workRequestsPanel,
     };
 
@@ -69,6 +80,7 @@
         },
     };
     let currentServiceState = "";
+    let routingSettingsContext = "global-config";
     let pendingAction = null;
     let logsLoading = false;
     let ripLoading = false;
@@ -148,25 +160,70 @@
         syncRipAuthenticationPassword("password");
     }
 
+    function workRequestsVisible() {
+        return Boolean(workRequestsPanel && !workRequestsPanel.hidden);
+    }
+
+    function diagnosticsVisible() {
+        return Boolean(diagnosticsPanel && !diagnosticsPanel.hidden);
+    }
+
+    function setRoutingNavigationContext(selectedView) {
+        const unimplementedProtocol = selectedView === "ospf" || selectedView === "bgp";
+        if (selectedView === "rip") {
+            routingSettingsContext = "rip";
+        } else if (selectedView !== "diagnostics") {
+            routingSettingsContext = "global-config";
+        }
+
+        if (routingServiceActions) {
+            routingServiceActions.hidden = unimplementedProtocol;
+        }
+        if (serviceActionTabs) {
+            serviceActionTabs.hidden = routingSettingsContext === "rip";
+        }
+        contextButtons.forEach((button) => {
+            button.hidden = button.dataset.routingContextButton !== routingSettingsContext;
+        });
+    }
+
+    function isRoutingButtonActive(button, selectedView) {
+        if (button.dataset.routingView === selectedView) {
+            return true;
+        }
+        return selectedView === "diagnostics" && button.dataset.routingView === "diagnostics";
+    }
+
     function setActiveView(viewName) {
         const selectedView = panels[viewName] ? viewName : "global-config";
+        setRoutingNavigationContext(selectedView);
         Object.entries(panels).forEach(([name, panel]) => {
             if (panel) {
                 panel.hidden = name !== selectedView;
             }
         });
         viewButtons.forEach((button) => {
-            button.classList.toggle("active", button.dataset.routingView === selectedView);
+            button.classList.toggle("active", isRoutingButtonActive(button, selectedView));
         });
         if (selectedView === "work-requests") {
-            loadWorkRequests();
+            workRequestsLoading = false;
+            loadWorkRequests({force: true});
         }
         if (selectedView === "logs") {
             loadLogs();
         }
+        if (selectedView === "diagnostics") {
+            loadDiagnostics({force: true});
+        }
         if (selectedView === "rip") {
             loadRip();
         }
+    }
+
+    async function showWorkRequests() {
+        setActiveView("work-requests");
+        workRequestsLoading = false;
+        await loadWorkRequests({force: true});
     }
 
     function closeActionModal() {
@@ -226,7 +283,7 @@
         if (routeTableSelect) {
             routeTableSelect.innerHTML = "";
             (tables || []).forEach((table) => {
-                const label = `${HF.text(table.table_id)} : ${HF.text(table.table_name)}`;
+                const label = `${HF.text(table.table_name)} (${HF.text(table.table_id)})`;
                 routeTableSelect.appendChild(option(label, table.table_id));
             });
             setFieldValue(routeTableSelect, selectedRouteTable);
@@ -234,10 +291,7 @@
         if (channelTableSelect) {
             channelTableSelect.innerHTML = "";
             channelTableSelect.appendChild(option("-", ""));
-            (tables || []).forEach((table) => {
-                channelTableSelect.appendChild(option(table.table_name, table.table_name));
-            });
-            setFieldValue(channelTableSelect, selectedTableName || "main");
+            setFieldValue(channelTableSelect, "");
         }
     }
 
@@ -457,7 +511,7 @@
             });
             render(data);
             setStatus("", false);
-            scrollToTop();
+            await showWorkRequests();
         } catch (error) {
             setStatus(error.message, true);
         }
@@ -499,7 +553,7 @@
             });
             populateRipForm(data.settings || {});
             setRipStatus("", false);
-            scrollToTop();
+            await showWorkRequests();
         } catch (error) {
             setRipStatus(error.message, true);
         }
@@ -515,7 +569,7 @@
         });
         setStatus("Service action queued.", false);
         await loadWorkRequests();
-        await load();
+        await showWorkRequests();
     }
 
     function renderLogs(data) {
@@ -524,7 +578,7 @@
             logsCount.textContent = `lines=${lines.length}`;
         }
         if (logsOutput) {
-            logsOutput.textContent = lines.length ? lines.join("\n") : "bird.out.log is empty.";
+            logsOutput.textContent = lines.length ? lines.join("\n") : "bird stdout/stderr logs are empty.";
         }
     }
 
@@ -544,6 +598,85 @@
             }
         } finally {
             logsLoading = false;
+        }
+    }
+
+    function diagnosticStateClass(state) {
+        const normalized = String(state || "").toLowerCase();
+        if (normalized === "up") {
+            return "up";
+        }
+        if (normalized === "down" || normalized === "start" || normalized === "stop") {
+            return "down";
+        }
+        return "disabled";
+    }
+
+    function renderDiagnostics(data) {
+        const run = data.last_run;
+        const protocols = data.protocols || [];
+        const collectedAt = run?.collected_at ? String(run.collected_at).split(" ").pop() : "-";
+        if (diagnosticsSummary) {
+            diagnosticsSummary.textContent = run
+                ? `UPDATED ${HF.text(collectedAt)} | ${HF.text(run.duration_ms ?? "-")}ms`
+                : "NO SNAPSHOT";
+        }
+        if (diagnosticsMeta) {
+            diagnosticsMeta.textContent = "";
+        }
+        if (diagnosticsBody) {
+            if (!protocols.length) {
+                diagnosticsBody.innerHTML = `
+                    <tr>
+                        <td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>no protocol rows collected</span></div></td>
+                    </tr>
+                `;
+            } else {
+                diagnosticsBody.innerHTML = protocols.map((protocol) => `
+                    <tr>
+                        <td>${HF.escapeHtml(protocol.name || "-")}</td>
+                        <td>${HF.escapeHtml(protocol.proto || "-")}</td>
+                        <td>${HF.escapeHtml(protocol.table_name || "-")}</td>
+                        <td><span class="status ${diagnosticStateClass(protocol.state)}">${HF.escapeHtml(protocol.state || "-")}</span></td>
+                        <td>${HF.escapeHtml(protocol.since || "-")}</td>
+                        <td>${HF.escapeHtml(protocol.info || "")}</td>
+                    </tr>
+                `).join("");
+            }
+        }
+        if (diagnosticsOutput) {
+            const output = data.raw_output || data.error_output || "No raw output collected.";
+            diagnosticsOutput.textContent = output.trim() || "No raw output collected.";
+        }
+    }
+
+    let diagnosticsLoading = false;
+    async function loadDiagnostics(options = {}) {
+        if (!diagnosticsPanel || diagnosticsPanel.hidden) {
+            return;
+        }
+        if (diagnosticsLoading && !options.force) {
+            return;
+        }
+        diagnosticsLoading = true;
+        try {
+            renderDiagnostics(await HF.fetchJson("/api/network/routing-protocols/bird/diagnostics"));
+        } catch (error) {
+            if (diagnosticsMeta) {
+                diagnosticsMeta.textContent = error.message;
+            }
+            if (diagnosticsBody) {
+                diagnosticsBody.innerHTML = `
+                    <tr>
+                        <td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div></td>
+                    </tr>
+                `;
+            }
+            if (diagnosticsOutput) {
+                diagnosticsOutput.textContent = error.message;
+            }
+        } finally {
+            diagnosticsLoading = false;
         }
     }
 
@@ -578,13 +711,19 @@
         }).join("");
     }
 
-    async function loadWorkRequests() {
-        if (workRequestsLoading || !workRequestsPanel || workRequestsPanel.hidden) {
+    async function loadWorkRequests(options = {}) {
+        if (!workRequestsPanel || workRequestsPanel.hidden) {
+            return;
+        }
+        if (workRequestsLoading && !options.force) {
+            return;
+        }
+        if (workRequestsLoading) {
             return;
         }
         workRequestsLoading = true;
         try {
-            const data = await HF.fetchJson("/api/work-requests?category=SERVICE_MANAGEMENT.SERVICE_CONTROL&service_name=bird&include_payload=true");
+            const data = await HF.fetchJson("/api/work-requests?category=SERVICE_MANAGEMENT.BIRD_CONFIG&category=SERVICE_MANAGEMENT.SERVICE_CONTROL&service_name=bird&include_payload=true");
             renderWorkRequests(data);
         } catch (error) {
             if (workRequestsBody) {
@@ -669,7 +808,29 @@
     if (actionConfirm) {
         actionConfirm.addEventListener("click", runPendingAction);
     }
+    window.setInterval(() => {
+        if (workRequestsVisible()) {
+            loadWorkRequests();
+        }
+    }, WORK_REQUEST_REFRESH_MS);
+    window.setInterval(() => {
+        if (diagnosticsVisible()) {
+            loadDiagnostics();
+        }
+    }, DIAGNOSTICS_REFRESH_MS);
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            return;
+        }
+        if (workRequestsVisible()) {
+            loadWorkRequests({force: true});
+        }
+        if (diagnosticsVisible()) {
+            loadDiagnostics({force: true});
+        }
+    });
 
-    setActiveView("global-config");
+    const initialView = new URLSearchParams(window.location.search).get("view") || window.location.hash.replace("#", "") || "global-config";
+    setActiveView(initialView);
     load();
 })();

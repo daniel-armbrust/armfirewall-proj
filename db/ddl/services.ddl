@@ -37,6 +37,7 @@ INSERT OR IGNORE INTO services (
     ('armfirewall-api', 'armfirewall-api', 'web', 'ArmFirewall HTTPS API and web GUI.', 'main', 1, 1, 10),
     ('armfirewall-ifaced', 'armfirewall-ifaced', 'daemon', 'Interface inventory and network metrics collector.', 'main', 1, 0, 20),
     ('armfirewall-monitord', 'armfirewall-monitord', 'daemon', 'RRD monitoring collector and graph generator.', 'main', 0, 0, 30),
+    ('armfirewall-collectord', 'armfirewall-collectord', 'daemon', 'Operating-system state collector for web GUI snapshots.', 'main', 1, 0, 35),
     ('armfirewall-workreqd', 'armfirewall-workreqd', 'daemon', 'Work request executor for operating system changes.', 'main', 1, 0, 40),
     ('armfirewall-linkfailover', 'armfirewall-linkfailover', 'daemon', 'Ping-based default route failover daemon.', 'main', 0, 0, 50);
 
@@ -120,10 +121,13 @@ startsecs=3
 stopsignal=TERM
 stopasgroup=true
 killasgroup=true
-redirect_stderr=true
+redirect_stderr=false
 stdout_logfile={root}/logs/bird.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=5
+stderr_logfile={root}/logs/bird.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=5
 ',
         120
     ),

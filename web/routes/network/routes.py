@@ -65,6 +65,12 @@ def api_bird_logs() -> dict[str, Any]:
     return routing_protocols_api.read_bird_logs()
 
 
+@router.get("/api/network/routing-protocols/bird/diagnostics")
+def api_bird_diagnostics() -> dict[str, Any]:
+    """Return latest BIRD diagnostics collected from bird.db."""
+    return routing_protocols_api.get_bird_diagnostics()
+
+
 @router.get("/api/network/routing-protocols/bird/rip-settings")
 def api_bird_rip_settings() -> dict[str, Any]:
     """Return BIRD RIP protocol settings."""

@@ -10,6 +10,7 @@ PROTECTED_SERVICES = {
     "armfirewall-api",
     "armfirewall-workreqd",
     "armfirewall-ifaced",
+    "armfirewall-collectord",
 }
 
 RESTARTABLE_PROTECTED_SERVICES = {

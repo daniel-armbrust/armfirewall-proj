@@ -1,0 +1,57 @@
+1-<aside class="sidebar" id="main-menu" aria-label="Main navigation">
+2-    <div class="sidebar-title">Main Menu</div>
+3-    <nav class="menu">
+4:        <div class="menu-group">ArmFirewall</div>
+5-        <a class="menu-link child {% if current_path in ['/', '/dashboard'] %}active{% endif %}" href="/">Dashboard</a>
+6-        <a class="menu-link child {% if current_path == '/armfirewall/ia' %}active{% endif %}" href="/armfirewall/ia">Adam (IA)</a>
+7-        <a class="menu-link child {% if current_path == '/settings/users' %}active{% endif %}" href="/settings/users">Users</a>
+8-        <a class="menu-link child {% if current_path == '/settings/system' %}active{% endif %}" href="/settings/system">Runtime Settings</a>
+9-        <a class="menu-link child {% if current_path == '/settings/system-logs' %}active{% endif %}" href="/settings/system-logs">System Logs</a>
+10-
+11:        <div class="menu-group">Network</div>
+12-        <a class="menu-link child {% if current_path == '/network/interfaces' %}active{% endif %}" href="/network/interfaces">Interfaces</a>
+13-        <a class="menu-link child {% if current_path == '/network/kernel-params' %}active{% endif %}" href="/network/kernel-params">Kernel Params</a>
+14-        <a class="menu-link child {% if current_path == '/network/neighbor-table' %}active{% endif %}" href="/network/neighbor-table">Neighbor Table</a>
+15-        <a class="menu-link child {% if current_path == '/network/qos' %}active{% endif %}" href="/network/qos">QoS</a>
+16-
+17:        <div class="menu-group">Routing</div>
+18-        <a class="menu-link child {% if current_path == '/network/policy-routing' %}active{% endif %}" href="/network/policy-routing">Policy Routing</a>
+19-        {% if request.app.state.service_installed('bird') %}
+20-        {% set routing_view = request.query_params.get('view', 'global-config') if current_path == '/network/routing-protocols' else '' %}
+21-        <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'global-config' %}active{% endif %}" href="/network/routing-protocols?view=global-config">BIRD Settings</a>
+22-        <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'rip' %}active{% endif %}" href="/network/routing-protocols?view=rip">RIP</a>
+23-        <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'ospf' %}active{% endif %}" href="/network/routing-protocols?view=ospf">OSPF</a>
+24-        <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'bgp' %}active{% endif %}" href="/network/routing-protocols?view=bgp">BGP</a>
+25-        {% endif %}
+26-
+27:        <div class="menu-group">Firewall</div>
+28-        <a class="menu-link child {% if current_path == '/firewall/filter-rules' %}active{% endif %}" href="/firewall/filter-rules">Filter Rules</a>
+29-        <a class="menu-link child {% if current_path == '/firewall/nat-rules' %}active{% endif %}" href="/firewall/nat-rules">NAT Rules</a>
+30-        <a class="menu-link child {% if current_path == '/firewall/mangle-rules' %}active{% endif %}" href="/firewall/mangle-rules">Mangle Rules</a>
+31-
+32:        <div class="menu-group">Monitoring</div>
+33-        <a class="menu-link child {% if current_path == '/monitoring/cpu-mem' %}active{% endif %}" href="/monitoring/cpu-mem">CPU &amp; Mem</a>
+34-        <a class="menu-link child {% if current_path == '/monitoring/network' %}active{% endif %}" href="/monitoring/network">Network</a>
+35-        <a class="menu-link child {% if current_path == '/monitoring/system' %}active{% endif %}" href="/monitoring/system">System</a>
+36-        <a class="menu-link child {% if current_path == '/monitoring/socket-states' %}active{% endif %}" href="/monitoring/socket-states">Socket States</a>
+37-        <a class="menu-link child {% if current_path in ['/monitoring/filesystem', '/monitoring/disk'] %}active{% endif %}" href="/monitoring/filesystem">Filesystem</a>
+38-        <a class="menu-link child {% if current_path == '/monitoring/latency' %}active{% endif %}" href="/monitoring/latency">Latency</a>
+39-
+40:        <div class="menu-group">Services</div>
+41-        <a class="menu-link child {% if current_path == '/services/status' %}active{% endif %}" href="/services/status">Status</a>
+42-        <a class="menu-link child {% if current_path == '/services/dnsmasq' %}active{% endif %}" href="/services/dnsmasq">Dnsmasq</a>
+43-        {% if request.app.state.service_installed('libreswan') %}
+44-        <a class="menu-link child {% if current_path == '/services/libreswan' %}active{% endif %}" href="/services/libreswan">Libreswan</a>
+45-        {% endif %}
+46-        {% if request.app.state.service_installed('squid') %}
+47-        <a class="menu-link child {% if current_path == '/services/squid' %}active{% endif %}" href="/services/squid">Squid</a>
+48-        {% endif %}
+49-        <a class="menu-link child {% if current_path == '/services/link-failover' %}active{% endif %}" href="/services/link-failover">Link Failover</a>
+50-
+51:        <div class="menu-group">Tools</div>
+52-        <a class="menu-link child {% if current_path == '/tools/ping' %}active{% endif %}" href="/tools/ping">Ping</a>
+53-        <a class="menu-link child {% if current_path == '/tools/mtr' %}active{% endif %}" href="/tools/mtr">MTR</a>
+54-        <a class="menu-link child {% if current_path == '/tools/packet-capture' %}active{% endif %}" href="/tools/packet-capture">Packet Capture</a>
+55-        <a class="menu-link child {% if current_path == '/tools/traceroute' %}active{% endif %}" href="/tools/traceroute">Traceroute</a>
+56-    </nav>
+57-</aside>

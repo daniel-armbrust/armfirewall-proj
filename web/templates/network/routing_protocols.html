@@ -28,23 +28,17 @@
     </div>
 </section>
 
-<div class="routing-tabs-row">
-    <nav class="local-tabs routing-protocol-tabs" aria-label="Routing protocols menu">
-        <button class="local-tab active" type="button" data-routing-view="global-config">GLOBAL CONFIG</button>
-        <button class="local-tab" type="button" data-routing-view="rip">RIP</button>
-        <button class="local-tab" type="button" data-routing-view="ospf">OSPF</button>
-        <button class="local-tab" type="button" data-routing-view="bgp">BGP</button>
-    </nav>
-</div>
-
 <div class="routing-service-actions">
     <nav class="local-tabs service-action-tabs" aria-label="BIRD service controls">
         <button class="local-tab" type="button" data-bird-service-action="start-restart">START / RESTART</button>
         <button class="local-tab" type="button" data-bird-service-action="stop">STOP</button>
-    </nav>
-    <nav class="local-tabs service-query-tabs" aria-label="BIRD service history">
         <button class="local-tab" type="button" data-routing-view="logs">LOGS</button>
         <button class="local-tab" type="button" data-routing-view="work-requests">WORK REQUESTS</button>
+    </nav>
+    <nav class="local-tabs service-query-tabs" aria-label="Routing protocol navigation">
+        <button class="local-tab active" type="button" data-routing-view="global-config" data-routing-context-button="global-config">BIRD SETTINGS</button>
+        <button class="local-tab" type="button" data-routing-view="rip" data-routing-context-button="rip" hidden>RIP SETTINGS</button>
+        <button class="local-tab" type="button" data-routing-view="diagnostics">DIAGNOSTICS</button>
     </nav>
 </div>
 
@@ -82,7 +76,7 @@
             <div class="edit-form">
                 <div class="form-grid routing-settings-grid">
                     <label class="field">
-                        <span>Route Table</span>
+                        <span>Linux Route Table</span>
                         <select id="bird-kernel-route-table" name="kernel_route_table"></select>
                     </label>
                     <label class="field">
@@ -102,7 +96,7 @@
                         </select>
                     </label>
                     <label class="field">
-                        <span>Channel Table</span>
+                        <span>BIRD Route Table</span>
                         <select id="bird-kernel-channel-table-name" name="kernel_channel_table_name"></select>
                     </label>
                     <label class="field">
@@ -197,6 +191,36 @@
         <span id="bird-logs-count">lines=0</span>
     </div>
     <pre class="tool-output" id="bird-logs-output">Waiting for bird.out.log...</pre>
+</section>
+
+<section class="panel" id="bird-diagnostics-panel" hidden>
+    <div class="panel-head compact">
+        <h2>Diagnostics</h2>
+        <span id="bird-diagnostics-summary">birdcl show protocols</span>
+    </div>
+    <div class="diagnostics-meta" id="bird-diagnostics-meta">Waiting for collectord snapshot...</div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Proto</th>
+                    <th>Table</th>
+                    <th>State</th>
+                    <th>Since</th>
+                    <th>Info</th>
+                </tr>
+            </thead>
+            <tbody id="bird-diagnostics-protocols-body">
+                <tr>
+                    <td colspan="6">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>waiting for BIRD diagnostics</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <pre class="tool-output routing-diagnostics-output" id="bird-diagnostics-output">Waiting for birdcl show protocols...</pre>
 </section>
 
 <section class="panel" id="bird-work-requests-panel" hidden>
@@ -306,25 +330,17 @@
     </form>
 </section>
 
-<section class="panel" id="routing-ospf-panel" hidden>
-    <div class="panel-head">
-        <h2>OSPF</h2>
-        <span>protocol ospf</span>
-    </div>
-    <div class="terminal-empty">
+<section id="routing-ospf-panel" hidden>
+    <div class="terminal-empty not-implemented-panel">
         <span class="prompt">$</span>
-        <span>OSPF configuration will be managed here.</span>
+        <span>OSPF is not implemented yet</span>
     </div>
 </section>
 
-<section class="panel" id="routing-bgp-panel" hidden>
-    <div class="panel-head">
-        <h2>BGP</h2>
-        <span>protocol bgp</span>
-    </div>
-    <div class="terminal-empty">
+<section id="routing-bgp-panel" hidden>
+    <div class="terminal-empty not-implemented-panel">
         <span class="prompt">$</span>
-        <span>BGP configuration will be managed here.</span>
+        <span>BGP is not implemented yet</span>
     </div>
 </section>
 
@@ -346,6 +362,6 @@
 
 {% block scripts %}
 {% if bird_installed %}
-<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260610-rip-auth-password-rules" defer></script>
+<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260610-ospf-bgp-unimplemented" defer></script>
 {% endif %}
 {% endblock %}

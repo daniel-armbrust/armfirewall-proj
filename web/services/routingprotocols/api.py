@@ -3,8 +3,8 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
-import shutil
 import subprocess
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,7 @@ from core.constants import (
     BIRD_CONFIG_PATH,
     BIRD_DB_PATH,
     BIRD_DEFAULT_CHANNEL_TABLE_NAME,
+    BIRD_ERR_LOG_PATH,
     BIRD_DEFAULT_HOSTNAME,
     BIRD_DEFAULT_ROUTER_ID,
     BIRD_IMPORT_EXPORT_VALUES,
@@ -28,6 +29,7 @@ from core.constants import (
     BIRD_RIP_VERSIONS,
     IFACE_DB_PATH,
     POLICY_ROUTING_DB_PATH,
+    WORK_REQUEST_DB_PATH,
 )
 from web.services.api import service_installed, service_status_by_name
 
@@ -660,10 +662,55 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
         )
 
 
+def queue_bird_apply(operation: str) -> int:
+    """Queue a BIRD configuration apply work request."""
+    request_uid = str(uuid.uuid4())
+    payload = {
+        "service_name": "bird",
+        "display_name": "BIRD Routing Daemon",
+        "operation": operation,
+        "config_db": str(BIRD_DB_PATH),
+        "config_path": str(BIRD_CONFIG_PATH),
+    }
+    with db.transaction(WORK_REQUEST_DB_PATH) as conn:
+        cursor = db.execute_on(
+            conn,
+            """
+            INSERT INTO work_requests (
+                request_uid, source, category_name, action_name,
+                target_rule_id, priority, status, payload_json
+            )
+            VALUES (?, 'gui', 'SERVICE_MANAGEMENT.BIRD_CONFIG', 'apply', NULL, 70, 'queue', ?)
+            """,
+            (request_uid, json.dumps(payload, sort_keys=True)),
+        )
+        work_request_id = int(cursor.lastrowid)
+        db.execute_on(
+            conn,
+            """
+            INSERT INTO work_request_events (work_request_id, event_type, message)
+            VALUES (?, 'queue', ?)
+            """,
+            (work_request_id, f"Queued BIRD configuration apply: {operation}."),
+        )
+        return work_request_id
+
+
+def channel_table_declarations(settings: dict[str, Any]) -> list[str]:
+    """Render top-level BIRD table declarations needed by channel table references."""
+    kernel = settings.get("kernel") or {}
+    table_name = str(kernel.get("channel_table_name") or "").strip()
+    if not kernel.get("enabled") or not table_name or table_name == BIRD_DEFAULT_CHANNEL_TABLE_NAME:
+        return []
+    families = ("ipv4", "ipv6") if kernel["channel_family"] == "ipv4/ipv6" else (kernel["channel_family"],)
+    return [f"{family} table {table_name};" for family in families]
+
+
 def channel_block(settings: dict[str, Any]) -> str:
     """Render one BIRD channel block."""
     families = ("ipv4", "ipv6") if settings["channel_family"] == "ipv4/ipv6" else (settings["channel_family"],)
-    table_line = f"    table {settings['channel_table_name']};\n" if settings.get("channel_table_name") else ""
+    table_name = str(settings.get("channel_table_name") or "").strip()
+    table_line = f"    table {table_name};\n" if table_name and table_name != BIRD_DEFAULT_CHANNEL_TABLE_NAME else ""
     return "".join(
         (
             f"  {family} {{\n"
@@ -680,11 +727,10 @@ def render_rip_config(settings: dict[str, Any]) -> str:
     """Render the managed BIRD RIP protocol block."""
     if not settings["enabled"]:
         return ""
-    version_line = "  version 2;" if settings["version"] == "2" else "  version 1;" if settings["version"] == "1" else "  ipv6;"
+    channel_family = "ipv6" if settings["version"] == "ng" else "ipv4"
     passive_line = "    passive yes;" if settings["passive"] else "    passive no;"
-    multicast_line = "" if settings["version"] == "1" or settings["mode"] == "broadcast" else f"    multicast address {settings['multicast_addr']};\n"
     iface_names = settings.get("iface_names") or [BIRD_ANY_INTERFACE]
-    iface_pattern = '", "'.join(str(item).replace('"', '\\"') for item in iface_names)
+    iface_pattern = '", "'.join(str(item).replace('"', '\"') for item in iface_names)
     auth_lines = ""
     if settings["authentication"] != "none":
         auth_lines = (
@@ -693,14 +739,15 @@ def render_rip_config(settings: dict[str, Any]) -> str:
         )
     return (
         "protocol rip {\n"
-        f"{version_line}\n"
-        f"  port {settings['port']};\n"
-        f"  update time {settings['update_time_secs']};\n"
-        f"  timeout time {settings['timeout_time_secs']};\n"
-        f"  garbage time {settings['garbage_time_secs']};\n"
+        f"  {channel_family} {{\n"
+        "    import all;\n"
+        "    export none;\n"
+        "  };\n"
         f"  interface \"{iface_pattern}\" {{\n"
         f"    mode {settings['mode']};\n"
-        f"{multicast_line}"
+        f"    update time {settings['update_time_secs']};\n"
+        f"    timeout time {settings['timeout_time_secs']};\n"
+        f"    garbage time {settings['garbage_time_secs']};\n"
         f"{passive_line}\n"
         f"{auth_lines}"
         "  };\n"
@@ -710,12 +757,12 @@ def render_rip_config(settings: dict[str, Any]) -> str:
 
 def render_global_config(settings: dict[str, Any], rip_settings: dict[str, Any] | None = None) -> str:
     """Render a managed BIRD global configuration."""
-    log_target = "all" if settings["log_syslog"] else "off"
     blocks = [
         "# Managed by ArmFirewall Network / Routing Protocols.",
         f"router id {settings['router_id']};",
         f"hostname \"{settings['hostname']}\";",
-        f"log syslog {log_target};",
+        "log stderr all;",
+        *channel_table_declarations(settings),
         "",
     ]
 
@@ -725,8 +772,6 @@ def render_global_config(settings: dict[str, Any], rip_settings: dict[str, Any] 
             "protocol device {",
             f"  scan time {device['scan_time_secs']};",
             f"  interface \"{device['iface_name']}\";",
-            "  ipv4;",
-            "  ipv6;",
             "}",
             "",
         ])
@@ -779,16 +824,11 @@ def get_global_settings() -> dict[str, Any]:
 
 
 def save_global_settings(payload: dict[str, Any]) -> dict[str, Any]:
-    """Persist BIRD global daemon settings to the host configuration file."""
+    """Persist BIRD global daemon settings and queue host configuration apply."""
     settings = normalize_global_settings(payload)
     save_settings_to_db(settings)
-    path = bird_config_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        backup_path = path.with_suffix(path.suffix + ".armfw.bak")
-        shutil.copy2(path, backup_path)
-    path.write_text(render_global_config(settings, rip_settings_from_db()), encoding="utf-8")
-    return get_global_settings() | {"saved": True}
+    work_request_id = queue_bird_apply("global-settings")
+    return get_global_settings() | {"saved": True, "work_request_id": work_request_id}
 
 
 def get_rip_settings() -> dict[str, Any]:
@@ -802,27 +842,84 @@ def get_rip_settings() -> dict[str, Any]:
 
 
 def save_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
-    """Persist BIRD RIP protocol settings and rewrite bird.conf."""
+    """Persist BIRD RIP protocol settings and queue host configuration apply."""
     settings = normalize_rip_settings(payload)
     save_rip_settings_to_db(settings)
-    global_settings = settings_from_db()
-    path = bird_config_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        backup_path = path.with_suffix(path.suffix + ".armfw.bak")
-        shutil.copy2(path, backup_path)
-    path.write_text(render_global_config(global_settings, settings), encoding="utf-8")
-    return get_rip_settings() | {"saved": True}
+    work_request_id = queue_bird_apply("rip-settings")
+    return get_rip_settings() | {"saved": True, "work_request_id": work_request_id}
+
+
+def get_bird_diagnostics() -> dict[str, Any]:
+    """Return the latest BIRD diagnostics snapshot collected by collectord."""
+    ensure_bird_db()
+    with db.connection(BIRD_DB_PATH) as conn:
+        run = db.fetch_one_on(
+            conn,
+            """
+            SELECT id, command, exit_code, stdout, stderr, duration_ms, collected_at
+            FROM diagnostic_command_run
+            WHERE command LIKE '% show protocols'
+            ORDER BY collected_at DESC, id DESC
+            LIMIT 1
+            """,
+        )
+        if run is None:
+            return {
+                "last_run": None,
+                "protocols": [],
+                "raw_output": "",
+                "error_output": "",
+            }
+        protocols = db.rows_to_dicts(db.execute_on(
+            conn,
+            """
+            SELECT name, proto, table_name, state, since, info, raw_line, collected_at
+            FROM diagnostic_protocol
+            WHERE command_id = ?
+            ORDER BY id
+            """,
+            (int(run["id"]),),
+        ).fetchall())
+    return {
+        "last_run": {
+            "id": int(run["id"]),
+            "command": str(run["command"]),
+            "exit_code": int(run["exit_code"]),
+            "duration_ms": run["duration_ms"],
+            "collected_at": str(run["collected_at"]),
+        },
+        "protocols": protocols,
+        "raw_output": str(run["stdout"] or ""),
+        "error_output": str(run["stderr"] or ""),
+    }
 
 
 def read_bird_logs(*, max_lines: int = 300) -> dict[str, Any]:
-    """Return recent BIRD supervisord stdout log lines."""
-    path = BIRD_LOG_PATH
-    if not path.exists():
-        return {"path": str(path), "exists": False, "lines": []}
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    """Return recent BIRD supervisord stdout and stderr log lines in chronological order."""
+    sources = (
+        ("stdout", BIRD_LOG_PATH),
+        ("stderr", BIRD_ERR_LOG_PATH),
+    )
+    files = []
+    entries: list[tuple[int, str, int, str]] = []
+    sequence = 0
+    timestamp_pattern = re.compile(r"^bird:\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+)")
+    for label, path in sources:
+        exists = path.exists()
+        source_lines = path.read_text(encoding="utf-8", errors="replace").splitlines() if exists else []
+        files.append({"name": label, "path": str(path), "exists": exists, "line_count": len(source_lines)})
+        for line in source_lines:
+            match = timestamp_pattern.match(line)
+            timestamp = match.group(1) if match else ""
+            has_timestamp = 0 if timestamp else 1
+            entries.append((has_timestamp, timestamp, sequence, line))
+            sequence += 1
+
+    entries.sort(key=lambda item: (item[0], item[1], item[2]))
     return {
-        "path": str(path),
-        "exists": True,
-        "lines": lines[-max_lines:],
+        "path": str(BIRD_LOG_PATH),
+        "stderr_path": str(BIRD_ERR_LOG_PATH),
+        "exists": any(item["exists"] for item in files),
+        "files": files,
+        "lines": [line for _, _, _, line in entries[-max_lines:]],
     }

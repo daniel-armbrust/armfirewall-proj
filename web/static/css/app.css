@@ -1906,8 +1906,9 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .routing-service-actions {
     display: flex;
+    flex-direction: column;
     align-items: flex-start;
-    gap: 28px;
+    gap: 12px;
     margin: 22px 0 14px;
     overflow-x: auto;
 }
@@ -2542,4 +2543,20 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     .fw-copilot-eye {
         transition: none;
     }
+}
+
+.diagnostics-meta {
+    color: var(--muted);
+    font-size: 12px;
+    margin: 0 0 12px;
+}
+
+.routing-diagnostics-output {
+    margin-top: 14px;
+    max-height: 260px;
+    overflow: auto;
+}
+
+.not-implemented-panel {
+    margin-top: 22px;
 }

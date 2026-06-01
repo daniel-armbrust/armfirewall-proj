@@ -200,6 +200,24 @@ stderr_logfile_maxbytes=5MB
 stderr_logfile_backups=5
 environment=PYTHONUNBUFFERED="1"
 
+
+[program:armfirewall-collectord]
+directory=$ROOT_DIR
+command=$ROOT_DIR/.venv/bin/python -m daemons.collectord
+autostart=true
+autorestart=true
+startsecs=3
+stopsignal=TERM
+stopasgroup=true
+killasgroup=true
+stdout_logfile=$ROOT_DIR/logs/armfirewall-collectord.out.log
+stdout_logfile_maxbytes=5MB
+stdout_logfile_backups=5
+stderr_logfile=$ROOT_DIR/logs/armfirewall-collectord.err.log
+stderr_logfile_maxbytes=5MB
+stderr_logfile_backups=5
+environment=PYTHONUNBUFFERED="1"
+
 [program:armfirewall-workreqd]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/python -m daemons.workreqd.workreqd

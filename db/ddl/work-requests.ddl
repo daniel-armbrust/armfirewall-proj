@@ -46,6 +46,7 @@ INSERT OR IGNORE INTO work_request_categories (name, category, family, target_na
      ('POLICY_ROUTING.IPV6.main', 'POLICY_ROUTING', 'IPV6', 'main', 'IPv6 policy routing changes.'),
      ('SERVICE_MANAGEMENT.OPTIONAL_SERVICES', 'SERVICE_MANAGEMENT', NULL, 'optional_services', 'Optional ArmFirewall service package operations.'),
      ('SERVICE_MANAGEMENT.SERVICE_CONTROL', 'SERVICE_MANAGEMENT', NULL, 'service_control', 'ArmFirewall supervisord service control actions.'),
+     ('SERVICE_MANAGEMENT.BIRD_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'bird_config', 'BIRD routing daemon configuration changes.'),
      ('SERVICE_MANAGEMENT.DNSMASQ_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'dnsmasq_config', 'Dnsmasq DNS and DHCP configuration changes.'),
      ('SERVICE_MANAGEMENT.LIBRESWAN_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'libreswan_config', 'Libreswan IPsec tunnel configuration changes.');
 

@@ -101,6 +101,44 @@ CREATE TABLE IF NOT EXISTS proto_rip (
      )
 );
 
+-- Stores each BIRD diagnostic command execution. The collector should insert one
+-- row per birdctl command run, then attach parsed rows to command_id.
+CREATE TABLE IF NOT EXISTS diagnostic_command_run (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     command TEXT NOT NULL,
+     exit_code INTEGER NOT NULL DEFAULT 0,
+     stdout TEXT,
+     stderr TEXT,
+     duration_ms INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0),
+     collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Stores parsed output from: birdctl show protocols.
+-- Expected columns from BIRD are: Name, Proto, Table, State, Since and Info.
+CREATE TABLE IF NOT EXISTS diagnostic_protocol (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     command_id INTEGER NOT NULL,
+     name TEXT NOT NULL,
+     proto TEXT NOT NULL,
+     table_name TEXT,
+     state TEXT NOT NULL,
+     since TEXT,
+     info TEXT,
+     raw_line TEXT NOT NULL,
+     collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     FOREIGN KEY (command_id) REFERENCES diagnostic_command_run(id) ON DELETE CASCADE,
+     UNIQUE (command_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bird_diagnostic_command_run_command
+ON diagnostic_command_run (command, collected_at);
+
+CREATE INDEX IF NOT EXISTS idx_bird_diagnostic_protocol_command
+ON diagnostic_protocol (command_id);
+
+CREATE INDEX IF NOT EXISTS idx_bird_diagnostic_protocol_proto_state
+ON diagnostic_protocol (proto, state);
+
 CREATE INDEX IF NOT EXISTS idx_bird_channel_family
 ON channel (family);
 
