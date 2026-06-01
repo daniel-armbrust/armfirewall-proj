@@ -3,7 +3,6 @@ from __future__ import annotations
 import ipaddress
 import re
 import shutil
-import socket
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -11,6 +10,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from core import db
+from core.system import get_hostname
 from core.constants import (
     BIRD_ANY_INTERFACE,
     BIRD_CHANNEL_FAMILIES,
@@ -174,7 +174,7 @@ def choice_setting(value: Any, *, field: str, choices: set[str], default: str) -
 def default_hostname() -> str:
     """Return a stable default hostname for BIRD global settings."""
     try:
-        return hostname_setting(socket.gethostname())
+        return hostname_setting(get_hostname())
     except HTTPException:
         return BIRD_DEFAULT_HOSTNAME
 
@@ -277,12 +277,13 @@ def settings_from_db() -> dict[str, Any]:
     path = bird_config_path()
     if path.exists():
         settings |= parse_router_settings(path.read_text(encoding="utf-8"))
+        settings["hostname"] = default_hostname()
 
     with db.connection(BIRD_DB_PATH) as conn:
         global_cfg = db.fetch_one_on(conn, "SELECT * FROM global_cfg WHERE id = 1")
         if global_cfg is not None:
             settings["router_id"] = str(global_cfg["router_id"])
-            settings["hostname"] = str(global_cfg["hostname"])
+            settings["hostname"] = str(global_cfg["hostname"] or default_hostname())
 
         kernel = db.fetch_one_on(
             conn,

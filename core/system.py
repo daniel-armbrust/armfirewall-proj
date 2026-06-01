@@ -12,6 +12,11 @@ from core.mem import read_memory_status
 from core.process import count_processes
 
 
+def get_hostname() -> str:
+    """Return the current system hostname."""
+    return platform.node() or "unknown"
+
+
 def get_system_status() -> dict[str, Any]:
     """Return operating system status values."""
     architecture = platform.machine() or "unknown"
