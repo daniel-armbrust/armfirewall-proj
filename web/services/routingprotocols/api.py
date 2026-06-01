@@ -506,6 +506,8 @@ def default_rip_settings() -> dict[str, Any]:
         "version": "2",
         "mode": "multicast",
         "iface_names": [BIRD_ANY_INTERFACE],
+        "import_policy": "all",
+        "export_policy": "none",
         "multicast_addr": "224.0.0.9",
         "passive": False,
         "port": 520,
@@ -538,6 +540,8 @@ def rip_settings_from_db() -> dict[str, Any]:
         "version": str(row["version"]),
         "mode": str(row["mode"]),
         "iface_names": iface_names,
+        "import_policy": str(row["import_policy"] if "import_policy" in row.keys() else "all"),
+        "export_policy": str(row["export_policy"] if "export_policy" in row.keys() else "none"),
         "multicast_addr": str(row["multicast_addr"]),
         "passive": bool(row["passive"]),
         "port": int(row["port"]),
@@ -614,6 +618,8 @@ def normalize_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
         "version": version,
         "mode": mode,
         "iface_names": rip_iface_names_setting(payload.get("iface_names")),
+        "import_policy": import_export_setting(payload.get("import_policy"), field="import_policy", default="all"),
+        "export_policy": import_export_setting(payload.get("export_policy"), field="export_policy", default="none"),
         "multicast_addr": multicast_addr,
         "passive": bool_setting(payload.get("passive", False)),
         "port": port,
@@ -632,6 +638,7 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
         existing = db.fetch_one_on(conn, "SELECT id FROM proto_rip ORDER BY id LIMIT 1")
         values = (
             settings["version"], settings["mode"], json.dumps(settings["iface_names"], sort_keys=True),
+            settings["import_policy"], settings["export_policy"],
             settings["multicast_addr"], 1 if settings["passive"] else 0,
             settings["port"], settings["update_time_secs"], settings["timeout_time_secs"], settings["garbage_time_secs"],
             settings["authentication"], settings["password"] or None, 1 if settings["enabled"] else 0,
@@ -641,10 +648,10 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
                 conn,
                 """
                 INSERT INTO proto_rip (
-                    version, mode, iface_names, multicast_addr, passive, port, update_time_secs,
+                    version, mode, iface_names, import_policy, export_policy, multicast_addr, passive, port, update_time_secs,
                     timeout_time_secs, garbage_time_secs, authentication, password, enabled
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )
@@ -653,9 +660,9 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
             conn,
             """
             UPDATE proto_rip
-               SET version = ?, mode = ?, iface_names = ?, multicast_addr = ?, passive = ?, port = ?,
-                   update_time_secs = ?, timeout_time_secs = ?, garbage_time_secs = ?,
-                   authentication = ?, password = ?, enabled = ?
+               SET version = ?, mode = ?, iface_names = ?, import_policy = ?, export_policy = ?,
+                   multicast_addr = ?, passive = ?, port = ?, update_time_secs = ?,
+                   timeout_time_secs = ?, garbage_time_secs = ?, authentication = ?, password = ?, enabled = ?
              WHERE id = ?
             """,
             (*values, int(existing["id"])),
@@ -740,8 +747,8 @@ def render_rip_config(settings: dict[str, Any]) -> str:
     return (
         "protocol rip {\n"
         f"  {channel_family} {{\n"
-        "    import all;\n"
-        "    export none;\n"
+        f"    import {settings['import_policy']};\n"
+        f"    export {settings['export_policy']};\n"
         "  };\n"
         f"  interface \"{iface_pattern}\" {{\n"
         f"    mode {settings['mode']};\n"

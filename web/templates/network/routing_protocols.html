@@ -282,6 +282,20 @@
                         <input id="bird-rip-port" name="port" type="number" min="1" max="65535" step="1">
                     </label>
                     <label class="field">
+                        <span>Import</span>
+                        <select id="bird-rip-import-policy" name="import_policy">
+                            <option value="all">all</option>
+                            <option value="none">none</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Export</span>
+                        <select id="bird-rip-export-policy" name="export_policy">
+                            <option value="all">all</option>
+                            <option value="none">none</option>
+                        </select>
+                    </label>
+                    <label class="field">
                         <span>Update Time</span>
                         <input id="bird-rip-update-time-secs" name="update_time_secs" type="number" min="1" max="86400" step="1">
                     </label>
@@ -362,6 +376,6 @@
 
 {% block scripts %}
 {% if bird_installed %}
-<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260610-ospf-bgp-unimplemented" defer></script>
+<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260610-rip-interface-selection" defer></script>
 {% endif %}
 {% endblock %}

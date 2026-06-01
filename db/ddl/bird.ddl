@@ -74,6 +74,8 @@ CREATE TABLE IF NOT EXISTS proto_rip (
      version TEXT NOT NULL DEFAULT '2' CHECK (version IN ('1', '2', 'ng')),
      mode TEXT NOT NULL DEFAULT 'multicast' CHECK (mode IN ('multicast', 'broadcast')),
      iface_names TEXT NOT NULL DEFAULT '["*"]',
+     import_policy TEXT NOT NULL DEFAULT 'all' CHECK (import_policy IN ('all', 'none')),
+     export_policy TEXT NOT NULL DEFAULT 'none' CHECK (export_policy IN ('all', 'none')),
      multicast_addr TEXT NOT NULL DEFAULT '224.0.0.9',
      passive INTEGER NOT NULL DEFAULT 0 CHECK (passive IN (0, 1)),
      port INTEGER NOT NULL DEFAULT 520 CHECK (port IN (520, 521)),

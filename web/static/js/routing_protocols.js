@@ -70,6 +70,8 @@
             iface_names: document.querySelector("#bird-rip-iface-names"),
             address_label: document.querySelector("#bird-rip-address-label"),
             multicast_addr: document.querySelector("#bird-rip-multicast-addr"),
+            import_policy: document.querySelector("#bird-rip-import-policy"),
+            export_policy: document.querySelector("#bird-rip-export-policy"),
             passive: document.querySelector("#bird-rip-passive"),
             port: document.querySelector("#bird-rip-port"),
             update_time_secs: document.querySelector("#bird-rip-update-time-secs"),
@@ -84,6 +86,7 @@
     let pendingAction = null;
     let logsLoading = false;
     let ripLoading = false;
+    let ripSelectedInterfaceValues = ["*"];
     let workRequestsLoading = false;
 
     function setText(element, value) {
@@ -325,10 +328,11 @@
 
     function setSelectedRipInterfaces(values) {
         const select = fields.rip.iface_names;
+        ripSelectedInterfaceValues = (Array.isArray(values) && values.length ? values : ["*"]).map(String);
         if (!select) {
             return;
         }
-        const selected = new Set((Array.isArray(values) && values.length ? values : ["*"]).map(String));
+        const selected = new Set(ripSelectedInterfaceValues);
         Array.from(select.options).forEach((option) => {
             option.selected = selected.has(option.value);
         });
@@ -342,7 +346,9 @@
         const selected = selectedRipInterfaces();
         if (selected.includes("*") && selected.length > 1) {
             setSelectedRipInterfaces(["*"]);
+            return;
         }
+        ripSelectedInterfaceValues = selected;
     }
 
     function renderRipInterfaceOptions(interfaces) {
@@ -350,7 +356,7 @@
         if (!select) {
             return;
         }
-        const selected = selectedRipInterfaces();
+        const selected = ripSelectedInterfaceValues.length ? ripSelectedInterfaceValues : selectedRipInterfaces();
         select.innerHTML = "";
         select.appendChild(option("all - all interfaces", "*"));
         interfaces.forEach((iface) => {
@@ -458,6 +464,8 @@
             mode: readFieldValue(fields.rip.mode),
             iface_names: selectedRipInterfaces(),
             multicast_addr: readFieldValue(fields.rip.multicast_addr),
+            import_policy: readFieldValue(fields.rip.import_policy),
+            export_policy: readFieldValue(fields.rip.export_policy),
             passive: readFieldValue(fields.rip.passive),
             port: readFieldValue(fields.rip.port),
             update_time_secs: readFieldValue(fields.rip.update_time_secs),
