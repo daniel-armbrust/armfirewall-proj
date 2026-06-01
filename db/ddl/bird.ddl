@@ -85,7 +85,9 @@ CREATE TABLE IF NOT EXISTS proto_rip (
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
      CHECK (
-          (version IN ('1', '2') AND multicast_addr = '224.0.0.9' AND port = 520)
+          (version = '1' AND mode = 'broadcast' AND multicast_addr = '255.255.255.255' AND port = 520)
+          OR
+          (version = '2' AND multicast_addr = '224.0.0.9' AND port = 520)
           OR
           (version = 'ng' AND multicast_addr = 'ff02::9' AND port = 521 AND mode = 'multicast')
      ),

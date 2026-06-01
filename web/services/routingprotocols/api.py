@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from core import db
+from core.iface import get_lan_primary_iface_name, get_lan_primary_ipv4_address, get_role_config
 from core.system import get_hostname
 from core.constants import (
     BIRD_ANY_INTERFACE,
@@ -179,9 +180,20 @@ def default_hostname() -> str:
         return BIRD_DEFAULT_HOSTNAME
 
 
+def default_router_id() -> str:
+    """Return the LAN IPv4 address as the default BIRD router id."""
+    try:
+        lan_ipv4 = get_lan_primary_ipv4_address()
+        if lan_ipv4:
+            return router_id_setting(lan_ipv4)
+    except HTTPException:
+        pass
+    return BIRD_DEFAULT_ROUTER_ID
+
+
 def parse_router_settings(text: str) -> dict[str, Any]:
     """Extract global router settings from an existing BIRD config."""
-    settings = {"router_id": BIRD_DEFAULT_ROUTER_ID, "hostname": default_hostname(), "log_syslog": True}
+    settings = {"router_id": default_router_id(), "hostname": default_hostname(), "log_syslog": True}
     router_match = re.search(r"^\s*router\s+id\s+([0-9.]+)\s*;", text, re.MULTILINE)
     hostname_match = re.search(r'^\s*hostname\s+"([^"]+)"\s*;', text, re.MULTILINE)
     log_match = re.search(r"^\s*log\s+syslog\s+(all|off)\s*;", text, re.MULTILINE)
@@ -235,15 +247,34 @@ def interfaces() -> list[dict[str, Any]]:
 
 
 def default_iface_name() -> str:
-    """Return the first known interface name."""
+    """Return the default interface for BIRD device/direct protocols."""
+    role_config = get_role_config()
+    lan_iface = str(role_config.get("lan_iface") or "").strip()
+    if lan_iface:
+        return lan_iface
+    primary_iface = get_lan_primary_iface_name()
+    if primary_iface:
+        return primary_iface
     items = interfaces()
-    return str(items[0]["name"]) if items else ""
+    for item in items:
+        name = str(item["name"] or "")
+        if name and name != "lo" and not name.startswith("armfw"):
+            return name
+    return ""
+
+
+def persisted_iface_name(value: Any) -> str:
+    """Return a persisted BIRD interface or the default LAN interface."""
+    iface_name = str(value or "").strip()
+    if not iface_name or iface_name == "lo" or iface_name.startswith("armfw"):
+        return default_iface_name()
+    return iface_name
 
 
 def default_global_settings() -> dict[str, Any]:
     """Return default global BIRD daemon settings for the GUI."""
     return {
-        "router_id": BIRD_DEFAULT_ROUTER_ID,
+        "router_id": default_router_id(),
         "hostname": default_hostname(),
         "log_syslog": True,
         "kernel": {
@@ -277,12 +308,14 @@ def settings_from_db() -> dict[str, Any]:
     path = bird_config_path()
     if path.exists():
         settings |= parse_router_settings(path.read_text(encoding="utf-8"))
+        settings["router_id"] = default_router_id()
         settings["hostname"] = default_hostname()
 
     with db.connection(BIRD_DB_PATH) as conn:
         global_cfg = db.fetch_one_on(conn, "SELECT * FROM global_cfg WHERE id = 1")
         if global_cfg is not None:
-            settings["router_id"] = str(global_cfg["router_id"])
+            saved_router_id = str(global_cfg["router_id"] or "").strip()
+            settings["router_id"] = default_router_id() if saved_router_id in {"", BIRD_DEFAULT_ROUTER_ID} else saved_router_id
             settings["hostname"] = str(global_cfg["hostname"] or default_hostname())
 
         kernel = db.fetch_one_on(
@@ -319,7 +352,7 @@ def settings_from_db() -> dict[str, Any]:
             settings["device"] = {
                 "enabled": bool(device["enabled"]),
                 "scan_time_secs": int(device["scan_time_secs"]),
-                "iface_name": str(device["iface_name"]),
+                "iface_name": persisted_iface_name(device["iface_name"]),
             }
         else:
             settings["device"]["iface_name"] = default_iface_name()
@@ -328,7 +361,7 @@ def settings_from_db() -> dict[str, Any]:
         if direct is not None:
             settings["direct"] = {
                 "enabled": bool(direct["enabled"]),
-                "iface_name": str(direct["iface_name"]),
+                "iface_name": persisted_iface_name(direct["iface_name"]),
             }
         else:
             settings["direct"]["iface_name"] = default_iface_name()
@@ -513,7 +546,7 @@ def normalize_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
         choices=BIRD_RIP_AUTHENTICATIONS,
         default="none",
     )
-    default_addr = "ff02::9" if version == "ng" else "224.0.0.9"
+    default_addr = "ff02::9" if version == "ng" else "255.255.255.255" if version == "1" else "224.0.0.9"
     default_port = 521 if version == "ng" else 520
     multicast_addr = ip_address_setting(payload.get("multicast_addr") or default_addr, field="multicast_addr")
     port = int_setting(payload.get("port"), default=default_port, minimum=1, maximum=65535, field="port")
@@ -522,8 +555,14 @@ def normalize_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
         mode = "multicast"
         multicast_addr = "ff02::9"
         port = 521
+    elif version == "1":
+        if mode == "multicast":
+            raise HTTPException(status_code=400, detail="RIPv1 does not support multicast mode.")
+        mode = "broadcast"
+        multicast_addr = "255.255.255.255"
+        port = 520
     elif multicast_addr != "224.0.0.9" or port != 520:
-        raise HTTPException(status_code=400, detail="RIP version 1 and 2 must use multicast address 224.0.0.9 and port 520.")
+        raise HTTPException(status_code=400, detail="RIPv2 must use multicast address 224.0.0.9 and port 520.")
     if authentication != "none" and not password:
         raise HTTPException(status_code=400, detail="password is required when authentication is enabled.")
     if authentication == "none":
@@ -601,6 +640,7 @@ def render_rip_config(settings: dict[str, Any]) -> str:
         return ""
     version_line = "  version 2;" if settings["version"] == "2" else "  version 1;" if settings["version"] == "1" else "  ipv6;"
     passive_line = "    passive yes;" if settings["passive"] else "    passive no;"
+    multicast_line = "" if settings["version"] == "1" else f"    multicast address {settings['multicast_addr']};\n"
     auth_lines = ""
     if settings["authentication"] != "none":
         auth_lines = (
@@ -616,7 +656,7 @@ def render_rip_config(settings: dict[str, Any]) -> str:
         f"  garbage time {settings['garbage_time_secs']};\n"
         "  interface \"*\" {\n"
         f"    mode {settings['mode']};\n"
-        f"    multicast address {settings['multicast_addr']};\n"
+        f"{multicast_line}"
         f"{passive_line}\n"
         f"{auth_lines}"
         "  };\n"

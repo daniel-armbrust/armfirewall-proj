@@ -31,12 +31,6 @@
         <a class="menu-link child {% if current_path in ['/monitoring/filesystem', '/monitoring/disk'] %}active{% endif %}" href="/monitoring/filesystem">Filesystem</a>
         <a class="menu-link child {% if current_path == '/monitoring/latency' %}active{% endif %}" href="/monitoring/latency">Latency</a>
 
-        <div class="menu-group">Tools</div>
-        <a class="menu-link child {% if current_path == '/tools/ping' %}active{% endif %}" href="/tools/ping">Ping</a>
-        <a class="menu-link child {% if current_path == '/tools/mtr' %}active{% endif %}" href="/tools/mtr">MTR</a>
-        <a class="menu-link child {% if current_path == '/tools/packet-capture' %}active{% endif %}" href="/tools/packet-capture">Packet Capture</a>
-        <a class="menu-link child {% if current_path == '/tools/traceroute' %}active{% endif %}" href="/tools/traceroute">Traceroute</a>
-
         <div class="menu-group">Services</div>
         <a class="menu-link child {% if current_path == '/services/status' %}active{% endif %}" href="/services/status">Status</a>
         <a class="menu-link child {% if current_path == '/services/dnsmasq' %}active{% endif %}" href="/services/dnsmasq">Dnsmasq</a>
@@ -47,5 +41,11 @@
         <a class="menu-link child {% if current_path == '/services/squid' %}active{% endif %}" href="/services/squid">Squid</a>
         {% endif %}
         <a class="menu-link child {% if current_path == '/services/link-failover' %}active{% endif %}" href="/services/link-failover">Link Failover</a>
+
+        <div class="menu-group">Tools</div>
+        <a class="menu-link child {% if current_path == '/tools/ping' %}active{% endif %}" href="/tools/ping">Ping</a>
+        <a class="menu-link child {% if current_path == '/tools/mtr' %}active{% endif %}" href="/tools/mtr">MTR</a>
+        <a class="menu-link child {% if current_path == '/tools/packet-capture' %}active{% endif %}" href="/tools/packet-capture">Packet Capture</a>
+        <a class="menu-link child {% if current_path == '/tools/traceroute' %}active{% endif %}" href="/tools/traceroute">Traceroute</a>
     </nav>
 </aside>

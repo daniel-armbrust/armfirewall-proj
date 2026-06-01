@@ -26,6 +26,29 @@
     const ruleIifSelect = document.querySelector("#policy-rule-iif");
     const ruleOifSelect = document.querySelector("#policy-rule-oif");
     const familyFilterSelect = document.querySelector("#policy-family-filter");
+    const tableFilterSelect = document.querySelector("#policy-table-filter");
+    const ruleFamilyFilterSelect = document.querySelector("#policy-rule-family-filter");
+    const ruleTableFilterSelect = document.querySelector("#policy-rule-table-filter");
+    const pageStatusLabels = {
+        routes: document.querySelector("[data-policy-page-status='routes']"),
+        rules: document.querySelector("[data-policy-page-status='rules']"),
+        tables: document.querySelector("[data-policy-page-status='tables']"),
+    };
+    const pagePrevButtons = {
+        routes: document.querySelector("[data-policy-page-prev='routes']"),
+        rules: document.querySelector("[data-policy-page-prev='rules']"),
+        tables: document.querySelector("[data-policy-page-prev='tables']"),
+    };
+    const pageNextButtons = {
+        routes: document.querySelector("[data-policy-page-next='routes']"),
+        rules: document.querySelector("[data-policy-page-next='rules']"),
+        tables: document.querySelector("[data-policy-page-next='tables']"),
+    };
+    const pageSizeSelects = {
+        routes: document.querySelector("[data-policy-page-size='routes']"),
+        rules: document.querySelector("[data-policy-page-size='rules']"),
+        tables: document.querySelector("[data-policy-page-size='tables']"),
+    };
     const familyButtons = Array.from(document.querySelectorAll("[data-policy-family]"));
     const createButtons = Array.from(document.querySelectorAll("[data-policy-create-for]"));
     let currentData = {tables: [], routes: [], rules: []};
@@ -35,6 +58,14 @@
     let interfaceDescriptions = new Map();
     let interfaceRoles = new Map();
     let activeFamily = "ipv4";
+    let activeRouteTable = "";
+    let activeRuleFamily = "ipv4";
+    let activeRuleTable = "";
+    const viewPagination = {
+        routes: {page: 1, pageSize: 25},
+        rules: {page: 1, pageSize: 25},
+        tables: {page: 1, pageSize: 25},
+    };
     const WORK_REQUESTS_POLL_MS = 3000;
     const PROTECTED_ROUTE_TABLE_IDS = new Set([253, 255]);
 
@@ -91,6 +122,36 @@
             .map((table) => ({value: table.table_id, label: tableLabel(table)}));
         replaceOptions(routeTableSelect, routeOptions);
         replaceOptions(ruleTableSelect, ruleOptions);
+    }
+
+    function refreshRouteTableFilter() {
+        if (!tableFilterSelect) {
+            return;
+        }
+        const currentValue = activeRouteTable;
+        const tables = (currentData.tables || [])
+            .filter((table) => numberValue(table.enabled) === 1 && numberValue(table.pending_delete) === 0)
+            .map((table) => ({value: String(table.table_id), label: tableLabel(table)}));
+        replaceOptions(tableFilterSelect, tables);
+        const values = new Set(Array.from(tableFilterSelect.options).map((option) => option.value));
+        const mainTable = tables.find((table) => String(table.label || "").toLowerCase().endsWith(" main"));
+        activeRouteTable = values.has(currentValue) ? currentValue : (mainTable?.value || tables[0]?.value || "");
+        tableFilterSelect.value = activeRouteTable;
+    }
+
+    function refreshRuleTableFilter() {
+        if (!ruleTableFilterSelect) {
+            return;
+        }
+        const currentValue = activeRuleTable;
+        const tables = (currentData.tables || [])
+            .filter((table) => numberValue(table.enabled) === 1 && numberValue(table.pending_delete) === 0)
+            .map((table) => ({value: String(table.table_id), label: tableLabel(table)}));
+        replaceOptions(ruleTableFilterSelect, tables);
+        const values = new Set(Array.from(ruleTableFilterSelect.options).map((option) => option.value));
+        const mainTable = tables.find((table) => String(table.label || "").toLowerCase().endsWith(" main"));
+        activeRuleTable = values.has(currentValue) ? currentValue : (mainTable?.value || tables[0]?.value || "");
+        ruleTableFilterSelect.value = activeRuleTable;
     }
 
     function interfaceOptionLabel(iface) {
@@ -195,28 +256,98 @@
         return String(item.addr_family || "ipv4").toLowerCase() === activeFamily;
     }
 
+    function routeTableMatches(route) {
+        return activeRouteTable !== "" && String(route.table_id) === activeRouteTable;
+    }
+
     function filteredRoutes() {
-        return (currentData.routes || []).filter(familyMatches);
+        return (currentData.routes || []).filter((route) => familyMatches(route) && routeTableMatches(route));
     }
 
     function filteredRules() {
-        return (currentData.rules || []).filter(familyMatches);
+        return (currentData.rules || []).filter((rule) => {
+            const family = String(rule.addr_family || "ipv4").toLowerCase();
+            return family === activeRuleFamily && activeRuleTable !== "" && String(rule.table_id) === activeRuleTable;
+        });
     }
 
-    function setPolicyFormFamily(family) {
-        setSelectValue(routeFamilySelect, family);
-        setSelectValue(ruleFamilySelect, family);
+    function updatePagination(kind, page, totalPages, totalItems, startIndex, endIndex) {
+        const status = pageStatusLabels[kind];
+        const prev = pagePrevButtons[kind];
+        const next = pageNextButtons[kind];
+        if (status) {
+            const firstItem = totalItems ? startIndex + 1 : 0;
+            const lastItem = totalItems ? endIndex : 0;
+            status.textContent = `Page ${page} of ${totalPages} (${firstItem} - ${lastItem} of ${totalItems} total items)`;
+        }
+        if (prev) {
+            prev.disabled = page <= 1;
+        }
+        if (next) {
+            next.disabled = page >= totalPages;
+        }
+    }
+
+    function pagedItems(kind, items) {
+        const pagination = viewPagination[kind] || {page: 1, pageSize: 25};
+        const totalItems = items.length;
+        const totalPages = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
+        pagination.page = Math.min(Math.max(1, pagination.page), totalPages);
+        const startIndex = totalItems ? (pagination.page - 1) * pagination.pageSize : 0;
+        const endIndex = Math.min(startIndex + pagination.pageSize, totalItems);
+        updatePagination(kind, pagination.page, totalPages, totalItems, startIndex, endIndex);
+        return items.slice(startIndex, endIndex);
+    }
+
+    function setPolicyFormFamily() {
+        setSelectValue(routeFamilySelect, activeFamily);
+        setSelectValue(ruleFamilySelect, activeRuleFamily);
     }
 
     function setActiveFamily(family) {
         activeFamily = String(family || "ipv4").toLowerCase() === "ipv6" ? "ipv6" : "ipv4";
+        viewPagination.routes.page = 1;
         familyButtons.forEach((button) => {
             button.classList.toggle("active", button.dataset.policyFamily === activeFamily);
         });
         if (familyFilterSelect) {
             familyFilterSelect.value = activeFamily;
         }
-        setPolicyFormFamily(activeFamily);
+        setPolicyFormFamily();
+        if (currentData.summary) {
+            renderData(currentData);
+        }
+    }
+
+    function setActiveRuleFamily(family) {
+        activeRuleFamily = String(family || "ipv4").toLowerCase() === "ipv6" ? "ipv6" : "ipv4";
+        viewPagination.rules.page = 1;
+        if (ruleFamilyFilterSelect) {
+            ruleFamilyFilterSelect.value = activeRuleFamily;
+        }
+        setSelectValue(ruleFamilySelect, activeRuleFamily);
+        if (currentData.summary) {
+            renderData(currentData);
+        }
+    }
+
+    function setActiveRouteTable(tableId) {
+        activeRouteTable = String(tableId || "");
+        viewPagination.routes.page = 1;
+        if (tableFilterSelect) {
+            tableFilterSelect.value = activeRouteTable;
+        }
+        if (currentData.summary) {
+            renderData(currentData);
+        }
+    }
+
+    function setActiveRuleTable(tableId) {
+        activeRuleTable = String(tableId || "");
+        viewPagination.rules.page = 1;
+        if (ruleTableFilterSelect) {
+            ruleTableFilterSelect.value = activeRuleTable;
+        }
         if (currentData.summary) {
             renderData(currentData);
         }
@@ -364,20 +495,25 @@
 
     function renderData(data) {
         currentData = data;
+        refreshTableChoices();
+        refreshRouteTableFilter();
+        refreshRuleTableFilter();
         const routes = filteredRoutes();
         const rules = filteredRules();
+        const pagedRoutes = pagedItems("routes", routes);
+        const pagedRules = pagedItems("rules", rules);
+        const pagedTables = pagedItems("tables", data.tables || []);
         setMetric("#policy-summary-tables", data.summary.tables);
         setMetric("#policy-summary-routes", data.summary.routes);
         setMetric("#policy-summary-rules", data.summary.rules);
         setMetric("#policy-summary-enabled", data.summary.enabled);
         document.querySelector("#policy-routes-count").textContent = `${familyLabel(activeFamily)} routes=${routes.length}`;
-        document.querySelector("#policy-rules-count").textContent = `${familyLabel(activeFamily)} rules=${rules.length}`;
+        document.querySelector("#policy-rules-count").textContent = `${familyLabel(activeRuleFamily)} rules=${rules.length}`;
         document.querySelector("#policy-tables-count").textContent = `tables=${data.tables.length}`;
-        routesBody.innerHTML = routes.length ? groupedRows(routes, routeRow, 9) : emptyRow(9, `no ${familyLabel(activeFamily)} policy routes`);
-        rulesBody.innerHTML = rules.length ? groupedRows(rules, ruleRow, 7) : emptyRow(7, `no ${familyLabel(activeFamily)} policy rules`);
-        tablesBody.innerHTML = data.tables.length ? data.tables.map(tableRow).join("") : emptyRow(5, "no routing tables");
-        refreshTableChoices();
-        setPolicyFormFamily(activeFamily);
+        routesBody.innerHTML = routes.length ? pagedRoutes.map(routeRow).join("") : emptyRow(9, `no ${familyLabel(activeFamily)} policy routes`);
+        rulesBody.innerHTML = rules.length ? pagedRules.map(ruleRow).join("") : emptyRow(7, `no ${familyLabel(activeRuleFamily)} policy rules`);
+        tablesBody.innerHTML = data.tables.length ? pagedTables.map(tableRow).join("") : emptyRow(5, "no routing tables");
+        setPolicyFormFamily();
     }
 
     function emptyRow(colspan, message) {
@@ -496,7 +632,7 @@
             setStatus(statusElement, `saved=${result.route_id || result.rule_id || result.table_row_id}`);
             form.reset();
             updateRuleFormShape();
-            setPolicyFormFamily(activeFamily);
+            setPolicyFormFamily();
             setActiveTab(url.includes("routes") ? "routes" : url.includes("rules") ? "rules" : "tables", true);
         } catch (error) {
             setStatus(statusElement, `error=${error.message}`);
@@ -583,6 +719,43 @@
     if (familyFilterSelect) {
         familyFilterSelect.addEventListener("change", () => setActiveFamily(familyFilterSelect.value));
     }
+    if (tableFilterSelect) {
+        tableFilterSelect.addEventListener("change", () => setActiveRouteTable(tableFilterSelect.value));
+    }
+    if (ruleFamilyFilterSelect) {
+        ruleFamilyFilterSelect.addEventListener("change", () => setActiveRuleFamily(ruleFamilyFilterSelect.value));
+    }
+    if (ruleTableFilterSelect) {
+        ruleTableFilterSelect.addEventListener("change", () => setActiveRuleTable(ruleTableFilterSelect.value));
+    }
+    Object.entries(pageSizeSelects).forEach(([kind, select]) => {
+        if (!select) {
+            return;
+        }
+        select.addEventListener("change", () => {
+            viewPagination[kind].page = 1;
+            viewPagination[kind].pageSize = Number(select.value) || 25;
+            renderData(currentData);
+        });
+    });
+    Object.entries(pagePrevButtons).forEach(([kind, button]) => {
+        if (!button) {
+            return;
+        }
+        button.addEventListener("click", () => {
+            viewPagination[kind].page = Math.max(1, viewPagination[kind].page - 1);
+            renderData(currentData);
+        });
+    });
+    Object.entries(pageNextButtons).forEach(([kind, button]) => {
+        if (!button) {
+            return;
+        }
+        button.addEventListener("click", () => {
+            viewPagination[kind].page += 1;
+            renderData(currentData);
+        });
+    });
     document.querySelectorAll("[data-policy-apply]").forEach((button) => {
         button.addEventListener("click", openApplyModal);
     });
@@ -596,7 +769,7 @@
     deleteConfirmButton.addEventListener("click", deleteItem);
     ruleActionSelect.addEventListener("change", updateRuleFormShape);
     routeFamilySelect.addEventListener("change", () => setActiveFamily(routeFamilySelect.value));
-    ruleFamilySelect.addEventListener("change", () => setActiveFamily(ruleFamilySelect.value));
+    ruleFamilySelect.addEventListener("change", () => setActiveRuleFamily(ruleFamilySelect.value));
     routeForm.addEventListener("submit", (event) => submitForm(event, routeForm, "/api/network/policy-routing/routes", routeStatus));
     ruleForm.addEventListener("submit", (event) => submitForm(event, ruleForm, "/api/network/policy-routing/rules", ruleStatus));
     tableForm.addEventListener("submit", (event) => submitForm(event, tableForm, "/api/network/policy-routing/tables", tableStatus));

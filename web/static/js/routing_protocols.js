@@ -55,6 +55,7 @@
             enabled: document.querySelector("#bird-rip-enabled"),
             version: document.querySelector("#bird-rip-version"),
             mode: document.querySelector("#bird-rip-mode"),
+            address_label: document.querySelector("#bird-rip-address-label"),
             multicast_addr: document.querySelector("#bird-rip-multicast-addr"),
             passive: document.querySelector("#bird-rip-passive"),
             port: document.querySelector("#bird-rip-port"),
@@ -95,6 +96,13 @@
         ripStatus.classList.toggle("error", Boolean(isError));
     }
 
+    function scrollToTop() {
+        document.querySelector("#main-content")?.scrollTo({top: 0, behavior: "smooth"});
+        document.documentElement.scrollTo({top: 0, behavior: "smooth"});
+        document.body.scrollTo({top: 0, behavior: "smooth"});
+        window.scrollTo({top: 0, behavior: "smooth"});
+    }
+
     function setActiveView(viewName) {
         const selectedView = panels[viewName] ? viewName : "global-config";
         Object.entries(panels).forEach(([name, panel]) => {
@@ -126,10 +134,10 @@
         }
     }
 
-    function openActionModal(action, label, run) {
+    function openActionModal(action, label, run, title = "Confirm action") {
         pendingAction = {action, run};
         if (actionTitle) {
-            actionTitle.textContent = "Confirm action";
+            actionTitle.textContent = title;
         }
         if (actionMessage) {
             actionMessage.textContent = label;
@@ -250,6 +258,7 @@
     function applyRipVersionDefaults() {
         const version = readFieldValue(fields.rip.version);
         if (version === "ng") {
+            setText(fields.rip.address_label, "Multicast Address");
             setFieldValue(fields.rip.mode, "multicast");
             setFieldValue(fields.rip.multicast_addr, "ff02::9");
             setFieldValue(fields.rip.port, "521");
@@ -258,10 +267,21 @@
             }
             return;
         }
+        if (version === "1") {
+            setText(fields.rip.address_label, "Broadcast Address");
+            setFieldValue(fields.rip.mode, "broadcast");
+            setFieldValue(fields.rip.multicast_addr, "255.255.255.255");
+            setFieldValue(fields.rip.port, "520");
+            if (fields.rip.mode) {
+                fields.rip.mode.disabled = true;
+            }
+            return;
+        }
         if (fields.rip.mode) {
             fields.rip.mode.disabled = false;
         }
-        if (!readFieldValue(fields.rip.multicast_addr) || readFieldValue(fields.rip.multicast_addr) === "ff02::9") {
+        setText(fields.rip.address_label, readFieldValue(fields.rip.mode) === "broadcast" ? "Broadcast Address" : "Multicast Address");
+        if (!readFieldValue(fields.rip.multicast_addr) || ["ff02::9", "255.255.255.255"].includes(readFieldValue(fields.rip.multicast_addr))) {
             setFieldValue(fields.rip.multicast_addr, "224.0.0.9");
         }
         if (!readFieldValue(fields.rip.port) || readFieldValue(fields.rip.port) === "521") {
@@ -270,7 +290,11 @@
     }
 
     function populateRipForm(settings) {
-        Object.entries(fields.rip).forEach(([name, element]) => setFieldValue(element, settings[name]));
+        Object.entries(fields.rip).forEach(([name, element]) => {
+            if (name !== "address_label") {
+                setFieldValue(element, settings[name]);
+            }
+        });
         applyRipVersionDefaults();
     }
 
@@ -313,8 +337,17 @@
         }
     }
 
-    async function save(event) {
+    function confirmSave(event) {
         event.preventDefault();
+        openActionModal(
+            "save-global-config",
+            "Save this BIRD configuration?",
+            saveGlobalSettings,
+            "Save configuration",
+        );
+    }
+
+    async function saveGlobalSettings() {
         setStatus("Saving BIRD settings...", false);
         try {
             const data = await HF.fetchJson("/api/network/routing-protocols/bird/global-settings", {
@@ -323,7 +356,8 @@
                 body: JSON.stringify(readForm()),
             });
             render(data);
-            setStatus("Saved.", false);
+            setStatus("", false);
+            scrollToTop();
         } catch (error) {
             setStatus(error.message, true);
         }
@@ -344,8 +378,17 @@
         }
     }
 
-    async function saveRip(event) {
+    function confirmSaveRip(event) {
         event.preventDefault();
+        openActionModal(
+            "save-rip-config",
+            "Save this RIP configuration?",
+            saveRipSettings,
+            "Save configuration",
+        );
+    }
+
+    async function saveRipSettings() {
         applyRipVersionDefaults();
         setRipStatus("Saving RIP settings...", false);
         try {
@@ -355,7 +398,8 @@
                 body: JSON.stringify(readRipForm()),
             });
             populateRipForm(data.settings || {});
-            setRipStatus("Saved.", false);
+            setRipStatus("", false);
+            scrollToTop();
         } catch (error) {
             setRipStatus(error.message, true);
         }
@@ -480,13 +524,16 @@
         button.addEventListener("click", () => setActiveView(button.dataset.routingView || "global-config"));
     });
     if (form) {
-        form.addEventListener("submit", save);
+        form.addEventListener("submit", confirmSave);
     }
     if (ripForm) {
-        ripForm.addEventListener("submit", saveRip);
+        ripForm.addEventListener("submit", confirmSaveRip);
     }
     if (fields.rip.version) {
         fields.rip.version.addEventListener("change", applyRipVersionDefaults);
+    }
+    if (fields.rip.mode) {
+        fields.rip.mode.addEventListener("change", applyRipVersionDefaults);
     }
     document.addEventListener("click", (event) => {
         const actionButton = event.target.closest("[data-bird-service-action]");

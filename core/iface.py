@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from typing import Any
 
 from core import db
@@ -32,6 +33,66 @@ def get_role_config() -> dict[str, str]:
         values.setdefault(key, str(row["name"]))
     
     return values
+
+
+def get_lan_primary_ipv4_address() -> str | None:
+    """Return the preferred LAN IPv4 address for router-facing defaults."""
+    try:
+        rows = fetch_iface_rows(
+            """
+            SELECT a.addr
+            FROM ifaces i
+            JOIN addresses a ON a.iface_id = i.id
+            WHERE a.addr_family = 'ipv4'
+              AND i.name <> 'lo'
+            ORDER BY
+                CASE i.role WHEN 'LAN' THEN 0 ELSE 1 END,
+                CASE i.protected WHEN 1 THEN 0 ELSE 1 END,
+                i.id,
+                a.is_secondary,
+                a.id
+            """
+        )
+    except (FileNotFoundError, db.DatabaseError):
+        return None
+
+    for row in rows:
+        address = str(row["addr"] or "").strip()
+        try:
+            parsed = ipaddress.IPv4Address(address)
+        except ipaddress.AddressValueError:
+            continue
+        if not parsed.is_loopback:
+            return str(parsed)
+    return None
+
+
+def get_lan_primary_iface_name() -> str | None:
+    """Return the preferred LAN interface name for service defaults."""
+    try:
+        rows = fetch_iface_rows(
+            """
+            SELECT i.name
+            FROM ifaces i
+            JOIN addresses a ON a.iface_id = i.id
+            WHERE a.addr_family = 'ipv4'
+              AND i.name <> 'lo'
+            ORDER BY
+                CASE i.role WHEN 'LAN' THEN 0 ELSE 1 END,
+                CASE i.protected WHEN 1 THEN 0 ELSE 1 END,
+                i.id,
+                a.is_secondary,
+                a.id
+            """
+        )
+    except (FileNotFoundError, db.DatabaseError):
+        return None
+
+    for row in rows:
+        iface_name = str(row["name"] or "").strip()
+        if iface_name and not iface_name.startswith("armfw"):
+            return iface_name
+    return None
 
 
 def bytes_label(value: int | None) -> str:

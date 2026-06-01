@@ -1158,6 +1158,86 @@ body.graph-modal-open {
     font-weight: 900;
 }
 
+.panel-title-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent);
+}
+
+.panel:has(.panel-help-icon),
+.panel:has(.panel-help-icon) .panel-head {
+    overflow: visible;
+}
+
+.panel:has(.panel-help-icon) {
+    position: relative;
+}
+
+.panel:has(.panel-help-icon:hover),
+.panel:has(.panel-help-icon:focus-visible) {
+    z-index: 80;
+}
+
+.panel-title-help span {
+    color: inherit;
+}
+
+.panel-help-icon {
+    position: relative;
+    width: 18px;
+    height: 18px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--accent);
+    background: var(--panel-2);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: help;
+}
+
+.panel-help-icon:hover,
+.panel-help-icon:focus-visible {
+    border-color: var(--line-hot);
+    box-shadow: 0 0 0 2px var(--shadow);
+    outline: none;
+}
+
+.panel-help-icon[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    z-index: 9999;
+    left: 0;
+    bottom: calc(100% + 8px);
+    width: max-content;
+    max-width: min(360px, 76vw);
+    padding: 10px 12px;
+    border: 1px solid var(--line-hot);
+    border-radius: 3px;
+    color: var(--text);
+    background: var(--panel);
+    box-shadow: 0 0 24px var(--shadow);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    text-align: left;
+    text-transform: none;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(4px);
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.panel-help-icon[data-tooltip]:hover::after,
+.panel-help-icon[data-tooltip]:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 .arm-tooltip,
 .iface-tooltip {
     position: relative;
@@ -1509,6 +1589,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     margin-top: 12px;
 }
 
+.policy-work-tab {
+    margin-left: 14px;
+}
+
 .policy-routes-title {
     display: flex;
     align-items: center;
@@ -1527,6 +1611,28 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     font-weight: 900;
     text-transform: lowercase;
     outline: none;
+}
+
+.policy-routes-title #policy-table-filter {
+    min-width: 118px;
+}
+
+.panel[data-policy-view="routes"],
+.panel[data-policy-view="rules"],
+.panel[data-policy-view="tables"] {
+    width: calc(100% - 28px);
+    max-width: calc(100% - 28px);
+}
+
+.policy-table-scroll {
+    max-height: 340px;
+    overflow: auto;
+}
+
+.policy-table-scroll .data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 .policy-routes-title select:focus {

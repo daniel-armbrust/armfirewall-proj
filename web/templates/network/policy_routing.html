@@ -32,7 +32,7 @@
     <button class="local-tab active" type="button" data-policy-tab="routes">Routes</button>
     <button class="local-tab" type="button" data-policy-tab="rules">Rules</button>
     <button class="local-tab" type="button" data-policy-tab="tables">Tables</button>
-    <button class="local-tab" type="button" data-policy-tab="work-requests">Work Requests</button>
+    <button class="local-tab policy-work-tab" type="button" data-policy-tab="work-requests">Work Requests</button>
 </nav>
 
 <div class="policy-create-actions">
@@ -45,6 +45,7 @@
     <div class="panel-head">
         <div class="policy-routes-title">
             <h2>Routes</h2>
+            <select id="policy-table-filter" aria-label="Policy routing table filter"></select>
             <select id="policy-family-filter" aria-label="Policy routing family filter">
                 <option value="ipv4">ipv4</option>
                 <option value="ipv6">ipv6</option>
@@ -54,7 +55,7 @@
             <span id="policy-routes-count">routes=0</span>
         </div>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap policy-table-scroll">
         <table class="data-table">
             <thead>
                 <tr>
@@ -77,6 +78,22 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+    <div class="table-pagination" data-policy-pagination="routes">
+        <div class="table-pagination-nav">
+            <button class="text-button compact table-page-button" type="button" data-policy-page-prev="routes" aria-label="Routes previous page">&lt;</button>
+            <button class="text-button compact table-page-button" type="button" data-policy-page-next="routes" aria-label="Routes next page">&gt;</button>
+            <span class="table-page-status" data-policy-page-status="routes">Page 1 of 1 (0 - 0 of 0 total items)</span>
+        </div>
+        <label class="table-page-size">
+            <span>Items per page</span>
+            <select data-policy-page-size="routes" aria-label="Routes items per page">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </label>
     </div>
 </section>
 
@@ -178,12 +195,19 @@
 
 <section class="panel" data-policy-view="rules" hidden>
     <div class="panel-head">
-        <h2>Rules</h2>
+        <div class="policy-routes-title">
+            <h2>Rules</h2>
+            <select id="policy-rule-table-filter" aria-label="Policy routing rule table filter"></select>
+            <select id="policy-rule-family-filter" aria-label="Policy routing rule family filter">
+                <option value="ipv4">ipv4</option>
+                <option value="ipv6">ipv6</option>
+            </select>
+        </div>
         <div class="panel-actions">
             <span id="policy-rules-count">rules=0</span>
         </div>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap policy-table-scroll">
         <table class="data-table">
             <thead>
                 <tr>
@@ -204,6 +228,22 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+    <div class="table-pagination" data-policy-pagination="rules">
+        <div class="table-pagination-nav">
+            <button class="text-button compact table-page-button" type="button" data-policy-page-prev="rules" aria-label="Rules previous page">&lt;</button>
+            <button class="text-button compact table-page-button" type="button" data-policy-page-next="rules" aria-label="Rules next page">&gt;</button>
+            <span class="table-page-status" data-policy-page-status="rules">Page 1 of 1 (0 - 0 of 0 total items)</span>
+        </div>
+        <label class="table-page-size">
+            <span>Items per page</span>
+            <select data-policy-page-size="rules" aria-label="Rules items per page">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </label>
     </div>
 </section>
 
@@ -295,7 +335,7 @@
             <span id="policy-tables-count">tables=0</span>
         </div>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap policy-table-scroll">
         <table class="data-table">
             <thead>
                 <tr>
@@ -308,6 +348,22 @@
             </thead>
             <tbody id="policy-tables-body"></tbody>
         </table>
+    </div>
+    <div class="table-pagination" data-policy-pagination="tables">
+        <div class="table-pagination-nav">
+            <button class="text-button compact table-page-button" type="button" data-policy-page-prev="tables" aria-label="Tables previous page">&lt;</button>
+            <button class="text-button compact table-page-button" type="button" data-policy-page-next="tables" aria-label="Tables next page">&gt;</button>
+            <span class="table-page-status" data-policy-page-status="tables">Page 1 of 1 (0 - 0 of 0 total items)</span>
+        </div>
+        <label class="table-page-size">
+            <span>Items per page</span>
+            <select data-policy-page-size="tables" aria-label="Tables items per page">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </label>
     </div>
 </section>
 

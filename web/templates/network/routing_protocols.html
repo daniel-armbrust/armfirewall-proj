@@ -52,7 +52,10 @@
     <form id="bird-global-settings-form">
         <section class="panel" id="bird-daemon-settings-panel">
             <div class="panel-head">
-                <h2>Router Settings</h2>
+                <h2 class="panel-title-help">
+                    <span>Router Settings</span>
+                    <button class="panel-help-icon" type="button" aria-label="Router Settings help" data-tooltip="Defines the global BIRD router identity, including Router ID and hostname used in bird.conf.">?</button>
+                </h2>
                 <span>bird.conf</span>
             </div>
             <div class="edit-form">
@@ -71,7 +74,10 @@
 
         <section class="panel routing-protocol-panel">
             <div class="panel-head">
-                <h2>Kernel Protocol</h2>
+                <h2 class="panel-title-help">
+                    <span>Kernel Protocol</span>
+                    <button class="panel-help-icon" type="button" aria-label="Kernel Protocol help" data-tooltip="Controls how BIRD exchanges routes with the Linux kernel routing table.">?</button>
+                </h2>
             </div>
             <div class="edit-form">
                 <div class="form-grid routing-settings-grid">
@@ -134,7 +140,10 @@
 
         <section class="panel routing-protocol-panel">
             <div class="panel-head">
-                <h2>Device Protocol</h2>
+                <h2 class="panel-title-help">
+                    <span>Device Protocol</span>
+                    <button class="panel-help-icon" type="button" aria-label="Device Protocol help" data-tooltip="Monitors network interface state so BIRD can react when interfaces appear, disappear, or change.">?</button>
+                </h2>
             </div>
             <div class="edit-form">
                 <div class="form-grid routing-settings-grid">
@@ -156,7 +165,10 @@
 
         <section class="panel routing-protocol-panel">
             <div class="panel-head">
-                <h2>Direct Protocol</h2>
+                <h2 class="panel-title-help">
+                    <span>Direct Protocol</span>
+                    <button class="panel-help-icon" type="button" aria-label="Direct Protocol help" data-tooltip="Imports directly connected interface networks into BIRD routing tables.">?</button>
+                </h2>
             </div>
             <div class="edit-form">
                 <div class="form-grid routing-settings-grid">
@@ -238,7 +250,7 @@
                         </select>
                     </label>
                     <label class="field">
-                        <span>Multicast Address</span>
+                        <span id="bird-rip-address-label">Multicast Address</span>
                         <input id="bird-rip-multicast-addr" name="multicast_addr" type="text" autocomplete="off">
                     </label>
                     <label class="field">
