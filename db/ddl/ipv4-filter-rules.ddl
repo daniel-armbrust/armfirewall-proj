@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS filter_input_rules (
 
      action TEXT NOT NULL DEFAULT 'DROP' CHECK (action IN ('DROP', 'REJECT', 'ACCEPT')),
      protected INTEGER NOT NULL DEFAULT 0 CHECK (protected IN (0, 1)),
+     rule_source TEXT NOT NULL DEFAULT 'system' CHECK (rule_source IN ('system', 'user')),
      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
 
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -109,6 +110,7 @@ CREATE TABLE IF NOT EXISTS filter_forward_rules (
 
      action TEXT NOT NULL DEFAULT 'DROP' CHECK (action IN ('DROP', 'REJECT', 'ACCEPT')),
      protected INTEGER NOT NULL DEFAULT 0 CHECK (protected IN (0, 1)),
+     rule_source TEXT NOT NULL DEFAULT 'system' CHECK (rule_source IN ('system', 'user')),
      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
 
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -168,6 +170,7 @@ CREATE TABLE IF NOT EXISTS filter_output_rules (
 
      action TEXT NOT NULL DEFAULT 'DROP' CHECK (action IN ('DROP', 'REJECT', 'ACCEPT')),
      protected INTEGER NOT NULL DEFAULT 0 CHECK (protected IN (0, 1)),
+     rule_source TEXT NOT NULL DEFAULT 'system' CHECK (rule_source IN ('system', 'user')),
      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
 
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

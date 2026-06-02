@@ -43,15 +43,19 @@
 <section class="filter-rules-view" data-nat-view="rules">
     {% for chain in ["PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"] %}
     <section class="panel filter-chain-panel" data-nat-chain-panel="{{ chain }}" {% if chain != "PREROUTING" %}hidden{% endif %}>
-        <div class="panel-head">
+        <div class="panel-head firewall-chain-head">
             <h2 class="chain-title">
                 <span>{{ chain }}</span>
+            </h2>
+            <div class="panel-actions firewall-chain-actions">
                 <select class="chain-policy-select" data-nat-family-filter="{{ chain }}" aria-label="{{ chain }} family filter">
                     <option value="IPV4">ipv4</option>
                     <option value="IPV6">ipv6</option>
                 </select>
-            </h2>
-            <div class="panel-actions">
+                <select class="chain-policy-select chain-origin-filter-select" data-nat-origin-filter="{{ chain }}" aria-label="{{ chain }} rule origin filter">
+                    <option value="all">All Rules</option>
+                    <option value="user">User Rules</option>
+                </select>
                 <span id="nat-{{ chain | lower }}-count">rules=-</span>
             </div>
         </div>
@@ -142,6 +146,7 @@
                     <option value="tcp">tcp</option>
                     <option value="udp">udp</option>
                     <option value="icmp">icmp / icmpv6</option>
+                            <option value="esp">esp</option>
                 </select>
             </label>
             <label class="field" data-iface-in-field>
@@ -264,5 +269,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/nat_rules.js') }}?v=20260613-nat-pending-apply" defer></script>
+<script src="{{ url_for('static', path='/js/nat_rules.js') }}?v=20260613-nat-user-defined" defer></script>
 {% endblock %}

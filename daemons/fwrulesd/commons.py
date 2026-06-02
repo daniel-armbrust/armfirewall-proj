@@ -92,11 +92,18 @@ def next_rule_order(conn: db.Connection, table: str) -> int:
 
 
 def ensure_pending_delete_column(conn: db.Connection, table: str) -> None:
-    """Add the pending delete marker to older rule tables when needed."""
+    """Add compatibility columns required by rule tables when needed."""
     columns = {str(row["name"]) for row in db.execute_on(conn, f"PRAGMA table_info({table})").fetchall()}
 
     if "pending_delete" not in columns:
         db.execute_on(conn, f"ALTER TABLE {table} ADD COLUMN pending_delete INTEGER NOT NULL DEFAULT 0")
+    if "rule_source" not in columns:
+        db.execute_on(conn, f"ALTER TABLE {table} ADD COLUMN rule_source TEXT NOT NULL DEFAULT 'system'")
+    db.execute_on(
+        conn,
+        f"UPDATE {table} SET rule_source = CASE WHEN protected = 1 THEN 'system' ELSE 'user' END "
+        "WHERE rule_source IS NULL OR rule_source = '' OR (rule_source = 'system' AND protected = 0)",
+    )
 
 
 def row_to_rule(family: str, chain: str, row: Any, *, chain_tables: Mapping[str, str]) -> dict[str, Any]:
@@ -107,6 +114,12 @@ def row_to_rule(family: str, chain: str, row: Any, *, chain_tables: Mapping[str,
     data["table_name"] = chain_tables[chain]
     data["enabled_label"] = "enabled" if int(data["enabled"]) == 1 else "disabled"
     data["protected_label"] = "protected" if int(data["protected"]) == 1 else "editable"
+    rule_source = str(data.get("rule_source") or ("system" if int(data["protected"]) == 1 else "user")).strip().lower()
+    if rule_source not in {"system", "user"}:
+        rule_source = "system" if int(data["protected"]) == 1 else "user"
+    data["rule_source"] = rule_source
+    data["user_defined"] = 1 if rule_source == "user" else 0
+    data["rule_source_label"] = "user defined" if rule_source == "user" else "system"
 
     return data
 

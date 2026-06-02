@@ -11,16 +11,24 @@
 
 <section class="summary-grid compact" aria-label="Libreswan summary">
     <div class="metric">
+        <span class="metric-label">Daemon</span>
+        <strong id="libreswan-summary-daemon">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Libreswan Version</span>
+        <strong id="libreswan-summary-version">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">PID</span>
+        <strong id="libreswan-summary-pid">-</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Uptime</span>
+        <strong id="libreswan-summary-uptime">-</strong>
+    </div>
+    <div class="metric">
         <span class="metric-label">Connections</span>
         <strong id="libreswan-summary-connections">-</strong>
-    </div>
-    <div class="metric">
-        <span class="metric-label">Enabled</span>
-        <strong id="libreswan-summary-enabled">-</strong>
-    </div>
-    <div class="metric">
-        <span class="metric-label">Disabled</span>
-        <strong id="libreswan-summary-disabled">-</strong>
     </div>
 </section>
 
@@ -65,63 +73,74 @@
     </div>
 </section>
 
-<section class="panel" id="libreswan-form-panel" hidden>
-    <div class="panel-head">
-        <h2 id="libreswan-form-title">New IPsec Connection</h2>
-        <span id="libreswan-form-state">mode=create</span>
-    </div>
-    <form class="edit-form" id="libreswan-form">
+<section id="libreswan-form-panel" hidden>
+    <form id="libreswan-form">
+        <section class="panel">
+            <div class="panel-head">
+                <h2 id="libreswan-form-title">New IPsec Connection</h2>
+                <span id="libreswan-form-state" hidden>mode=create</span>
+            </div>
+            <div class="edit-form">
         <input id="libreswan-id" type="hidden">
         <input id="libreswan-enabled" name="enabled" type="hidden" value="1">
         <input id="libreswan-leftsubnet" name="leftsubnet" type="hidden" value="0.0.0.0/0">
         <input id="libreswan-rightsubnet" name="rightsubnet" type="hidden" value="0.0.0.0/0">
         <input id="libreswan-auto" name="auto" type="hidden" value="start">
         <input id="libreswan-encapsulation" name="encapsulation" type="hidden" value="yes">
-        <div class="form-grid libreswan-form-grid">
-            <label class="field libreswan-field-half">
+        <input id="libreswan-mark" name="mark" type="hidden" value="">
+                <div class="form-grid libreswan-form-grid">
+            <label class="field libreswan-span-2">
                 <span>Connection Name</span>
                 <input id="libreswan-conn-name" name="conn_name" type="text" autocomplete="off">
             </label>
-            <label class="field libreswan-field-wide">
+            <div class="libreswan-spacer" aria-hidden="true"></div>
+            <div class="libreswan-spacer" aria-hidden="true"></div>
+
+            <label class="field wide">
                 <span>Description</span>
                 <input id="libreswan-description" name="description" type="text" autocomplete="off">
             </label>
-            <label class="field libreswan-field-half">
+            <div class="libreswan-break" aria-hidden="true"></div>
+
+            <label class="field libreswan-span-2">
                 <span>Left</span>
                 <input id="libreswan-left-addr" name="left_addr" type="text" autocomplete="off" inputmode="decimal" placeholder="192.0.2.10" maxlength="15" data-ipv4-address required>
             </label>
-            <label class="field libreswan-field-half">
+            <label class="field libreswan-span-2">
                 <span>Left ID</span>
                 <input id="libreswan-left-id" name="left_id" type="text" autocomplete="off">
             </label>
-            <label class="field libreswan-field-half">
+
+            <label class="field libreswan-span-2">
                 <span>Right</span>
                 <input id="libreswan-right-addr" name="right_addr" type="text" autocomplete="off" inputmode="decimal" placeholder="198.51.100.10" maxlength="15" data-ipv4-address required>
             </label>
-            <label class="field libreswan-field-half">
-                <span>VTI interface</span>
-                <input id="libreswan-vti-interface" name="vti_interface" type="text" autocomplete="off" readonly>
-            </label>
-            <label class="field libreswan-field-half">
+            <div class="libreswan-spacer libreswan-span-2" aria-hidden="true"></div>
+            <div class="libreswan-break" aria-hidden="true"></div>
+
+            <label class="field libreswan-span-2">
                 <span>VTI IP / Mask</span>
                 <input id="libreswan-vti-addr" name="vti_addr" type="text" autocomplete="off" inputmode="decimal" placeholder="169.254.10.2/30" maxlength="18" data-ipv4-cidr>
             </label>
-            <label class="field libreswan-field-half">
-                <span>VTI MTU</span>
-                <input id="libreswan-vti-mtu" name="vti_mtu" type="number" autocomplete="off" inputmode="numeric" placeholder="1400" min="576" max="9000">
-            </label>
-            <label class="field libreswan-field-half">
+            <label class="field libreswan-span-2">
                 <span>VTI routing</span>
                 <select id="libreswan-vti-routing" name="vti_routing">
                     <option value="no">no</option>
                     <option value="yes">yes</option>
                 </select>
             </label>
-            <label class="field libreswan-field-half">
-                <span>Mark</span>
-                <input id="libreswan-mark" name="mark" type="text" autocomplete="off" placeholder="5/0xffffffff" readonly required>
+
+            <label class="field libreswan-span-2">
+                <span>VTI interface</span>
+                <input id="libreswan-vti-interface" name="vti_interface" type="text" autocomplete="off" readonly>
             </label>
-            <label class="field libreswan-field-half">
+            <label class="field libreswan-span-2">
+                <span>VTI MTU</span>
+                <input id="libreswan-vti-mtu" name="vti_mtu" type="number" autocomplete="off" inputmode="numeric" placeholder="1400" min="576" max="9000">
+            </label>
+            <div class="libreswan-break" aria-hidden="true"></div>
+
+            <label class="field libreswan-span-2">
                 <span>IKEv2</span>
                 <select id="libreswan-ikev2" name="ikev2">
                     <option value="no">no</option>
@@ -132,7 +151,9 @@
                     <option value="yes">yes</option>
                 </select>
             </label>
-            <label class="field libreswan-field-half">
+            <div class="libreswan-spacer libreswan-span-2" aria-hidden="true"></div>
+
+            <label class="field libreswan-span-2">
                 <span>IKE</span>
                 <select id="libreswan-ike" name="ike">
                     <option value="aes_cbc256-sha2_256;dh20">aes_cbc256-sha2_256;dh20</option>
@@ -143,7 +164,7 @@
                     <option value="aes_cbc256-sha2_384;modp1536" selected>aes_cbc256-sha2_384;modp1536</option>
                 </select>
             </label>
-            <label class="field libreswan-field-half">
+            <label class="field libreswan-span-2">
                 <span>Phase2 alg</span>
                 <select id="libreswan-phase2alg" name="phase2alg">
                     <option value="aes_gcm256;dh20">aes_gcm256;dh20</option>
@@ -153,15 +174,18 @@
                     <option value="aes_gcm256;modp1536" selected>aes_gcm256;modp1536</option>
                 </select>
             </label>
-            <label class="field libreswan-field-half">
+
+            <label class="field libreswan-span-2">
                 <span>IKE lifetime</span>
                 <input id="libreswan-ikelifetime" name="ikelifetime" type="text" autocomplete="off" value="28800s">
             </label>
-            <label class="field libreswan-field-half">
+            <label class="field libreswan-span-2">
                 <span>SA lifetime</span>
                 <input id="libreswan-salifetime" name="salifetime" type="text" autocomplete="off" value="3600s">
             </label>
-            <label class="field libreswan-field-wide">
+            <div class="libreswan-break" aria-hidden="true"></div>
+
+            <label class="field libreswan-span-2">
                 <span>Shared secret</span>
                 <div class="secret-field-control">
                     <input id="libreswan-shared-secret" name="shared_secret" type="password" autocomplete="new-password" required>
@@ -169,10 +193,11 @@
                     <button class="icon-button secret-action" type="button" id="libreswan-secret-toggle" title="Show shared secret" aria-label="Show shared secret" aria-pressed="false">◉</button>
                 </div>
             </label>
-        </div>
-        <div class="form-actions">
-            <button class="text-button primary" type="submit" id="libreswan-submit">Add connection</button>
-            <button class="text-button" type="button" id="libreswan-clear">Clear</button>
+            <div class="libreswan-spacer libreswan-span-2" aria-hidden="true"></div>
+</div>
+        </section>
+        <div class="form-actions policy-route-actions">
+            <button class="text-button primary policy-apply-button" type="submit" id="libreswan-submit">Add</button>
         </div>
         <div class="form-status" id="libreswan-form-status" hidden></div>
     </form>
@@ -216,5 +241,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_libreswan.js') }}?v=20260613-libreswan-service-tabs" defer></script>
+<script src="{{ url_for('static', path='/js/services_libreswan.js') }}?v=20260613-libreswan-summary-cards" defer></script>
 {% endblock %}

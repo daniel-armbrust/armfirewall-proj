@@ -51,6 +51,7 @@
         POSTROUTING: document.querySelector("#mangle-postrouting-count"),
     };
     const familyFilterSelects = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-family-filter='${chain}']`)]));
+    const originFilterSelects = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-origin-filter='${chain}']`)]));
     const pageStatusLabels = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-page-status='${chain}']`)]));
     const pagePrevButtons = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-page-prev='${chain}']`)]));
     const pageNextButtons = Object.fromEntries(MANGLE_CHAINS.map((chain) => [chain, document.querySelector(`[data-mangle-page-next='${chain}']`)]));
@@ -214,6 +215,7 @@
         const protocol = protocolSelect ? protocolSelect.value : "tcp";
         const isIcmp = protocol === "icmp";
         const isAny = protocol === "all";
+        const isEsp = protocol === "esp";
         const wildcard = family === "IPV6" ? "::/0" : "0.0.0.0/0";
 
         if (srcAddr && (srcAddr.value === "" || srcAddr.value === "0.0.0.0/0" || srcAddr.value === "::/0")) {
@@ -224,7 +226,7 @@
         }
         document.querySelectorAll("[data-iface-in-field]").forEach((field) => setFieldHidden(field, chain === "OUTPUT" || chain === "POSTROUTING"));
         document.querySelectorAll("[data-iface-out-field]").forEach((field) => setFieldHidden(field, chain === "PREROUTING" || chain === "INPUT"));
-        document.querySelectorAll("[data-port-field]").forEach((field) => setFieldHidden(field, isIcmp || isAny));
+        document.querySelectorAll("[data-port-field]").forEach((field) => setFieldHidden(field, isIcmp || isAny || isEsp));
     }
 
     function payloadFromForm() {
@@ -353,8 +355,10 @@
         const count = ruleCounts[chain];
         const chainRules = rules || [];
         const activeFamily = familyFilterSelects[chain] ? familyFilterSelects[chain].value : "IPV4";
+        const activeOrigin = originFilterSelects[chain] ? originFilterSelects[chain].value : "all";
         const filteredRules = chainRules
             .filter((rule) => rule.family === activeFamily)
+            .filter((rule) => activeOrigin !== "user" || HF.number(rule.user_defined) === 1)
             .slice()
             .sort(compareRulesForDisplay);
         const pagination = chainPagination[chain] || {page: 1, pageSize: 25};
@@ -366,7 +370,8 @@
         const visibleRules = filteredRules.slice(startIndex, endIndex);
 
         if (count) {
-            count.textContent = `${familyLabel(activeFamily)} rules=${filteredRules.length}`;
+            const originLabel = activeOrigin === "user" ? " user-defined" : "";
+            count.textContent = `${familyLabel(activeFamily)}${originLabel} rules=${filteredRules.length}`;
         }
         updatePagination(chain, pagination.page, totalPages, totalItems, startIndex, endIndex);
         if (!body) {
@@ -376,7 +381,7 @@
             body.innerHTML = `
                 <tr>
                     <td colspan="11">
-                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${familyLabel(activeFamily)} ${HF.escapeHtml(chain)} mangle rules</span></div>
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no ${familyLabel(activeFamily)}${activeOrigin === "user" ? " user defined" : ""} ${HF.escapeHtml(chain)} mangle rules</span></div>
                     </td>
                 </tr>
             `;
@@ -661,6 +666,15 @@
     });
 
     Object.entries(familyFilterSelects).forEach(([chain, select]) => {
+        if (select) {
+            select.addEventListener("change", () => {
+                chainPagination[chain].page = 1;
+                renderChain(chain, currentChains[chain] || []);
+            });
+        }
+    });
+
+    Object.entries(originFilterSelects).forEach(([chain, select]) => {
         if (select) {
             select.addEventListener("change", () => {
                 chainPagination[chain].page = 1;

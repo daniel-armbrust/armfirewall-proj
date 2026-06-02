@@ -65,7 +65,7 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    nat_action, to_addr, to_port,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             ORDER BY rule_order, id
         """
@@ -75,7 +75,7 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    nat_action, to_addr, to_port,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             ORDER BY rule_order, id
         """
@@ -98,7 +98,7 @@ def get_nat_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    nat_action, to_addr, to_port,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             WHERE id = ?
         """
@@ -108,7 +108,7 @@ def get_nat_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    nat_action, to_addr, to_port,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             WHERE id = ?
         """
@@ -226,6 +226,7 @@ def sanitize_nat_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "to_port": optional_int(payload.get("to_port")),
         "enabled": normalize_enabled(payload.get("enabled", 1)),
         "protected": 0,
+        "rule_source": "user",
     }
 
     if chain in {"PREROUTING", "INPUT"} and not rule["iface_in"]:
@@ -248,26 +249,26 @@ def insert_nat_rule(conn: db.Connection, rule: dict[str, Any]) -> int:
             INSERT INTO {table} (
                 iface_in, rule_order, src_addr, src_port, dst_addr, dst_port,
                 protocol_name, protocol_type, protocol_code, nat_action, to_addr,
-                to_port, protected, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                to_port, protected, rule_source, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         params = (
             rule["iface_in"], rule_order, rule["src_addr"], rule["src_port"], rule["dst_addr"],
             rule["dst_port"], rule["protocol_name"], rule["protocol_type"], rule["protocol_code"],
-            rule["nat_action"], rule["to_addr"], rule["to_port"], rule["protected"], rule["enabled"],
+            rule["nat_action"], rule["to_addr"], rule["to_port"], rule["protected"], rule["rule_source"], rule["enabled"],
         )
     else:
         query = f"""
             INSERT INTO {table} (
                 iface_out, rule_order, src_addr, src_port, dst_addr, dst_port,
                 protocol_name, protocol_type, protocol_code, nat_action, to_addr,
-                to_port, protected, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                to_port, protected, rule_source, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         params = (
             rule["iface_out"], rule_order, rule["src_addr"], rule["src_port"], rule["dst_addr"],
             rule["dst_port"], rule["protocol_name"], rule["protocol_type"], rule["protocol_code"],
-            rule["nat_action"], rule["to_addr"], rule["to_port"], rule["protected"], rule["enabled"],
+            rule["nat_action"], rule["to_addr"], rule["to_port"], rule["protected"], rule["rule_source"], rule["enabled"],
         )
 
     cursor = db.execute_on(conn, query, params)

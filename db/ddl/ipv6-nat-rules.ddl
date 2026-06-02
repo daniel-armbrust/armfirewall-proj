@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS nat_prerouting_rules (
      to_port INTEGER,
 
      protected INTEGER NOT NULL DEFAULT 0 CHECK (protected IN (0, 1)),
+     rule_source TEXT NOT NULL DEFAULT 'system' CHECK (rule_source IN ('system', 'user')),
      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
 
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -86,6 +87,7 @@ CREATE TABLE IF NOT EXISTS nat_input_rules (
      to_port INTEGER,
 
      protected INTEGER NOT NULL DEFAULT 0 CHECK (protected IN (0, 1)),
+     rule_source TEXT NOT NULL DEFAULT 'system' CHECK (rule_source IN ('system', 'user')),
      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
 
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -140,6 +142,7 @@ CREATE TABLE IF NOT EXISTS nat_output_rules (
      to_port INTEGER,
 
      protected INTEGER NOT NULL DEFAULT 0 CHECK (protected IN (0, 1)),
+     rule_source TEXT NOT NULL DEFAULT 'system' CHECK (rule_source IN ('system', 'user')),
      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
 
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -194,6 +197,7 @@ CREATE TABLE IF NOT EXISTS nat_postrouting_rules (
      to_port INTEGER,
 
      protected INTEGER NOT NULL DEFAULT 0 CHECK (protected IN (0, 1)),
+     rule_source TEXT NOT NULL DEFAULT 'system' CHECK (rule_source IN ('system', 'user')),
      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
 
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

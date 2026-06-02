@@ -986,6 +986,23 @@ body.graph-modal-open {
     box-shadow: 0 0 0 2px var(--shadow);
 }
 
+.chain-origin-filter-select {
+    width: 138px;
+}
+
+.firewall-chain-head {
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.firewall-chain-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-left: auto;
+}
+
 .table-wrap {
     width: 100%;
     overflow-x: auto;
@@ -2587,6 +2604,59 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.libreswan-form-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.libreswan-span-2 {
+    grid-column: span 2;
+}
+
+.libreswan-spacer {
+    min-height: 1px;
+}
+
+.libreswan-break {
+    grid-column: 1 / -1;
+    min-height: 22px;
+}
+
+.libreswan-form-actions {
+    justify-content: flex-start;
+}
+
+.secret-field-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.secret-field-control input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.secret-field-control .secret-action {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+}
+
+@media (max-width: 860px) {
+    .libreswan-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .libreswan-span-2,
+    .libreswan-spacer {
+        grid-column: auto;
+    }
+
+    .libreswan-spacer {
+        display: none;
+    }
 }
 
 .routing-routes-title select {

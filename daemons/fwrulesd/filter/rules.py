@@ -76,7 +76,7 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
                    ct_new, ct_established, ct_related, ct_invalid,
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
-                   action, protected, enabled, pending_delete, created_at, updated_at
+                   action, protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             ORDER BY rule_order, id
         """
@@ -86,7 +86,7 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
                    ct_new, ct_established, ct_related, ct_invalid,
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
-                   action, protected, enabled, pending_delete, created_at, updated_at
+                   action, protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             ORDER BY rule_order, id
         """
@@ -96,7 +96,7 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
                    ct_new, ct_established, ct_related, ct_invalid,
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
-                   action, protected, enabled, pending_delete, created_at, updated_at
+                   action, protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             ORDER BY rule_order, id
         """
@@ -143,7 +143,7 @@ def get_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
                    ct_new, ct_established, ct_related, ct_invalid,
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
-                   action, protected, enabled, pending_delete, created_at, updated_at
+                   action, protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             WHERE id = ?
         """
@@ -153,7 +153,7 @@ def get_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
                    ct_new, ct_established, ct_related, ct_invalid,
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
-                   action, protected, enabled, pending_delete, created_at, updated_at
+                   action, protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             WHERE id = ?
         """
@@ -163,7 +163,7 @@ def get_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
                    ct_new, ct_established, ct_related, ct_invalid,
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
-                   action, protected, enabled, pending_delete, created_at, updated_at
+                   action, protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             WHERE id = ?
         """
@@ -275,6 +275,7 @@ def sanitize_rule_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "action": action,
         "enabled": normalize_enabled(payload.get("enabled", 1)),
         "protected": 0,
+        "rule_source": "user",
         "ct_new": normalize_enabled(payload.get("ct_new", 0)),
         "ct_established": normalize_enabled(payload.get("ct_established", 0)),
         "ct_related": normalize_enabled(payload.get("ct_related", 0)),
@@ -299,45 +300,44 @@ def insert_rule(conn: db.Connection, rule: dict[str, Any]) -> int:
             INSERT INTO {table} (
                 iface_in, rule_order, ct_new, ct_established, ct_related, ct_invalid,
                 src_addr, src_port, dst_addr, dst_port, protocol_name, protocol_type,
-                protocol_code, action, protected, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                protocol_code, action, protected, rule_source, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         params = (
             rule["iface_in"], rule_order, rule["ct_new"], rule["ct_established"], rule["ct_related"], rule["ct_invalid"],
             rule["src_addr"], rule["src_port"], rule["dst_addr"], rule["dst_port"], rule["protocol_name"],
-            rule["protocol_type"], rule["protocol_code"], rule["action"], rule["protected"], rule["enabled"],
+            rule["protocol_type"], rule["protocol_code"], rule["action"], rule["protected"], rule["rule_source"], rule["enabled"],
         )
     elif rule["chain"] == "FORWARD":
         query = f"""
             INSERT INTO {table} (
                 iface_in, iface_out, rule_order, ct_new, ct_established, ct_related, ct_invalid,
                 src_addr, src_port, dst_addr, dst_port, protocol_name, protocol_type,
-                protocol_code, action, protected, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                protocol_code, action, protected, rule_source, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         params = (
             rule["iface_in"], rule["iface_out"], rule_order, rule["ct_new"], rule["ct_established"],
             rule["ct_related"], rule["ct_invalid"], rule["src_addr"], rule["src_port"], rule["dst_addr"],
             rule["dst_port"], rule["protocol_name"], rule["protocol_type"], rule["protocol_code"],
-            rule["action"], rule["protected"], rule["enabled"],
+            rule["action"], rule["protected"], rule["rule_source"], rule["enabled"],
         )
     else:
         query = f"""
             INSERT INTO {table} (
                 iface_out, rule_order, ct_new, ct_established, ct_related, ct_invalid,
                 src_addr, src_port, dst_addr, dst_port, protocol_name, protocol_type,
-                protocol_code, action, protected, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                protocol_code, action, protected, rule_source, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         params = (
             rule["iface_out"], rule_order, rule["ct_new"], rule["ct_established"], rule["ct_related"], rule["ct_invalid"],
             rule["src_addr"], rule["src_port"], rule["dst_addr"], rule["dst_port"], rule["protocol_name"],
-            rule["protocol_type"], rule["protocol_code"], rule["action"], rule["protected"], rule["enabled"],
+            rule["protocol_type"], rule["protocol_code"], rule["action"], rule["protected"], rule["rule_source"], rule["enabled"],
         )
 
     cursor = db.execute_on(conn, query, params)
     return int(cursor.lastrowid)
-
 
 def enqueue_rule_work_request(category_name: str, action_name: str, rule_id: int | None, payload: dict[str, Any]) -> int:
     """Queue one work request for a firewall rule change."""

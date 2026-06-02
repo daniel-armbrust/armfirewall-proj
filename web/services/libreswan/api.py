@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import ipaddress
 import re
+import shutil
+import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +13,7 @@ from typing import Any
 from core import db
 from core import ipsec
 from core.constants import IFACE_DB_PATH, LIBRESWAN_DB_PATH, WORK_REQUEST_DB_PATH
-from web.services.api import service_installed
+from web.services.api import service_installed, service_status_by_name
 from web.services.libreswan.constants import (
     AUTO_VALUES,
     CONNECTION_FIELDS,
@@ -26,6 +28,41 @@ from web.workrequests.api import list_work_requests
 def libreswan_service_installed() -> bool:
     """Return whether the Libreswan IPsec service is installed."""
     return service_installed("libreswan")
+
+
+def libreswan_version() -> str:
+    """Return the installed Libreswan version when available."""
+    ipsec_bin = shutil.which("ipsec") or "/usr/sbin/ipsec"
+    for command in ([ipsec_bin, "--version"], [ipsec_bin, "version"]):
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        output = (result.stdout or result.stderr or "").strip()
+        if not output:
+            continue
+        first_line = output.splitlines()[0]
+        match = re.search(r"(Libreswan\s+)?(\d+(?:\.\d+)+)", first_line, re.IGNORECASE)
+        if match:
+            return match.group(2)
+        return first_line
+    return "-"
+
+
+def libreswan_status() -> dict[str, Any]:
+    """Return persisted Libreswan service status for the GUI."""
+    try:
+        return service_status_by_name("libreswan")
+    except ValueError:
+        return {
+            "name": "libreswan",
+            "display_name": "Libreswan",
+            "installed": False,
+            "state": "NOT INSTALLED",
+            "pid": "-",
+            "uptime": "-",
+            "details": "Missing from service catalog.",
+        }
 
 
 def ensure_libreswan_schema() -> None:
@@ -476,8 +513,14 @@ def list_connections() -> dict[str, Any]:
     for row in rows:
         row["ipsec_status"] = "up" if str(row["conn_name"]) in established_names else "down"
     
+    status = libreswan_status()
+
     return {
         "summary": {
+            "daemon": str(status.get("state") or "-").upper(),
+            "version": libreswan_version(),
+            "pid": str(status.get("pid") or "-"),
+            "uptime": str(status.get("uptime") or "-"),
             "connections": len(rows),
             "enabled": enabled,
             "disabled": len(rows) - enabled,

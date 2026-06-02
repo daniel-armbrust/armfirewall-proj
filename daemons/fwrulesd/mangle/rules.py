@@ -66,7 +66,7 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             ORDER BY rule_order, id
         """
@@ -77,7 +77,7 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             ORDER BY rule_order, id
         """
@@ -88,7 +88,7 @@ def get_rules_for_table(family: str, chain: str) -> list[dict[str, Any]]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             ORDER BY rule_order, id
         """
@@ -112,7 +112,7 @@ def get_mangle_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             WHERE id = ?
         """
@@ -123,7 +123,7 @@ def get_mangle_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             WHERE id = ?
         """
@@ -134,7 +134,7 @@ def get_mangle_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
                    src_addr, src_port, dst_addr, dst_port,
                    protocol_name, protocol_type, protocol_code,
                    mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                   protected, enabled, pending_delete, created_at, updated_at
+                   protected, rule_source, enabled, pending_delete, created_at, updated_at
             FROM {table}
             WHERE id = ?
         """
@@ -257,6 +257,7 @@ def sanitize_mangle_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "ttl_value": str(payload.get("ttl_value", "")).strip() or None,
         "enabled": normalize_enabled(payload.get("enabled", 1)),
         "protected": 0,
+        "rule_source": "user",
     }
 
     if chain in {"PREROUTING", "INPUT", "FORWARD"} and not rule["iface_in"]:
@@ -277,7 +278,7 @@ def insert_mangle_rule(conn: db.Connection, rule: dict[str, Any]) -> int:
         rule_order, rule["ct_new"], rule["ct_established"], rule["ct_related"], rule["ct_invalid"],
         rule["src_addr"], rule["src_port"], rule["dst_addr"], rule["dst_port"], rule["protocol_name"],
         rule["protocol_type"], rule["protocol_code"], rule["mangle_action"], rule["mark_value"],
-        rule["dscp_value"], rule["tos_value"], rule["ttl_value"], rule["protected"], rule["enabled"],
+        rule["dscp_value"], rule["tos_value"], rule["ttl_value"], rule["protected"], rule["rule_source"], rule["enabled"],
     )
 
     if rule["chain"] in {"PREROUTING", "INPUT"}:
@@ -286,8 +287,8 @@ def insert_mangle_rule(conn: db.Connection, rule: dict[str, Any]) -> int:
                 iface_in, rule_order, ct_new, ct_established, ct_related, ct_invalid,
                 src_addr, src_port, dst_addr, dst_port, protocol_name, protocol_type,
                 protocol_code, mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                protected, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                protected, rule_source, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         params = (rule["iface_in"], *common_values)
     elif rule["chain"] == "FORWARD":
@@ -296,8 +297,8 @@ def insert_mangle_rule(conn: db.Connection, rule: dict[str, Any]) -> int:
                 iface_in, iface_out, rule_order, ct_new, ct_established, ct_related, ct_invalid,
                 src_addr, src_port, dst_addr, dst_port, protocol_name, protocol_type,
                 protocol_code, mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                protected, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                protected, rule_source, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         params = (rule["iface_in"], rule["iface_out"], *common_values)
     else:
@@ -306,14 +307,13 @@ def insert_mangle_rule(conn: db.Connection, rule: dict[str, Any]) -> int:
                 iface_out, rule_order, ct_new, ct_established, ct_related, ct_invalid,
                 src_addr, src_port, dst_addr, dst_port, protocol_name, protocol_type,
                 protocol_code, mangle_action, mark_value, dscp_value, tos_value, ttl_value,
-                protected, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                protected, rule_source, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         params = (rule["iface_out"], *common_values)
 
     cursor = db.execute_on(conn, query, params)
     return int(cursor.lastrowid)
-
 
 def create_mangle_rule(payload: dict[str, Any]) -> dict[str, Any]:
     """Create a mangle rule without applying it to the operating system."""

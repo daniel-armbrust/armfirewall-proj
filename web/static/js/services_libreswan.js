@@ -398,7 +398,7 @@
             formState.textContent = "mode=create";
         }
         if (submitButton) {
-            submitButton.textContent = "Add connection";
+            submitButton.textContent = "Add";
         }
         if (formStatus) {
             formStatus.hidden = true;
@@ -442,7 +442,7 @@
             formState.textContent = `mode=edit id=${item.id}`;
         }
         if (submitButton) {
-            submitButton.textContent = "Save connection";
+            submitButton.textContent = "Save";
         }
         setActiveView("new-connection");
         formPanel?.scrollIntoView({behavior: "smooth", block: "start"});
@@ -492,9 +492,11 @@
     function renderConfig(data) {
         const summary = data.summary || {};
         latestConnections = data.connections || [];
+        setMetric("#libreswan-summary-daemon", summary.daemon || "-");
+        setMetric("#libreswan-summary-version", summary.version || "-");
+        setMetric("#libreswan-summary-pid", summary.pid || "-");
+        setMetric("#libreswan-summary-uptime", summary.uptime || "-");
         setMetric("#libreswan-summary-connections", summary.connections);
-        setMetric("#libreswan-summary-enabled", summary.enabled);
-        setMetric("#libreswan-summary-disabled", summary.disabled);
         renderConnections(latestConnections);
         setNextVtiInterface();
         setNextMark();
