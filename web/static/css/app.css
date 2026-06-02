@@ -2516,6 +2516,18 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     white-space: pre-wrap;
 }
 
+#bird-logs-panel {
+    width: calc(100% - 28px);
+    max-width: calc(100% - 28px);
+}
+
+#bird-logs-output {
+    min-height: 300px;
+    height: min(420px, 48vh);
+    max-height: min(420px, 48vh);
+    overflow: auto;
+}
+
 @media (max-width: 860px) {
     .summary-grid.compact {
         grid-template-columns: none;
@@ -2553,10 +2565,84 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .routing-diagnostics-output {
     margin-top: 14px;
-    max-height: 260px;
+    max-height: 380px;
     overflow: auto;
 }
 
 .not-implemented-panel {
     margin-top: 22px;
+}
+
+.routing-diagnostics-blocks {
+    display: grid;
+    gap: 14px;
+}
+
+.routing-routes-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.routing-routes-title select {
+    min-width: 172px;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    color: var(--ink);
+    background: var(--panel-2);
+    font: inherit;
+    font-weight: 900;
+    text-transform: uppercase;
+    outline: none;
+}
+
+.routing-routes-title select:focus {
+    border-color: var(--line-hot);
+    box-shadow: 0 0 0 2px var(--shadow);
+}
+
+.routing-diagnostics-block {
+    border: 1px solid rgba(77, 255, 128, 0.22);
+    background: rgba(0, 18, 10, 0.52);
+    padding: 12px;
+}
+
+.routing-diagnostics-block .panel-head {
+    margin-bottom: 10px;
+}
+
+.routing-diagnostics-block h3 {
+    color: var(--text);
+    font-size: 13px;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+#bird-rip-diagnostics-blocks .routing-diagnostics-output {
+    margin-top: 0;
+    min-height: 360px;
+}
+
+#bird-rip-routes-blocks .routing-diagnostics-output {
+    border-top: 0;
+    margin-top: 0;
+    min-height: 360px;
+}
+
+.routing-routes-table-wrap {
+    max-height: 380px;
+    overflow: auto;
+}
+
+.routing-routes-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+
+.routing-empty-output {
+    color: transparent;
 }

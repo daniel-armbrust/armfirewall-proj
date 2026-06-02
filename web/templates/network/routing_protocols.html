@@ -7,6 +7,7 @@
         <p class="eyebrow">network/routing-protocols</p>
         <h1>Routing Protocols</h1>
     </div>
+    <div class="refresh-state" id="bird-diagnostics-summary">Loading</div>
 </section>
 
 <section class="summary-grid compact" aria-label="Routing protocol summary">
@@ -39,6 +40,7 @@
         <button class="local-tab active" type="button" data-routing-view="global-config" data-routing-context-button="global-config">BIRD SETTINGS</button>
         <button class="local-tab" type="button" data-routing-view="rip" data-routing-context-button="rip" hidden>RIP SETTINGS</button>
         <button class="local-tab" type="button" data-routing-view="diagnostics">DIAGNOSTICS</button>
+        <button class="local-tab" type="button" data-routing-view="rip-routes" data-routing-context-button="rip" hidden>SHOW ROUTES</button>
     </nav>
 </div>
 
@@ -61,6 +63,10 @@
                     <label class="field routing-router-id">
                         <span>Hostname</span>
                         <input id="bird-hostname" name="hostname" type="text" placeholder="armfirewall" autocomplete="off">
+                    </label>
+                    <label class="check-line wide">
+                        <input id="bird-debug-enabled" name="debug_enabled" type="checkbox">
+                        <span>Debug mode</span>
                     </label>
                 </div>
             </div>
@@ -196,10 +202,8 @@
 <section class="panel" id="bird-diagnostics-panel" hidden>
     <div class="panel-head compact">
         <h2>Diagnostics</h2>
-        <span id="bird-diagnostics-summary">birdcl show protocols</span>
     </div>
-    <div class="diagnostics-meta" id="bird-diagnostics-meta">Waiting for collectord snapshot...</div>
-    <div class="table-wrap wide">
+    <div class="table-wrap wide" id="bird-diagnostics-table-wrap" hidden>
         <table class="data-table">
             <thead>
                 <tr>
@@ -220,6 +224,7 @@
             </tbody>
         </table>
     </div>
+    <div class="routing-diagnostics-blocks" id="bird-rip-diagnostics-blocks" hidden></div>
     <pre class="tool-output routing-diagnostics-output" id="bird-diagnostics-output">Waiting for birdcl show protocols...</pre>
 </section>
 
@@ -344,6 +349,20 @@
     </form>
 </section>
 
+<section class="panel" id="routing-rip-routes-panel" hidden>
+    <div class="panel-head compact">
+        <div class="routing-routes-title">
+            <h2>Show Routes</h2>
+            <select id="bird-rip-routes-filter" aria-label="RIP route diagnostics filter">
+                <option value="learned_routes">LEARNED ROUTES</option>
+                <option value="exported_routes">EXPORTED ROUTES</option>
+            </select>
+            <select id="bird-rip-routes-table-filter" aria-label="RIP route table filter"></select>
+        </div>
+    </div>
+    <div class="routing-diagnostics-blocks" id="bird-rip-routes-blocks"></div>
+</section>
+
 <section id="routing-ospf-panel" hidden>
     <div class="terminal-empty not-implemented-panel">
         <span class="prompt">$</span>
@@ -376,6 +395,6 @@
 
 {% block scripts %}
 {% if bird_installed %}
-<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260610-rip-interface-selection" defer></script>
+<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260611-rip-empty-diagnostics-panel" defer></script>
 {% endif %}
 {% endblock %}

@@ -13,3 +13,8 @@ BIRD_COMMAND_TIMEOUT_SECONDS = int(os.environ.get("ARMFW_COLLECTORD_BIRD_COMMAND
 BIRD_COMMAND_RETENTION = int(os.environ.get("ARMFW_COLLECTORD_BIRD_COMMAND_RETENTION", "500"))
 BIRDCL_PATH = os.environ.get("ARMFW_BIRDCL_PATH", "/usr/sbin/birdcl")
 BIRD_SHOW_PROTOCOLS_COMMAND = [BIRDCL_PATH, "show", "protocols"]
+BIRD_RIP_DIAGNOSTIC_COMMANDS = (
+    ("status", [BIRDCL_PATH, "show", "protocols", "all", "rip1"]),
+    ("learned-routes", [BIRDCL_PATH, "show", "route", "protocol", "rip1"]),
+    ("exported-routes", [BIRDCL_PATH, "show", "route", "export", "rip1"]),
+)

@@ -23,8 +23,13 @@
     const contextButtons = Array.from(document.querySelectorAll("[data-routing-context-button]"));
     const diagnosticsPanel = document.querySelector("#bird-diagnostics-panel");
     const diagnosticsSummary = document.querySelector("#bird-diagnostics-summary");
-    const diagnosticsMeta = document.querySelector("#bird-diagnostics-meta");
     const diagnosticsBody = document.querySelector("#bird-diagnostics-protocols-body");
+    const diagnosticsTable = document.querySelector("#bird-diagnostics-table-wrap");
+    const ripDiagnosticsBlocks = document.querySelector("#bird-rip-diagnostics-blocks");
+    const ripRoutesBlocks = document.querySelector("#bird-rip-routes-blocks");
+    const ripRoutesSummary = document.querySelector("#bird-rip-routes-summary");
+    const ripRoutesFilter = document.querySelector("#bird-rip-routes-filter");
+    const ripRoutesTableFilter = document.querySelector("#bird-rip-routes-table-filter");
     const diagnosticsOutput = document.querySelector("#bird-diagnostics-output");
     const viewButtons = Array.from(document.querySelectorAll("[data-routing-view]"));
     const WORK_REQUEST_REFRESH_MS = 3000;
@@ -32,6 +37,7 @@
     const panels = {
         "global-config": document.querySelector("#routing-global-config-panel"),
         rip: document.querySelector("#routing-rip-panel"),
+        "rip-routes": document.querySelector("#routing-rip-routes-panel"),
         ospf: document.querySelector("#routing-ospf-panel"),
         bgp: document.querySelector("#routing-bgp-panel"),
         logs: logsPanel,
@@ -42,6 +48,7 @@
     const fields = {
         router_id: document.querySelector("#bird-router-id"),
         hostname: document.querySelector("#bird-hostname"),
+        debug_enabled: document.querySelector("#bird-debug-enabled"),
         kernel: {
             enabled: document.querySelector("#bird-kernel-enabled"),
             route_table: document.querySelector("#bird-kernel-route-table"),
@@ -173,7 +180,7 @@
 
     function setRoutingNavigationContext(selectedView) {
         const unimplementedProtocol = selectedView === "ospf" || selectedView === "bgp";
-        if (selectedView === "rip") {
+        if (selectedView === "rip" || selectedView === "rip-routes") {
             routingSettingsContext = "rip";
         } else if (selectedView !== "diagnostics") {
             routingSettingsContext = "global-config";
@@ -220,6 +227,9 @@
         }
         if (selectedView === "rip") {
             loadRip();
+        }
+        if (selectedView === "rip-routes") {
+            loadRipRoutes({force: true});
         }
     }
 
@@ -376,6 +386,7 @@
         renderInterfaceOptions(data.interfaces || [], device.iface_name, direct.iface_name);
         setFieldValue(fields.router_id, settings.router_id);
         setFieldValue(fields.hostname, settings.hostname);
+        setFieldValue(fields.debug_enabled, settings.debug_enabled);
         Object.entries(fields.kernel).forEach(([name, element]) => setFieldValue(element, kernel[name]));
         Object.entries(fields.device).forEach(([name, element]) => setFieldValue(element, device[name]));
         Object.entries(fields.direct).forEach(([name, element]) => setFieldValue(element, direct[name]));
@@ -385,6 +396,7 @@
         return {
             router_id: readFieldValue(fields.router_id),
             hostname: readFieldValue(fields.hostname),
+            debug_enabled: readFieldValue(fields.debug_enabled),
             kernel: {
                 enabled: readFieldValue(fields.kernel.enabled),
                 route_table: readFieldValue(fields.kernel.route_table),
@@ -620,18 +632,33 @@
         return "disabled";
     }
 
-    function renderDiagnostics(data) {
+    function setDiagnosticsSummary(run) {
+        const collectedAt = run?.collected_at || "";
+        if (!diagnosticsSummary) {
+            return;
+        }
+        if (collectedAt) {
+            diagnosticsSummary.innerHTML = `Live / <span class="refresh-state-label">updated=</span>${HF.escapeHtml(collectedAt)}`;
+            return;
+        }
+        diagnosticsSummary.textContent = "No snapshot";
+    }
+
+    function renderBirdDiagnostics(data) {
         const run = data.last_run;
         const protocols = data.protocols || [];
-        const collectedAt = run?.collected_at ? String(run.collected_at).split(" ").pop() : "-";
-        if (diagnosticsSummary) {
-            diagnosticsSummary.textContent = run
-                ? `UPDATED ${HF.text(collectedAt)} | ${HF.text(run.duration_ms ?? "-")}ms`
-                : "NO SNAPSHOT";
+        if (diagnosticsTable) {
+            diagnosticsTable.hidden = false;
         }
-        if (diagnosticsMeta) {
-            diagnosticsMeta.textContent = "";
+        if (ripDiagnosticsBlocks) {
+            ripDiagnosticsBlocks.hidden = true;
+            ripDiagnosticsBlocks.innerHTML = "";
         }
+        if (diagnosticsOutput) {
+            diagnosticsOutput.hidden = true;
+            diagnosticsOutput.textContent = "";
+        }
+        setDiagnosticsSummary(run);
         if (diagnosticsBody) {
             if (!protocols.length) {
                 diagnosticsBody.innerHTML = `
@@ -652,9 +679,188 @@
                 `).join("");
             }
         }
+    }
+
+    function captureScrollState(container) {
+        const outputScroll = {};
+        container?.querySelectorAll(".routing-diagnostics-output").forEach((element, index) => {
+            outputScroll[index] = element.scrollTop;
+        });
+        return {
+            pageX: window.scrollX,
+            pageY: window.scrollY,
+            mainTop: document.querySelector("#main-content")?.scrollTop ?? null,
+            outputScroll,
+        };
+    }
+
+    function restoreScrollState(container, state) {
+        container?.querySelectorAll(".routing-diagnostics-output").forEach((element, index) => {
+            element.scrollTop = state.outputScroll[index] || 0;
+        });
+        if (state.mainTop !== null) {
+            document.querySelector("#main-content")?.scrollTo({top: state.mainTop, behavior: "auto"});
+        }
+        window.scrollTo(state.pageX, state.pageY);
+    }
+
+    function renderRipDiagnostics(data) {
+        const sections = (data.sections || []).filter((section) => section.key === "status");
+        const scrollState = captureScrollState(ripDiagnosticsBlocks);
+        setDiagnosticsSummary(data.last_run);
+        if (diagnosticsTable) {
+            diagnosticsTable.hidden = true;
+        }
         if (diagnosticsOutput) {
-            const output = data.raw_output || data.error_output || "No raw output collected.";
-            diagnosticsOutput.textContent = output.trim() || "No raw output collected.";
+            diagnosticsOutput.hidden = true;
+            diagnosticsOutput.textContent = "";
+        }
+        if (!ripDiagnosticsBlocks) {
+            return;
+        }
+        ripDiagnosticsBlocks.hidden = false;
+        if (!sections.length) {
+            ripDiagnosticsBlocks.innerHTML = `<pre class="tool-output routing-diagnostics-output routing-empty-output"></pre>`;
+            restoreScrollState(ripDiagnosticsBlocks, scrollState);
+            return;
+        }
+        ripDiagnosticsBlocks.innerHTML = sections.map((section) => {
+            const output = (section.raw_output || section.error_output || "No output collected.").trim() || "No output collected.";
+            return `<pre class="tool-output routing-diagnostics-output">${HF.escapeHtml(section.command || "")}
+${HF.escapeHtml(output)}</pre>`;
+        }).join("");
+        restoreScrollState(ripDiagnosticsBlocks, scrollState);
+    }
+
+    function currentRipRouteSection(data) {
+        const selectedRouteView = ripRoutesFilter?.value || "learned_routes";
+        return (data.sections || []).find((section) => section.key === selectedRouteView) || null;
+    }
+
+    function renderRipRouteTableOptions(routes) {
+        if (!ripRoutesTableFilter) {
+            return;
+        }
+        const previous = ripRoutesTableFilter.value;
+        const tableNames = Array.from(new Set((routes || []).map((route) => route.table_name || "-").filter(Boolean))).sort();
+        ripRoutesTableFilter.innerHTML = "";
+        ripRoutesTableFilter.hidden = tableNames.length === 0;
+        tableNames.forEach((tableName) => {
+            ripRoutesTableFilter.appendChild(option(tableName, tableName));
+        });
+        if (tableNames.includes(previous)) {
+            setFieldValue(ripRoutesTableFilter, previous);
+        } else if (tableNames.length) {
+            setFieldValue(ripRoutesTableFilter, tableNames[0]);
+        }
+        ripRoutesTableFilter.disabled = tableNames.length <= 1;
+    }
+
+    let ripRoutesData = null;
+    function renderRipRouteBlocks(data) {
+        ripRoutesData = data;
+        const section = currentRipRouteSection(data);
+        const sections = section ? [section] : [];
+        if (ripRoutesSummary) {
+            ripRoutesSummary.textContent = "";
+        }
+        if (!ripRoutesBlocks) {
+            return;
+        }
+        if (!sections.length) {
+            ripRoutesBlocks.innerHTML = "";
+            renderRipRouteTableOptions([]);
+            return;
+        }
+        ripRoutesBlocks.innerHTML = sections.map((section) => {
+            const allRoutes = section.routes || [];
+            renderRipRouteTableOptions(allRoutes);
+            const selectedTable = ripRoutesTableFilter?.value || "";
+            const routes = selectedTable ? allRoutes.filter((route) => (route.table_name || "-") === selectedTable) : allRoutes;
+            if (!routes.length) {
+                return `<div class="terminal-empty"><span class="prompt">$</span><span>No structured routes collected.</span></div>`;
+            }
+            return `
+                <div class="table-wrap routing-routes-table-wrap">
+                    <table class="data-table routing-routes-table">
+                        <thead>
+                            <tr>
+                                <th>Table</th>
+                                <th>Prefix</th>
+                                <th>Type</th>
+                                <th>Source</th>
+                                <th>Metric</th>
+                                <th>Next Hop</th>
+                                <th>Interface</th>
+                                <th>Since</th>
+                                <th>Selected</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${routes.map((route) => `
+                                <tr>
+                                    <td>${HF.escapeHtml(route.table_name || "-")}</td>
+                                    <td>${HF.escapeHtml(route.route_prefix || "-")}</td>
+                                    <td>${HF.escapeHtml(route.route_type || "-")}</td>
+                                    <td>${HF.escapeHtml(route.source_protocol || "-")}</td>
+                                    <td>${HF.escapeHtml(route.metric ?? "-")}</td>
+                                    <td>${HF.escapeHtml(route.next_hop || "-")}</td>
+                                    <td>${HF.escapeHtml(route.iface_name || "-")}</td>
+                                    <td>${HF.escapeHtml(route.since || "-")}</td>
+                                    <td>${route.selected ? "yes" : "no"}</td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }).join("");
+    }
+
+    let ripRoutesLoading = false;
+    async function loadRipRoutes(options = {}) {
+        if (!panels["rip-routes"] || panels["rip-routes"].hidden) {
+            return;
+        }
+        if (ripRoutesLoading && !options.force) {
+            return;
+        }
+        ripRoutesLoading = true;
+        try {
+            renderRipRouteBlocks(await HF.fetchJson("/api/network/routing-protocols/bird/rip-diagnostics"));
+        } catch (error) {
+            if (ripRoutesBlocks) {
+                ripRoutesBlocks.innerHTML = `<div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div>`;
+            }
+        } finally {
+            ripRoutesLoading = false;
+        }
+    }
+
+    function renderDiagnostics(data) {
+        if (routingSettingsContext === "rip") {
+            renderRipDiagnostics(data);
+            return;
+        }
+        renderBirdDiagnostics(data);
+    }
+
+    let headerDiagnosticsLoading = false;
+    async function loadHeaderDiagnostics(options = {}) {
+        if (!diagnosticsSummary) {
+            return;
+        }
+        if (headerDiagnosticsLoading && !options.force) {
+            return;
+        }
+        headerDiagnosticsLoading = true;
+        try {
+            const data = await HF.fetchJson("/api/network/routing-protocols/bird/diagnostics");
+            setDiagnosticsSummary(data.last_run);
+        } catch (error) {
+            diagnosticsSummary.textContent = "Error";
+        } finally {
+            headerDiagnosticsLoading = false;
         }
     }
 
@@ -668,7 +874,10 @@
         }
         diagnosticsLoading = true;
         try {
-            renderDiagnostics(await HF.fetchJson("/api/network/routing-protocols/bird/diagnostics"));
+            const endpoint = routingSettingsContext === "rip"
+                ? "/api/network/routing-protocols/bird/rip-diagnostics"
+                : "/api/network/routing-protocols/bird/diagnostics";
+            renderDiagnostics(await HF.fetchJson(endpoint));
         } catch (error) {
             if (diagnosticsMeta) {
                 diagnosticsMeta.textContent = error.message;
@@ -816,29 +1025,60 @@
     if (actionConfirm) {
         actionConfirm.addEventListener("click", runPendingAction);
     }
+    if (ripRoutesFilter) {
+        ripRoutesFilter.addEventListener("change", () => {
+            if (ripRoutesData) {
+                renderRipRouteBlocks(ripRoutesData);
+                return;
+            }
+            loadRipRoutes({force: true});
+        });
+    }
+    if (ripRoutesTableFilter) {
+        ripRoutesTableFilter.addEventListener("change", () => {
+            if (ripRoutesData) {
+                renderRipRouteBlocks(ripRoutesData);
+            }
+        });
+    }
     window.setInterval(() => {
         if (workRequestsVisible()) {
             loadWorkRequests();
         }
     }, WORK_REQUEST_REFRESH_MS);
     window.setInterval(() => {
+        loadHeaderDiagnostics();
         if (diagnosticsVisible()) {
             loadDiagnostics();
+        }
+        if (logsPanel && !logsPanel.hidden) {
+            loadLogs();
+        }
+        if (panels["rip-routes"] && !panels["rip-routes"].hidden) {
+            loadRipRoutes();
         }
     }, DIAGNOSTICS_REFRESH_MS);
     document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
             return;
         }
+        loadHeaderDiagnostics({force: true});
         if (workRequestsVisible()) {
             loadWorkRequests({force: true});
         }
         if (diagnosticsVisible()) {
             loadDiagnostics({force: true});
         }
+        if (logsPanel && !logsPanel.hidden) {
+            loadLogs();
+        }
+        if (panels["rip-routes"] && !panels["rip-routes"].hidden) {
+            loadRipRoutes({force: true});
+        }
     });
 
     const initialView = new URLSearchParams(window.location.search).get("view") || window.location.hash.replace("#", "") || "global-config";
     setActiveView(initialView);
     load();
+    loadHeaderDiagnostics({force: true});
 })();

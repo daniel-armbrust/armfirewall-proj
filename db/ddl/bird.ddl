@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS global_cfg (
      id INTEGER PRIMARY KEY CHECK (id = 1),
      router_id TEXT NOT NULL DEFAULT '192.0.2.1',
      hostname TEXT NOT NULL DEFAULT 'armfirewall',
+     debug_enabled INTEGER NOT NULL DEFAULT 0 CHECK (debug_enabled IN (0, 1)),
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -140,6 +141,56 @@ ON diagnostic_protocol (command_id);
 
 CREATE INDEX IF NOT EXISTS idx_bird_diagnostic_protocol_proto_state
 ON diagnostic_protocol (proto, state);
+
+-- Stores structured RIP routes imported by the RIP protocol.
+CREATE TABLE IF NOT EXISTS rip_imported_routes (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     command_id INTEGER NOT NULL,
+     table_name TEXT,
+     route_prefix TEXT NOT NULL,
+     route_type TEXT,
+     source_protocol TEXT,
+     since TEXT,
+     selected INTEGER NOT NULL DEFAULT 0 CHECK (selected IN (0, 1)),
+     metric INTEGER,
+     next_hop TEXT,
+     iface_name TEXT,
+     raw_route TEXT NOT NULL,
+     raw_detail TEXT,
+     collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     FOREIGN KEY (command_id) REFERENCES diagnostic_command_run(id) ON DELETE CASCADE
+);
+
+-- Stores structured RIP routes exported by the RIP protocol.
+CREATE TABLE IF NOT EXISTS rip_exported_routes (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     command_id INTEGER NOT NULL,
+     table_name TEXT,
+     route_prefix TEXT NOT NULL,
+     route_type TEXT,
+     source_protocol TEXT,
+     since TEXT,
+     selected INTEGER NOT NULL DEFAULT 0 CHECK (selected IN (0, 1)),
+     metric INTEGER,
+     next_hop TEXT,
+     iface_name TEXT,
+     raw_route TEXT NOT NULL,
+     raw_detail TEXT,
+     collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     FOREIGN KEY (command_id) REFERENCES diagnostic_command_run(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_bird_rip_imported_routes_command
+ON rip_imported_routes (command_id);
+
+CREATE INDEX IF NOT EXISTS idx_bird_rip_imported_routes_prefix
+ON rip_imported_routes (route_prefix);
+
+CREATE INDEX IF NOT EXISTS idx_bird_rip_exported_routes_command
+ON rip_exported_routes (command_id);
+
+CREATE INDEX IF NOT EXISTS idx_bird_rip_exported_routes_prefix
+ON rip_exported_routes (route_prefix);
 
 CREATE INDEX IF NOT EXISTS idx_bird_channel_family
 ON channel (family);

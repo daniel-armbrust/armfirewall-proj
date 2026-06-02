@@ -4,6 +4,7 @@ import ipaddress
 import json
 import re
 import subprocess
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -279,6 +280,7 @@ def default_global_settings() -> dict[str, Any]:
     return {
         "router_id": default_router_id(),
         "hostname": default_hostname(),
+        "debug_enabled": False,
         "log_syslog": True,
         "kernel": {
             "enabled": True,
@@ -320,6 +322,7 @@ def settings_from_db() -> dict[str, Any]:
             saved_router_id = str(global_cfg["router_id"] or "").strip()
             settings["router_id"] = default_router_id() if saved_router_id in {"", BIRD_DEFAULT_ROUTER_ID} else saved_router_id
             settings["hostname"] = str(global_cfg["hostname"] or default_hostname())
+            settings["debug_enabled"] = bool(global_cfg["debug_enabled"]) if "debug_enabled" in global_cfg.keys() else False
 
         kernel = db.fetch_one_on(
             conn,
@@ -379,6 +382,7 @@ def normalize_global_settings(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "router_id": router_id_setting(payload.get("router_id")),
         "hostname": hostname_setting(payload.get("hostname")),
+        "debug_enabled": bool_setting(payload.get("debug_enabled", False)),
         "log_syslog": bool_setting(payload.get("log_syslog", True)),
         "kernel": {
             "enabled": bool_setting(kernel.get("kernel_enabled", kernel.get("enabled", True))),
@@ -440,16 +444,16 @@ def save_settings_to_db(settings: dict[str, Any]) -> None:
             conn,
             """
             UPDATE global_cfg
-               SET router_id = ?, hostname = ?
+               SET router_id = ?, hostname = ?, debug_enabled = ?
              WHERE id = 1
             """,
-            (settings["router_id"], settings["hostname"]),
+            (settings["router_id"], settings["hostname"], 1 if settings["debug_enabled"] else 0),
         ).rowcount
         if updated == 0:
             db.execute_on(
                 conn,
-                "INSERT INTO global_cfg (id, router_id, hostname) VALUES (1, ?, ?)",
-                (settings["router_id"], settings["hostname"]),
+                "INSERT INTO global_cfg (id, router_id, hostname, debug_enabled) VALUES (1, ?, ?, ?)",
+                (settings["router_id"], settings["hostname"], 1 if settings["debug_enabled"] else 0),
             )
 
         kernel = settings["kernel"]
@@ -713,22 +717,48 @@ def channel_table_declarations(settings: dict[str, Any]) -> list[str]:
     return [f"{family} table {table_name};" for family in families]
 
 
-def channel_block(settings: dict[str, Any]) -> str:
-    """Render one BIRD channel block."""
-    families = ("ipv4", "ipv6") if settings["channel_family"] == "ipv4/ipv6" else (settings["channel_family"],)
+def channel_block(settings: dict[str, Any], family: str | None = None) -> str:
+    """Render one or more BIRD channel blocks."""
+    families = (family,) if family else ("ipv4", "ipv6") if settings["channel_family"] == "ipv4/ipv6" else (settings["channel_family"],)
     table_name = str(settings.get("channel_table_name") or "").strip()
     table_line = f"    table {table_name};\n" if table_name and table_name != BIRD_DEFAULT_CHANNEL_TABLE_NAME else ""
     return "".join(
         (
-            f"  {family} {{\n"
+            f"  {item} {{\n"
             f"{table_line}"
             f"    import {settings['import_policy']};\n"
             f"    export {settings['export_policy']};\n"
             "  };\n"
         )
-        for family in families
+        for item in families
     )
 
+
+def render_kernel_config(kernel: dict[str, Any]) -> str:
+    """Render BIRD kernel protocol blocks.
+
+    BIRD accepts IPv4 and IPv6 kernel channels, but when a kernel table is
+    configured they must be rendered as separate protocol instances.
+    """
+    if not kernel["enabled"]:
+        return ""
+    families = ("ipv4", "ipv6") if kernel["channel_family"] == "ipv4/ipv6" else (kernel["channel_family"],)
+    learn_line = "  learn all;\n" if kernel["learn"] == "all" else ""
+    persist_line = "  persist;\n" if kernel["persist"] else ""
+    blocks = []
+    for family in families:
+        suffix = "4" if family == "ipv4" else "6"
+        blocks.append(
+            f"protocol kernel kernel{suffix} {{\n"
+            f"  kernel table {kernel['route_table']};\n"
+            f"{learn_line}"
+            f"{persist_line}"
+            f"  metric {kernel['metric']};\n"
+            f"  scan time {kernel['scan_time_secs']};\n"
+            f"{channel_block(kernel, family)}"
+            "}"
+        )
+    return "\n\n".join(blocks)
 
 def render_rip_config(settings: dict[str, Any]) -> str:
     """Render the managed BIRD RIP protocol block."""
@@ -769,6 +799,7 @@ def render_global_config(settings: dict[str, Any], rip_settings: dict[str, Any] 
         f"router id {settings['router_id']};",
         f"hostname \"{settings['hostname']}\";",
         "log stderr all;",
+        *( ["debug protocols all;"] if settings.get("debug_enabled") else [] ),
         *channel_table_declarations(settings),
         "",
     ]
@@ -794,20 +825,9 @@ def render_global_config(settings: dict[str, Any], rip_settings: dict[str, Any] 
             "",
         ])
 
-    kernel = settings["kernel"]
-    if kernel["enabled"]:
-        learn_line = "  learn all;\n" if kernel["learn"] == "all" else ""
-        persist_line = "  persist;\n" if kernel["persist"] else ""
-        blocks.append(
-            "protocol kernel {\n"
-            f"  kernel table {kernel['route_table']};\n"
-            f"{learn_line}"
-            f"{persist_line}"
-            f"  metric {kernel['metric']};\n"
-            f"  scan time {kernel['scan_time_secs']};\n"
-            f"{channel_block(kernel)}"
-            "}"
-        )
+    kernel_block = render_kernel_config(settings["kernel"])
+    if kernel_block:
+        blocks.append(kernel_block)
     rip_block = render_rip_config(rip_settings or default_rip_settings())
     if rip_block:
         blocks.extend(["", rip_block])
@@ -901,8 +921,114 @@ def get_bird_diagnostics() -> dict[str, Any]:
     }
 
 
+def latest_diagnostic_command(conn: db.Connection, command: str) -> dict[str, Any]:
+    """Return the latest collected diagnostic command output."""
+    row = db.fetch_one_on(
+        conn,
+        """
+        SELECT id, command, exit_code, stdout, stderr, duration_ms, collected_at
+        FROM diagnostic_command_run
+        WHERE command = ?
+        ORDER BY collected_at DESC, id DESC
+        LIMIT 1
+        """,
+        (command,),
+    )
+    if row is None:
+        return {
+            "command": command,
+            "last_run": None,
+            "raw_output": "",
+            "error_output": "",
+        }
+    return {
+        "command": command,
+        "last_run": {
+            "id": int(row["id"]),
+            "command": str(row["command"]),
+            "exit_code": int(row["exit_code"]),
+            "duration_ms": row["duration_ms"],
+            "collected_at": str(row["collected_at"]),
+        },
+        "raw_output": str(row["stdout"] or ""),
+        "error_output": str(row["stderr"] or ""),
+    }
+
+
+def latest_rip_routes(conn: db.Connection, table_name: str) -> list[dict[str, Any]]:
+    """Return the current structured RIP route snapshot."""
+    if table_name not in {"rip_imported_routes", "rip_exported_routes"}:
+        raise ValueError(f"Unsupported RIP route table: {table_name}")
+    try:
+        rows = db.fetch_all_on(
+            conn,
+            f"""
+            SELECT table_name, route_prefix, route_type, source_protocol, since, selected, metric,
+                   next_hop, iface_name, raw_route, raw_detail, collected_at
+            FROM {table_name}
+            ORDER BY route_prefix, iface_name, next_hop
+            """,
+        )
+    except db.DatabaseError:
+        return []
+    return [
+        {
+            "table_name": row["table_name"],
+            "route_prefix": str(row["route_prefix"]),
+            "route_type": row["route_type"],
+            "source_protocol": row["source_protocol"],
+            "since": row["since"],
+            "selected": bool(row["selected"]),
+            "metric": row["metric"],
+            "next_hop": row["next_hop"],
+            "iface_name": row["iface_name"],
+            "raw_route": row["raw_route"],
+            "raw_detail": row["raw_detail"],
+            "collected_at": str(row["collected_at"]),
+        }
+        for row in rows
+    ]
+
+
+def rip_protocol_enabled(conn: db.Connection) -> bool:
+    """Return whether the persisted RIP protocol is enabled."""
+    row = db.fetch_one_on(conn, "SELECT enabled FROM proto_rip ORDER BY id LIMIT 1")
+    return bool(row["enabled"]) if row is not None else False
+
+
+def get_rip_diagnostics() -> dict[str, Any]:
+    """Return latest RIP diagnostics snapshots collected by collectord."""
+    ensure_bird_db()
+    commands = [
+        {"key": "status", "title": "Status", "command": "/usr/sbin/birdcl show protocols all rip1"},
+        {"key": "learned_routes", "title": "Learned Routes", "command": "/usr/sbin/birdcl show route protocol rip1"},
+        {"key": "exported_routes", "title": "Exported Routes", "command": "/usr/sbin/birdcl show route export rip1"},
+    ]
+    with db.connection(BIRD_DB_PATH) as conn:
+        if not rip_protocol_enabled(conn):
+            return {"last_run": None, "sections": [], "enabled": False}
+        sections = []
+        for item in commands:
+            section = latest_diagnostic_command(conn, item["command"])
+            section["key"] = item["key"]
+            section["title"] = item["title"]
+            if item["key"] == "learned_routes":
+                section["routes"] = latest_rip_routes(conn, "rip_imported_routes")
+            elif item["key"] == "exported_routes":
+                section["routes"] = latest_rip_routes(conn, "rip_exported_routes")
+            sections.append(section)
+    latest_runs = [section["last_run"] for section in sections if section.get("last_run")]
+    latest_run = max(latest_runs, key=lambda run: (run["collected_at"], run["id"])) if latest_runs else None
+    return {
+        "last_run": latest_run,
+        "sections": sections,
+        "enabled": True,
+    }
+
+
 def read_bird_logs(*, max_lines: int = 300) -> dict[str, Any]:
-    """Return recent BIRD supervisord stdout and stderr log lines in chronological order."""
+    """Return recent BIRD supervisord stdout and stderr log lines newest first."""
+    started = time.monotonic()
     sources = (
         ("stdout", BIRD_LOG_PATH),
         ("stderr", BIRD_ERR_LOG_PATH),
@@ -923,10 +1049,14 @@ def read_bird_logs(*, max_lines: int = 300) -> dict[str, Any]:
             sequence += 1
 
     entries.sort(key=lambda item: (item[0], item[1], item[2]))
+    lines = [line for _, _, _, line in reversed(entries[-max_lines:])]
     return {
         "path": str(BIRD_LOG_PATH),
         "stderr_path": str(BIRD_ERR_LOG_PATH),
         "exists": any(item["exists"] for item in files),
         "files": files,
-        "lines": [line for _, _, _, line in entries[-max_lines:]],
+        "lines": lines,
+        "line_count": len(lines),
+        "updated_at": db.sqlite_timestamp(),
+        "duration_ms": int((time.monotonic() - started) * 1000),
     }
