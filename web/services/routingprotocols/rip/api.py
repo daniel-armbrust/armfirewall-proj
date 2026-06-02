@@ -27,19 +27,26 @@ def default_rip_settings() -> dict[str, Any]:
 def rip_settings_from_db() -> dict[str, Any]:
     """Return persisted BIRD RIP settings from bird.db."""
     db.verify_database(BIRD_DB_PATH)
+    
     settings = default_rip_settings()
+    
     with db.connection(BIRD_DB_PATH) as conn:
         row = db.fetch_one_on(conn, "SELECT * FROM proto_rip ORDER BY id LIMIT 1")
+    
     if row is None:
         return settings
+    
     iface_names = [BIRD_ANY_INTERFACE]
+    
     if "iface_names" in row.keys():
         try:
             loaded_iface_names = json.loads(str(row["iface_names"] or "[]"))
         except json.JSONDecodeError:
             loaded_iface_names = []
+    
         if isinstance(loaded_iface_names, list):
             iface_names = [str(item) for item in loaded_iface_names if str(item).strip()] or [BIRD_ANY_INTERFACE]
+    
     return {
         "enabled": bool(row["enabled"]),
         "version": str(row["version"]),
@@ -61,8 +68,10 @@ def rip_settings_from_db() -> dict[str, Any]:
 def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
     """Persist BIRD RIP settings to bird.db."""
     db.verify_database(BIRD_DB_PATH)
+    
     with db.transaction(BIRD_DB_PATH) as conn:
         existing = db.fetch_one_on(conn, "SELECT id FROM proto_rip ORDER BY id LIMIT 1")
+    
         values = (
             settings["version"], settings["mode"], json.dumps(settings["iface_names"], sort_keys=True),
             settings["import_policy"], settings["export_policy"],
@@ -70,6 +79,7 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
             settings["port"], settings["update_time_secs"], settings["timeout_time_secs"], settings["garbage_time_secs"],
             settings["authentication"], settings["password"] or None, 1 if settings["enabled"] else 0,
         )
+    
         if existing is None:
             db.execute_on(
                 conn,
@@ -83,6 +93,7 @@ def save_rip_settings_to_db(settings: dict[str, Any]) -> None:
                 values,
             )
             return
+    
         db.execute_on(
             conn,
             """
@@ -100,16 +111,19 @@ def render_rip_config(settings: dict[str, Any]) -> str:
     """Render the managed BIRD RIP protocol block."""
     if not settings["enabled"]:
         return ""
+    
     channel_family = "ipv6" if settings["version"] == "ng" else "ipv4"
     passive_line = "    passive yes;" if settings["passive"] else "    passive no;"
     iface_names = settings.get("iface_names") or [BIRD_ANY_INTERFACE]
     iface_pattern = '", "'.join(str(item).replace('"', '\"') for item in iface_names)
     auth_lines = ""
+    
     if settings["authentication"] != "none":
         auth_lines = (
             f"    authentication {settings['authentication']};\n"
             f"    password \"{settings['password']}\";\n"
         )
+    
     return (
         "protocol rip {\n"
         f"  {channel_family} {{\n"
@@ -131,6 +145,7 @@ def render_rip_config(settings: dict[str, Any]) -> str:
 def get_rip_settings() -> dict[str, Any]:
     """Return current BIRD RIP protocol settings."""
     settings = rip_settings_from_db()
+    
     return {
         "service": bird_status(),
         "settings": settings,
@@ -141,8 +156,11 @@ def get_rip_settings() -> dict[str, Any]:
 def save_rip_settings(payload: dict[str, Any]) -> dict[str, Any]:
     """Persist BIRD RIP protocol settings and queue host configuration apply."""
     settings = normalize_rip_settings(payload)
+    
     save_rip_settings_to_db(settings)
+    
     work_request_id = queue_bird_apply("rip-settings")
+    
     return get_rip_settings() | {"saved": True, "work_request_id": work_request_id}
 
 
@@ -158,8 +176,10 @@ def latest_rip_protocol_name(conn: db.Connection) -> str | None:
         LIMIT 1
         """,
     )
+    
     if run is None:
         return None
+    
     row = db.fetch_one_on(
         conn,
         """
@@ -171,6 +191,7 @@ def latest_rip_protocol_name(conn: db.Connection) -> str | None:
         """,
         (int(run["id"]),),
     )
+    
     return str(row["name"]) if row is not None else None
 
 
@@ -178,6 +199,7 @@ def latest_rip_routes(conn: db.Connection, table_name: str) -> list[dict[str, An
     """Return the current structured RIP route snapshot."""
     if table_name not in {"rip_imported_routes", "rip_exported_routes"}:
         raise ValueError(f"Unsupported RIP route table: {table_name}")
+    
     try:
         rows = db.fetch_all_on(
             conn,
@@ -190,6 +212,7 @@ def latest_rip_routes(conn: db.Connection, table_name: str) -> list[dict[str, An
         )
     except db.DatabaseError:
         return []
+    
     return [
         {
             "table_name": row["table_name"],
@@ -212,35 +235,46 @@ def latest_rip_routes(conn: db.Connection, table_name: str) -> list[dict[str, An
 def rip_protocol_enabled(conn: db.Connection) -> bool:
     """Return whether the persisted RIP protocol is enabled."""
     row = db.fetch_one_on(conn, "SELECT enabled FROM proto_rip ORDER BY id LIMIT 1")
+    
     return bool(row["enabled"]) if row is not None else False
 
 
 def get_rip_diagnostics() -> dict[str, Any]:
     """Return latest RIP diagnostics snapshots collected by collectord."""
     db.verify_database(BIRD_DB_PATH)
+    
     with db.connection(BIRD_DB_PATH) as conn:
         if not rip_protocol_enabled(conn):
             return {"last_run": None, "sections": [], "enabled": False, "active": False}
+        
         rip_protocol_name = latest_rip_protocol_name(conn)
+        
         if not rip_protocol_name:
             return {"last_run": None, "sections": [], "enabled": True, "active": False}
+        
         commands = [
             {"key": "status", "title": "Status", "command": f"/usr/sbin/birdcl show protocols all {rip_protocol_name}"},
             {"key": "learned_routes", "title": "Learned Routes", "command": f"/usr/sbin/birdcl show route protocol {rip_protocol_name}"},
             {"key": "exported_routes", "title": "Exported Routes", "command": f"/usr/sbin/birdcl show route export {rip_protocol_name}"},
         ]
+        
         sections = []
+        
         for item in commands:
             section = latest_diagnostic_command(conn, item["command"])
             section["key"] = item["key"]
             section["title"] = item["title"]
+            
             if item["key"] == "learned_routes":
                 section["routes"] = latest_rip_routes(conn, "rip_imported_routes")
             elif item["key"] == "exported_routes":
                 section["routes"] = latest_rip_routes(conn, "rip_exported_routes")
+            
             sections.append(section)
+    
     latest_runs = [section["last_run"] for section in sections if section.get("last_run")]
     latest_run = max(latest_runs, key=lambda run: (run["collected_at"], run["id"])) if latest_runs else None
+    
     return {
         "last_run": latest_run,
         "sections": sections,

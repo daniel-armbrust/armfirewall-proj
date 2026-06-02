@@ -171,6 +171,7 @@ def hostname_setting(value: Any) -> str:
     
     if len(text) > 253:
         raise HTTPException(status_code=400, detail="hostname must be 253 characters or fewer.")
+    
     labels = text.rstrip(".").split(".")
     label_pattern = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
     
@@ -352,6 +353,7 @@ def queue_bird_apply(operation: str) -> int:
             """,
             (work_request_id, f"Queued BIRD configuration apply: {operation}."),
         )
+
         return work_request_id
 
 
@@ -368,6 +370,7 @@ def latest_diagnostic_command(conn: db.Connection, command: str) -> dict[str, An
         """,
         (command,),
     )
+
     if row is None:
         return {
             "command": command,
@@ -375,6 +378,7 @@ def latest_diagnostic_command(conn: db.Connection, command: str) -> dict[str, An
             "raw_output": "",
             "error_output": "",
         }
+    
     return {
         "command": command,
         "last_run": {
