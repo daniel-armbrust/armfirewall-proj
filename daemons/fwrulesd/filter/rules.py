@@ -256,12 +256,15 @@ def sanitize_rule_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if is_icmp and ((protocol_type is None) != (protocol_code is None)):
         raise FilterRuleError("ICMP type and code must be filled together.", 400)
 
+    iface_in = str(payload.get("iface_in", "")).strip().upper() or "ANY"
+    iface_out = str(payload.get("iface_out", "")).strip().upper() or "ANY"
+
     rule = {
         "family": family,
         "chain": chain,
         "table": FILTER_CHAIN_TABLES[chain],
-        "iface_in": str(payload.get("iface_in", "")).strip(),
-        "iface_out": str(payload.get("iface_out", "")).strip(),
+        "iface_in": iface_in,
+        "iface_out": iface_out,
         "src_addr": str(payload.get("src_addr") or default_address(family)).strip(),
         "src_port": src_port,
         "dst_addr": str(payload.get("dst_addr") or default_address(family)).strip(),

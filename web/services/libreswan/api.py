@@ -78,34 +78,27 @@ def tail_log_file(path: Path, *, limit: int) -> list[str]:
 
 
 def list_logs(limit: int = 400) -> dict[str, Any]:
-    """Return tail-like Libreswan Pluto/IPsec process logs."""
+    """Return Libreswan stdout and stderr merged into one chronological log view."""
     normalized_limit = normalize_limit(limit, default=400, maximum=2000)
-    streams = []
+    merged: list[tuple[float, str]] = []
 
-    for label, path in LIBRESWAN_LOG_FILES:
+    for _label, path in LIBRESWAN_LOG_FILES:
         lines = tail_log_file(path, limit=normalized_limit)
         stat = path.stat() if path.exists() else None
-        streams.append(
-            {
-                "name": label,
-                "path": str(path),
-                "exists": path.exists(),
-                "size": stat.st_size if stat else 0,
-                "mtime": stat.st_mtime if stat else 0,
-                "lines": len(lines),
-                "content": "\n".join(lines),
-            }
-        )
+        mtime = float(stat.st_mtime) if stat else 0.0
+        for line in lines:
+            merged.append((mtime, line))
 
-    total_lines = sum(stream["lines"] for stream in streams)
-    latest_mtime = max((float(stream["mtime"]) for stream in streams), default=0)
+    merged.sort(key=lambda item: item[0])
+    lines = [line for _, line in merged][-normalized_limit:]
+    latest_mtime = max((item[0] for item in merged), default=0.0)
     summary = {
-        "rows": total_lines,
-        "files": len(streams),
+        "rows": len(lines),
+        "files": len(LIBRESWAN_LOG_FILES),
         "updated_at": db.sqlite_timestamp(datetime.fromtimestamp(latest_mtime)) if latest_mtime else "-",
     }
 
-    return {"summary": summary, "streams": streams}
+    return {"summary": summary, "lines": lines}
 
 
 def queue_libreswan_apply(

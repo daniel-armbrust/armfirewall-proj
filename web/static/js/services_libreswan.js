@@ -7,10 +7,7 @@
     const connectionsBody = document.querySelector("#libreswan-connections-body");
     const connectionsCount = document.querySelector("#libreswan-connections-count");
     const logsCount = document.querySelector("#libreswan-logs-count");
-    const stdoutOutput = document.querySelector("#libreswan-stdout-output");
-    const stderrOutput = document.querySelector("#libreswan-stderr-output");
-    const stdoutCount = document.querySelector("#libreswan-stdout-count");
-    const stderrCount = document.querySelector("#libreswan-stderr-count");
+    const logsOutput = document.querySelector("#libreswan-logs-output");
     const workRequestsBody = document.querySelector("#libreswan-work-requests-body");
     const workRequestsCount = document.querySelector("#libreswan-work-requests-count");
     const form = document.querySelector("#libreswan-form");
@@ -22,6 +19,7 @@
     const secretGenerateButton = document.querySelector("#libreswan-secret-generate");
     const secretToggleButton = document.querySelector("#libreswan-secret-toggle");
     const viewButtons = Array.from(document.querySelectorAll("[data-libreswan-view]"));
+    const serviceActionButtons = Array.from(document.querySelectorAll("[data-libreswan-service-action]"));
     let latestConnections = [];
     let interfaceInventory = [];
     let loading = false;
@@ -533,24 +531,17 @@
 
     function renderLogs(data) {
         const summary = data.summary || {};
-        const streams = data.streams || [];
+        const lines = data.lines || [];
         if (logsCount) {
             logsCount.textContent = `lines=${HF.text(summary.rows || 0)}`;
         }
-        streams.forEach((stream) => {
-            const output = stream.name === "stderr" ? stderrOutput : stdoutOutput;
-            const count = stream.name === "stderr" ? stderrCount : stdoutCount;
-            if (count) {
-                count.textContent = `lines=${HF.text(stream.lines || 0)}`;
+        if (logsOutput) {
+            const shouldFollow = logsOutput.scrollHeight - logsOutput.scrollTop - logsOutput.clientHeight < 24;
+            logsOutput.textContent = lines.length ? lines.join("\n") : "Libreswan stdout/stderr logs are empty.";
+            if (shouldFollow) {
+                logsOutput.scrollTop = logsOutput.scrollHeight;
             }
-            if (output) {
-                const shouldFollow = output.scrollHeight - output.scrollTop - output.clientHeight < 24;
-                output.textContent = stream.content || `No ${stream.name} log lines yet.`;
-                if (shouldFollow) {
-                    output.scrollTop = output.scrollHeight;
-                }
-            }
-        });
+        }
     }
 
     async function loadLogs() {
@@ -561,11 +552,11 @@
         try {
             renderLogs(await HF.fetchJson("/api/services/libreswan/logs"));
         } catch (error) {
-            if (stdoutOutput) {
-                stdoutOutput.textContent = error.message;
+            if (logsOutput) {
+                logsOutput.textContent = error.message;
             }
-            if (stderrOutput) {
-                stderrOutput.textContent = error.message;
+            if (logsCount) {
+                logsCount.textContent = "lines=0";
             }
         } finally {
             logsLoading = false;
@@ -609,6 +600,36 @@
         } finally {
             workRequestsLoading = false;
         }
+    }
+
+    async function resolveServiceAction(action) {
+        if (action !== "start-restart") {
+            return action;
+        }
+        try {
+            const data = await HF.fetchJson("/api/services/status");
+            const services = []
+                .concat(Array.isArray(data.services) ? data.services : [])
+                .concat(Array.isArray(data.optional_services) ? data.optional_services : []);
+            const libreswan = services.find((service) => String(service.name || "") === "libreswan");
+            return String(libreswan?.state || "").toUpperCase() === "RUNNING" ? "restart" : "start";
+        } catch (_error) {
+            return "start";
+        }
+    }
+
+    async function runServiceAction(action) {
+        const resolvedAction = await resolveServiceAction(action);
+        await HF.fetchJson("/api/services/status/libreswan/action", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({action: resolvedAction}),
+        });
+        setActiveView("work-requests");
+        await loadWorkRequests();
+        await loadConfig();
+        document.querySelector("#main-content")?.scrollTo({top: 0, behavior: "smooth"});
+        window.scrollTo({top: 0, behavior: "smooth"});
     }
 
     async function saveConnection(event) {
@@ -665,6 +686,16 @@
                 clearForm();
             }
             setActiveView(button.dataset.libreswanView);
+        });
+    });
+
+    serviceActionButtons.forEach((button) => {
+        button.addEventListener("click", async () => {
+            try {
+                await runServiceAction(button.dataset.libreswanServiceAction);
+            } catch (error) {
+                setState(error.message);
+            }
         });
     });
 

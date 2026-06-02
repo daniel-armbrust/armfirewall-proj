@@ -24,12 +24,18 @@
     </div>
 </section>
 
-<nav class="local-tabs" aria-label="Libreswan menu">
-    <button class="local-tab active" type="button" data-libreswan-view="connections">CONNECTIONS</button>
-    <button class="local-tab" type="button" data-libreswan-view="new-connection">NEW CONNECTION</button>
-    <button class="local-tab" type="button" data-libreswan-view="logs">LOGS</button>
-    <button class="local-tab" type="button" data-libreswan-view="work-requests">WORK REQUESTS</button>
-</nav>
+<div class="routing-service-actions">
+    <nav class="local-tabs service-action-tabs" aria-label="Libreswan service controls">
+        <button class="local-tab" type="button" data-libreswan-service-action="start-restart">START / RESTART</button>
+        <button class="local-tab" type="button" data-libreswan-service-action="stop">STOP</button>
+        <button class="local-tab" type="button" data-libreswan-view="logs">LOGS</button>
+        <button class="local-tab" type="button" data-libreswan-view="work-requests">WORK REQUESTS</button>
+    </nav>
+    <nav class="local-tabs service-query-tabs" aria-label="Libreswan navigation">
+        <button class="local-tab" type="button" data-libreswan-view="new-connection">NEW CONNECTION</button>
+        <button class="local-tab active" type="button" data-libreswan-view="connections">CONNECTIONS</button>
+    </nav>
+</div>
 
 <section class="panel" id="libreswan-connections-panel">
     <div class="panel-head">
@@ -175,19 +181,11 @@
 <section class="panel" id="libreswan-logs-panel" hidden>
     <div class="libreswan-log-box">
         <div class="panel-head compact">
-            <h2>Logs - STDOUT</h2>
-            <span id="libreswan-stdout-count">lines=0</span>
+            <h2>Logs</h2>
+            <span id="libreswan-logs-count">lines=0</span>
         </div>
-        <pre class="tool-output" id="libreswan-stdout-output">Waiting for libreswan.out.log...</pre>
+        <pre class="tool-output" id="libreswan-logs-output">Waiting for libreswan.out.log...</pre>
     </div>
-    <div class="libreswan-log-box">
-        <div class="panel-head compact">
-            <h2>Logs - STDERR</h2>
-            <span id="libreswan-stderr-count">lines=0</span>
-        </div>
-        <pre class="tool-output" id="libreswan-stderr-output">Waiting for libreswan.err.log...</pre>
-    </div>
-    <span id="libreswan-logs-count" hidden>lines=0</span>
 </section>
 <section class="panel" id="libreswan-work-requests-panel" hidden>
     <div class="panel-head">
@@ -218,5 +216,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_libreswan.js') }}?v=20260605-libreswan-vti-mtu" defer></script>
+<script src="{{ url_for('static', path='/js/services_libreswan.js') }}?v=20260613-libreswan-service-tabs" defer></script>
 {% endblock %}
