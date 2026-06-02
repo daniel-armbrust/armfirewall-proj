@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from web.services.routingprotocols.common import *  # noqa: F403
+from web.services.routingprotocols.bgp.api import default_bgp_settings, list_bgp_settings_from_db, render_bgp_configs
 from web.services.routingprotocols.birdsettings.normalize import normalize_global_settings
 from web.services.routingprotocols.rip.api import default_rip_settings, render_rip_config, rip_settings_from_db
 
@@ -276,7 +277,7 @@ def render_kernel_config(kernel: dict[str, Any]) -> str:
     return "\n\n".join(blocks)
 
 
-def render_global_config(settings: dict[str, Any], rip_settings: dict[str, Any] | None = None) -> str:
+def render_global_config(settings: dict[str, Any], rip_settings: dict[str, Any] | None = None, bgp_settings: list[dict[str, Any]] | None = None) -> str:
     """Render a managed BIRD global configuration."""
     blocks = [
         "# Managed by ArmFirewall Network / Routing Protocols.",
@@ -317,10 +318,13 @@ def render_global_config(settings: dict[str, Any], rip_settings: dict[str, Any] 
         blocks.append(kernel_block)
 
     rip_block = render_rip_config(rip_settings or default_rip_settings())
-    
     if rip_block:
         blocks.extend(["", rip_block])
-    
+
+    bgp_block = render_bgp_configs(bgp_settings or ([] if bgp_settings is not None else [default_bgp_settings()]))
+    if bgp_block:
+        blocks.extend(["", bgp_block])
+
     return "\n".join(blocks).rstrip() + "\n"
 
 
@@ -337,7 +341,7 @@ def get_global_settings() -> dict[str, Any]:
         "settings": settings,
         "routing_tables": routing_tables(),
         "interfaces": interfaces(),
-        "rendered_config": render_global_config(settings, rip_settings_from_db()),
+        "rendered_config": render_global_config(settings, rip_settings_from_db(), list_bgp_settings_from_db()),
     }
 
 

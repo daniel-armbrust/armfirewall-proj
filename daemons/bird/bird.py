@@ -81,8 +81,9 @@ def apply_config() -> None:
     """Render SQLite BIRD settings to conf/bird.conf only."""
     settings = bird_config.settings_from_db()
     rip_settings = bird_config.rip_settings_from_db()
-    
-    write_bird_conf(bird_config.render_global_config(settings, rip_settings))
+    bgp_settings = bird_config.list_bgp_settings_from_db()
+
+    write_bird_conf(bird_config.render_global_config(settings, rip_settings, bgp_settings))
     reload_running_bird()
     
     logger.log("BIRD configuration file was rendered from SQLite.", source=LOG_SOURCE)

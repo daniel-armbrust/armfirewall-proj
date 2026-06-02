@@ -41,6 +41,9 @@
         <button class="local-tab" type="button" data-routing-view="rip" data-routing-context-button="rip" hidden>RIP SETTINGS</button>
         <button class="local-tab" type="button" data-routing-view="diagnostics">DIAGNOSTICS</button>
         <button class="local-tab" type="button" data-routing-view="rip-routes" data-routing-context-button="rip" hidden>SHOW ROUTES</button>
+        <button class="local-tab" type="button" data-routing-view="bgp" data-routing-context-button="bgp" hidden>BGP SETTINGS</button>
+        <button class="local-tab" type="button" data-routing-view="bgp-diagnostics" data-routing-context-button="bgp" hidden>DIAGNOSTICS</button>
+        <button class="local-tab" type="button" data-routing-view="bgp-routes" data-routing-context-button="bgp" hidden>SHOW ROUTES</button>
     </nav>
 </div>
 
@@ -371,9 +374,148 @@
 </section>
 
 <section id="routing-bgp-panel" hidden>
+    <form id="bird-bgp-settings-form">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>BGP Instances</h2>
+            </div>
+            <div class="table-wrap wide">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Neighbor</th>
+                            <th>Local AS</th>
+                            <th>Neighbor AS</th>
+                            <th>Import</th>
+                            <th>Export</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bird-bgp-instances-body">
+                        <tr>
+                            <td colspan="9">
+                                <div class="terminal-empty">
+                                    <span class="prompt">$</span>
+                                    <span>loading bgp instances</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <section class="panel">
+            <div class="panel-head">
+                <h2>BGP Settings</h2>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid routing-settings-grid">
+                    <label class="field routing-router-id">
+                        <span>Instance Name</span>
+                        <input id="bird-bgp-protocol-name" name="protocol_name" type="text" autocomplete="off">
+                    </label>
+                    <label class="field routing-router-id">
+                        <span>Description</span>
+                        <input id="bird-bgp-description" name="description" type="text" autocomplete="off">
+                    </label>
+                    <div class="routing-form-spacer" aria-hidden="true"></div>
+                    <label class="field">
+                        <span>Source IP/Mask</span>
+                        <input id="bird-bgp-source-address" name="source_address" type="text" inputmode="text" spellcheck="false" autocomplete="off" placeholder="192.0.2.10 or 2001:db8::1/64" oninput="this.value=this.value.replace(/[^0-9A-Fa-f:./]/g, "")">
+                    </label>
+                    <label class="field">
+                        <span>Neighbor IP/Mask</span>
+                        <input id="bird-bgp-neighbor-ip" name="neighbor_ip" type="text" inputmode="text" spellcheck="false" autocomplete="off" placeholder="192.0.2.1 or 2001:db8::2/64" required oninput="this.value=this.value.replace(/[^0-9A-Fa-f:./]/g, "")">
+                    </label>
+                    <label class="field">
+                        <span>Local AS</span>
+                        <input id="bird-bgp-local-as" name="local_as" type="number" min="1" max="4294967295" step="1" inputmode="numeric" required oninput="this.value=this.value.replace(/\D+/g, "")">
+                    </label>
+                    <label class="field">
+                        <span>Neighbor AS</span>
+                        <input id="bird-bgp-neighbor-as" name="neighbor_as" type="number" min="1" max="4294967295" step="1" inputmode="numeric" required oninput="this.value=this.value.replace(/\D+/g, "")">
+                    </label>
+                    <label class="field">
+                        <span>Import</span>
+                        <select id="bird-bgp-import-policy" name="import_policy">
+                            <option value="none">none</option>
+                            <option value="ipv4">ipv4</option>
+                            <option value="ipv6">ipv6</option>
+                            <option value="ipv4/ipv6">ipv4/ipv6</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Export</span>
+                        <select id="bird-bgp-export-policy" name="export_policy">
+                            <option value="none">none</option>
+                            <option value="ipv4">ipv4</option>
+                            <option value="ipv6">ipv6</option>
+                            <option value="ipv4/ipv6">ipv4/ipv6</option>
+                        </select>
+                    </label>
+                    <div class="routing-form-spacer" aria-hidden="true"></div>
+                    <label class="field">
+                        <span>Session Type</span>
+                        <select id="bird-bgp-session-type" name="session_type">
+                            <option value="auto">auto</option>
+                            <option value="ibgp">iBGP</option>
+                            <option value="ebgp">eBGP</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Multihop TTL</span>
+                        <input id="bird-bgp-multihop-ttl" name="multihop_ttl" type="number" min="1" max="255" step="1">
+                    </label>
+                    <label class="field routing-router-id">
+                        <span>Password</span>
+                        <input id="bird-bgp-password" name="password" type="password" autocomplete="new-password">
+                    </label>
+                    <label class="field routing-router-id">
+                        <span>Network Interfaces</span>
+                        <select id="bird-bgp-iface-name" name="iface_name" size="5"></select>
+                    </label>
+                    <div class="routing-form-spacer" aria-hidden="true"></div>
+                </div>
+                <label class="check-line wide routing-check-start">
+                    <input id="bird-bgp-enabled" name="enabled" type="checkbox">
+                    <span>Enabled</span>
+                </label>
+                <label class="check-line wide">
+                    <input id="bird-bgp-direct" name="direct" type="checkbox">
+                    <span>Direct</span>
+                </label>
+                <label class="check-line wide">
+                    <input id="bird-bgp-multihop" name="multihop" type="checkbox">
+                    <span>Multihop</span>
+                </label>
+                <label class="check-line wide">
+                    <input id="bird-bgp-passive" name="passive" type="checkbox">
+                    <span>Passive</span>
+                </label>
+            </div>
+        </section>
+        <div class="form-actions routing-global-actions routing-bgp-actions">
+            <button class="text-button primary routing-apply-button" id="bird-bgp-submit-button" type="submit">Add</button>
+            <button class="text-button" id="bird-bgp-cancel-edit-button" type="button" hidden>Cancel Edit</button>
+        </div>
+        <div class="form-status" id="bird-bgp-settings-status" hidden></div>
+    </form>
+</section>
+
+<section id="routing-bgp-diagnostics-panel" hidden>
     <div class="terminal-empty not-implemented-panel">
         <span class="prompt">$</span>
-        <span>BGP is not implemented yet</span>
+        <span>BGP diagnostics are not implemented yet</span>
+    </div>
+</section>
+
+<section id="routing-bgp-routes-panel" hidden>
+    <div class="terminal-empty not-implemented-panel">
+        <span class="prompt">$</span>
+        <span>BGP routes view is not implemented yet</span>
     </div>
 </section>
 
@@ -395,6 +537,6 @@
 
 {% block scripts %}
 {% if bird_installed %}
-<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260611-rip-apply-workreq-active" defer></script>
+<script src="{{ url_for('static', path='/js/routing_protocols.js') }}?v=20260612-bgp-multi-4" defer></script>
 {% endif %}
 {% endblock %}

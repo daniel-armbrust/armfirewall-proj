@@ -39,7 +39,9 @@
 
         <div class="menu-group">Services</div>
         <a class="menu-link child {% if current_path == '/services/status' %}active{% endif %}" href="/services/status">Status</a>
+        {% if request.app.state.service_installed('dnsmasq') %}
         <a class="menu-link child {% if current_path == '/services/dnsmasq' %}active{% endif %}" href="/services/dnsmasq">Dnsmasq</a>
+        {% endif %}
         {% if request.app.state.service_installed('libreswan') %}
         <a class="menu-link child {% if current_path == '/services/libreswan' %}active{% endif %}" href="/services/libreswan">Libreswan</a>
         {% endif %}

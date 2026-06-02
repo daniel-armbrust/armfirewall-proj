@@ -2474,6 +2474,11 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     margin-top: 14px;
 }
 
+.routing-form-spacer {
+    grid-column: 1 / -1;
+    height: 10px;
+}
+
 .routing-tabs-row {
     margin: 12px 0 0;
     display: flex;
@@ -2645,4 +2650,13 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .routing-empty-output {
     color: transparent;
+}
+
+.bgp-description-cell {
+    display: inline-block;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
 }

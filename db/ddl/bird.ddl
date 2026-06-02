@@ -70,6 +70,40 @@ CREATE TABLE IF NOT EXISTS proto_direct (
 );
 
 -- Stores BIRD RIP/RIPng protocol configuration.
+-- Stores BIRD BGP protocol configuration.
+CREATE TABLE IF NOT EXISTS proto_bgp (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+     protocol_name TEXT NOT NULL DEFAULT '',
+     description TEXT,
+     local_as INTEGER,
+     neighbor_ip TEXT,
+     neighbor_as INTEGER,
+     source_address TEXT,
+     iface_name TEXT,
+     session_type TEXT NOT NULL DEFAULT 'auto' CHECK (session_type IN ('auto', 'ibgp', 'ebgp')),
+     direct INTEGER NOT NULL DEFAULT 1 CHECK (direct IN (0, 1)),
+     multihop INTEGER NOT NULL DEFAULT 0 CHECK (multihop IN (0, 1)),
+     multihop_ttl INTEGER CHECK (multihop_ttl IS NULL OR multihop_ttl BETWEEN 1 AND 255),
+     passive INTEGER NOT NULL DEFAULT 0 CHECK (passive IN (0, 1)),
+     password TEXT,
+     ipv4_enabled INTEGER NOT NULL DEFAULT 1 CHECK (ipv4_enabled IN (0, 1)),
+     ipv4_import_policy TEXT NOT NULL DEFAULT 'all' CHECK (ipv4_import_policy IN ('all', 'none')),
+     ipv4_export_policy TEXT NOT NULL DEFAULT 'none' CHECK (ipv4_export_policy IN ('all', 'none')),
+     ipv6_enabled INTEGER NOT NULL DEFAULT 0 CHECK (ipv6_enabled IN (0, 1)),
+     ipv6_import_policy TEXT NOT NULL DEFAULT 'all' CHECK (ipv6_import_policy IN ('all', 'none')),
+     ipv6_export_policy TEXT NOT NULL DEFAULT 'none' CHECK (ipv6_export_policy IN ('all', 'none')),
+     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     CHECK (ipv4_enabled = 1 OR ipv6_enabled = 1),
+     CHECK (multihop = 1 OR multihop_ttl IS NULL),
+     CHECK (
+          session_type = 'auto'
+          OR (session_type = 'ibgp' AND local_as = neighbor_as)
+          OR (session_type = 'ebgp' AND local_as != neighbor_as)
+     )
+);
+
 CREATE TABLE IF NOT EXISTS proto_rip (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      version TEXT NOT NULL DEFAULT '2' CHECK (version IN ('1', '2', 'ng')),
@@ -263,6 +297,18 @@ AFTER UPDATE ON proto_rip
 FOR EACH ROW
 BEGIN
      UPDATE proto_rip
+        SET updated_at = CURRENT_TIMESTAMP
+      WHERE id = OLD.id;
+END;
+
+CREATE INDEX IF NOT EXISTS idx_bird_proto_bgp_enabled
+ON proto_bgp (enabled);
+
+CREATE TRIGGER IF NOT EXISTS trg_bird_proto_bgp_touch_updated_at
+AFTER UPDATE ON proto_bgp
+FOR EACH ROW
+BEGIN
+     UPDATE proto_bgp
         SET updated_at = CURRENT_TIMESTAMP
       WHERE id = OLD.id;
 END;

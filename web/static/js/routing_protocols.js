@@ -7,6 +7,11 @@
     const status = document.querySelector("#bird-global-settings-status");
     const ripForm = document.querySelector("#bird-rip-settings-form");
     const ripStatus = document.querySelector("#bird-rip-settings-status");
+    const bgpForm = document.querySelector("#bird-bgp-settings-form");
+    const bgpStatus = document.querySelector("#bird-bgp-settings-status");
+    const bgpInstancesBody = document.querySelector("#bird-bgp-instances-body");
+    const bgpSubmitButton = document.querySelector("#bird-bgp-submit-button");
+    const bgpCancelEditButton = document.querySelector("#bird-bgp-cancel-edit-button");
     const ripPasswordToggle = document.querySelector("#bird-rip-password-toggle");
     const actionModal = document.querySelector("#bird-action-modal");
     const actionTitle = document.querySelector("#bird-action-title");
@@ -40,6 +45,8 @@
         "rip-routes": document.querySelector("#routing-rip-routes-panel"),
         ospf: document.querySelector("#routing-ospf-panel"),
         bgp: document.querySelector("#routing-bgp-panel"),
+        "bgp-diagnostics": document.querySelector("#routing-bgp-diagnostics-panel"),
+        "bgp-routes": document.querySelector("#routing-bgp-routes-panel"),
         logs: logsPanel,
         diagnostics: diagnosticsPanel,
         "work-requests": workRequestsPanel,
@@ -87,6 +94,24 @@
             authentication: document.querySelector("#bird-rip-authentication"),
             password: document.querySelector("#bird-rip-password"),
         },
+        bgp: {
+            enabled: document.querySelector("#bird-bgp-enabled"),
+            protocol_name: document.querySelector("#bird-bgp-protocol-name"),
+            description: document.querySelector("#bird-bgp-description"),
+            source_address: document.querySelector("#bird-bgp-source-address"),
+            local_as: document.querySelector("#bird-bgp-local-as"),
+            neighbor_ip: document.querySelector("#bird-bgp-neighbor-ip"),
+            neighbor_as: document.querySelector("#bird-bgp-neighbor-as"),
+            session_type: document.querySelector("#bird-bgp-session-type"),
+            iface_name: document.querySelector("#bird-bgp-iface-name"),
+            direct: document.querySelector("#bird-bgp-direct"),
+            multihop: document.querySelector("#bird-bgp-multihop"),
+            multihop_ttl: document.querySelector("#bird-bgp-multihop-ttl"),
+            passive: document.querySelector("#bird-bgp-passive"),
+            password: document.querySelector("#bird-bgp-password"),
+            import_policy: document.querySelector("#bird-bgp-import-policy"),
+            export_policy: document.querySelector("#bird-bgp-export-policy"),
+        },
     };
     let currentServiceState = "";
     let routingSettingsContext = "global-config";
@@ -95,6 +120,10 @@
     let ripLoading = false;
     let ripSelectedInterfaceValues = ["*"];
     let ripEnabled = false;
+    let bgpLoading = false;
+    let bgpCurrentInstanceId = null;
+    let bgpInterfacesCache = [];
+    let bgpInstancesCache = [];
     let workRequestsLoading = false;
 
     function setText(element, value) {
@@ -119,6 +148,15 @@
         ripStatus.textContent = message;
         ripStatus.hidden = !message;
         ripStatus.classList.toggle("error", Boolean(isError));
+    }
+
+    function setBgpStatus(message, isError) {
+        if (!bgpStatus) {
+            return;
+        }
+        bgpStatus.textContent = message;
+        bgpStatus.hidden = !message;
+        bgpStatus.classList.toggle("error", Boolean(isError));
     }
 
     function scrollToTop() {
@@ -181,8 +219,10 @@
             const isBirdDiagnostics = routingSettingsContext === "global-config" && view === "diagnostics";
             const isRipDiagnostics = routingSettingsContext === "rip" && view === "diagnostics";
             const isRipRoutes = view === "rip-routes";
+            const isBgpDiagnostics = routingSettingsContext === "bgp" && view === "bgp-diagnostics";
+            const isBgpRoutes = routingSettingsContext === "bgp" && view === "bgp-routes";
             const birdStopped = currentServiceState !== "RUNNING";
-            const shouldDisable = (isBirdDiagnostics && birdStopped) || ((birdStopped || !ripEnabled) && (isRipDiagnostics || isRipRoutes));
+            const shouldDisable = (isBirdDiagnostics && birdStopped) || ((birdStopped || !ripEnabled) && (isRipDiagnostics || isRipRoutes)) || (birdStopped && (isBgpDiagnostics || isBgpRoutes));
             button.setAttribute("aria-disabled", shouldDisable ? "true" : "false");
             button.classList.toggle("disabled", shouldDisable);
         });
@@ -193,9 +233,11 @@
     }
 
     function setRoutingNavigationContext(selectedView) {
-        const unimplementedProtocol = selectedView === "ospf" || selectedView === "bgp";
+        const unimplementedProtocol = selectedView === "ospf";
         if (selectedView === "rip" || selectedView === "rip-routes") {
             routingSettingsContext = "rip";
+        } else if (selectedView === "bgp" || selectedView === "bgp-diagnostics" || selectedView === "bgp-routes") {
+            routingSettingsContext = "bgp";
         } else if (selectedView !== "diagnostics") {
             routingSettingsContext = "global-config";
         }
@@ -204,10 +246,15 @@
             routingServiceActions.hidden = unimplementedProtocol;
         }
         if (serviceActionTabs) {
-            serviceActionTabs.hidden = routingSettingsContext === "rip";
+            serviceActionTabs.hidden = routingSettingsContext === "rip" || routingSettingsContext === "bgp";
         }
         contextButtons.forEach((button) => {
             button.hidden = button.dataset.routingContextButton !== routingSettingsContext;
+        });
+        viewButtons.forEach((button) => {
+            if (button.dataset.routingView === "diagnostics" && !button.dataset.routingContextButton) {
+                button.hidden = routingSettingsContext === "bgp";
+            }
         });
         syncQueryActionButtons();
     }
@@ -267,6 +314,9 @@
         }
         if (selectedView === "rip") {
             loadRip();
+        }
+        if (selectedView === "bgp") {
+            loadBgp();
         }
         if (selectedView === "rip-routes") {
             loadRipRoutes({force: true});
@@ -352,6 +402,68 @@
             channelTableSelect.appendChild(option("-", ""));
             setFieldValue(channelTableSelect, "");
         }
+    }
+
+    function renderBgpInterfaceOptions(interfaces, bgpIface) {
+        const select = fields.bgp.iface_name;
+        if (!select) {
+            return;
+        }
+        select.innerHTML = "";
+        select.appendChild(option("-", ""));
+        select.appendChild(option("any - all interfaces", "*"));
+        (interfaces || []).forEach((iface) => {
+            const description = HF.text(iface.description || "-");
+            const label = `${HF.text(iface.name)} - ${description}`;
+            select.appendChild(option(label, iface.name));
+        });
+        setFieldValue(select, bgpIface || "");
+    }
+
+    function setBgpFormMode(isEditing) {
+        if (bgpSubmitButton) {
+            bgpSubmitButton.textContent = isEditing ? "Save" : "Add";
+        }
+        if (bgpCancelEditButton) {
+            bgpCancelEditButton.hidden = !isEditing;
+        }
+    }
+
+    function renderBgpInstances(instances) {
+        bgpInstancesCache = Array.isArray(instances) ? instances.slice() : [];
+        if (!bgpInstancesBody) {
+            return;
+        }
+        if (!bgpInstancesCache.length) {
+            bgpInstancesBody.innerHTML = `
+                <tr>
+                    <td colspan="9"><div class="terminal-empty"><span class="prompt">$</span><span>no bgp instances configured</span></div></td>
+                </tr>
+            `;
+            return;
+        }
+        bgpInstancesBody.innerHTML = bgpInstancesCache.map((instance) => {
+            const description = String(instance.description || "-");
+            const truncatedDescription = description.length > 48 ? `${description.slice(0, 48)}...` : description;
+            return `
+                <tr>
+                    <td>${HF.escapeHtml(instance.name || "-")}</td>
+                    <td><span class="bgp-description-cell" title="${HF.escapeHtml(description)}">${HF.escapeHtml(truncatedDescription)}</span></td>
+                    <td>${HF.escapeHtml(instance.neighbor_ip || "-")}</td>
+                    <td>${HF.escapeHtml(instance.local_as || "-")}</td>
+                    <td>${HF.escapeHtml(instance.neighbor_as || "-")}</td>
+                    <td>${HF.escapeHtml(instance.import_policy || "none")}</td>
+                    <td>${HF.escapeHtml(instance.export_policy || "none")}</td>
+                    <td><span class="status ${instance.enabled ? "up" : "disabled"}">${instance.enabled ? "enabled" : "disabled"}</span></td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="text-button compact" type="button" data-bgp-instance-action="edit" data-bgp-instance-id="${HF.escapeHtml(instance.id)}">Edit</button>
+                            <button class="text-button compact" type="button" data-bgp-instance-action="delete" data-bgp-instance-id="${HF.escapeHtml(instance.id)}">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join("");
     }
 
     function renderInterfaceOptions(interfaces, deviceIface, directIface) {
@@ -534,6 +646,140 @@
         };
     }
 
+    function syncBgpTransportControls(source) {
+        if (!fields.bgp.multihop || !fields.bgp.direct || !fields.bgp.multihop_ttl) {
+            return;
+        }
+        if (source === "multihop" && fields.bgp.multihop.checked) {
+            fields.bgp.direct.checked = false;
+        }
+        if (source === "direct" && fields.bgp.direct.checked) {
+            fields.bgp.multihop.checked = false;
+        }
+        fields.bgp.multihop_ttl.disabled = !fields.bgp.multihop.checked;
+        if (fields.bgp.iface_name) {
+            fields.bgp.iface_name.disabled = fields.bgp.multihop.checked || !fields.bgp.direct.checked;
+        }
+    }
+
+    function populateBgpForm(settings, interfaces) {
+        const normalized = settings || {};
+        bgpInterfacesCache = Array.isArray(interfaces) ? interfaces.slice() : bgpInterfacesCache;
+        bgpCurrentInstanceId = normalized.id ?? null;
+        Object.entries(fields.bgp).forEach(([name, element]) => setFieldValue(element, normalized[name]));
+        renderBgpInterfaceOptions(bgpInterfacesCache || [], normalized.iface_name);
+        syncBgpTransportControls();
+        setBgpFormMode(bgpCurrentInstanceId !== null);
+    }
+
+    function resetBgpForm() {
+        bgpCurrentInstanceId = null;
+        populateBgpForm({
+            enabled: false,
+            description: "",
+            local_as: "",
+            neighbor_ip: "",
+            neighbor_as: "",
+            iface_name: "",
+            session_type: "auto",
+            direct: true,
+            multihop: false,
+            multihop_ttl: 64,
+            passive: false,
+            password: "",
+            import_policy: "ipv4",
+            export_policy: "none",
+        }, bgpInterfacesCache || []);
+        setBgpStatus("", false);
+    }
+
+    function validateBgpForm() {
+        const sourceAddress = String(readFieldValue(fields.bgp.source_address) || "").trim();
+        const neighborIp = String(readFieldValue(fields.bgp.neighbor_ip) || "").trim();
+        const localAs = String(readFieldValue(fields.bgp.local_as) || "").trim();
+        const neighborAs = String(readFieldValue(fields.bgp.neighbor_as) || "").trim();
+        const ipPattern = /^(?:[0-9]{1,3}(?:\.[0-9]{1,3}){3}|[0-9A-Fa-f:]+)(?:\/(?:[0-9]{1,3}))?$/;
+        const asPattern = /^\d+$/;
+
+        if (sourceAddress && !ipPattern.test(sourceAddress)) {
+            throw new Error("Source IP/Mask must be a valid IPv4 or IPv6 address.");
+        }
+        if (!neighborIp || !ipPattern.test(neighborIp)) {
+            throw new Error("Neighbor IP/Mask must be a valid IPv4 or IPv6 address.");
+        }
+        if (!asPattern.test(localAs)) {
+            throw new Error("Local AS must contain numbers only.");
+        }
+        if (!asPattern.test(neighborAs)) {
+            throw new Error("Neighbor AS must contain numbers only.");
+        }
+    }
+
+    function sanitizeBgpAsInput(event) {
+        const element = event?.target;
+        if (!element) {
+            return;
+        }
+        element.value = String(element.value || "").replace(/\D+/g, "");
+    }
+
+    function sanitizeBgpAddressInput(event) {
+        const element = event?.target;
+        if (!element) {
+            return;
+        }
+        element.value = String(element.value || "").replace(/[^0-9A-Fa-f:./]/g, "");
+    }
+
+    function allowBgpAddressBeforeInput(event) {
+        const data = event?.data;
+        if (!data) {
+            return;
+        }
+        if (/^[0-9A-Fa-f:./]+$/.test(data)) {
+            return;
+        }
+        event.preventDefault();
+    }
+
+    function sanitizeBgpAddressPaste(event) {
+        const element = event?.target;
+        const pasted = event?.clipboardData?.getData("text") || "";
+        if (!element) {
+            return;
+        }
+        const sanitized = pasted.replace(/[^0-9A-Fa-f:./]/g, "");
+        if (sanitized === pasted) {
+            return;
+        }
+        event.preventDefault();
+        const start = element.selectionStart ?? element.value.length;
+        const end = element.selectionEnd ?? element.value.length;
+        const current = String(element.value || "");
+        element.value = `${current.slice(0, start)}${sanitized}${current.slice(end)}`;
+    }
+
+    function readBgpForm() {
+        return {
+            enabled: readFieldValue(fields.bgp.enabled),
+            protocol_name: readFieldValue(fields.bgp.protocol_name),
+            description: readFieldValue(fields.bgp.description),
+            source_address: readFieldValue(fields.bgp.source_address),
+            local_as: readFieldValue(fields.bgp.local_as),
+            neighbor_ip: readFieldValue(fields.bgp.neighbor_ip),
+            neighbor_as: readFieldValue(fields.bgp.neighbor_as),
+            iface_name: readFieldValue(fields.bgp.iface_name),
+            session_type: readFieldValue(fields.bgp.session_type),
+            direct: readFieldValue(fields.bgp.direct),
+            multihop: readFieldValue(fields.bgp.multihop),
+            multihop_ttl: readFieldValue(fields.bgp.multihop_ttl),
+            passive: readFieldValue(fields.bgp.passive),
+            password: readFieldValue(fields.bgp.password),
+            import_policy: readFieldValue(fields.bgp.import_policy),
+            export_policy: readFieldValue(fields.bgp.export_policy),
+        };
+    }
+
     function render(data) {
         const service = data.service || {};
         const settings = data.settings || {};
@@ -635,6 +881,97 @@
             markSidebarRoutingView("global-config");
         } catch (error) {
             setRipStatus(error.message, true);
+        }
+    }
+
+    async function loadBgp(instanceId = null) {
+        if (bgpLoading) {
+            return;
+        }
+        bgpLoading = true;
+        try {
+            const query = instanceId ? `?instance_id=${encodeURIComponent(instanceId)}` : "";
+            const data = await HF.fetchJson(`/api/network/routing-protocols/bird/bgp-settings${query}`);
+            renderBgpInstances(data.instances || []);
+            populateBgpForm(data.settings || {}, data.interfaces || []);
+            if (!instanceId && !(data.settings || {}).id) {
+                resetBgpForm();
+            }
+            setBgpStatus("", false);
+        } catch (error) {
+            setBgpStatus(error.message, true);
+        } finally {
+            bgpLoading = false;
+        }
+    }
+
+    function confirmSaveBgp(event) {
+        event.preventDefault();
+        try {
+            validateBgpForm();
+        } catch (error) {
+            setBgpStatus(error.message, true);
+            return;
+        }
+        const editing = bgpCurrentInstanceId !== null;
+        openActionModal(
+            editing ? "save-bgp-config" : "add-bgp-config",
+            editing ? "Save this BGP instance?" : "Add this BGP instance?",
+            saveBgpSettings,
+            editing ? "Save configuration" : "Add configuration",
+        );
+    }
+
+    async function saveBgpSettings() {
+        const editing = bgpCurrentInstanceId !== null;
+        setBgpStatus(editing ? "Saving BGP instance..." : "Adding BGP instance...", false);
+        try {
+            const endpoint = editing
+                ? `/api/network/routing-protocols/bird/bgp-settings/${encodeURIComponent(bgpCurrentInstanceId)}`
+                : "/api/network/routing-protocols/bird/bgp-settings";
+            const method = editing ? "PUT" : "POST";
+            const data = await HF.fetchJson(endpoint, {
+                method,
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(readBgpForm()),
+            });
+            renderBgpInstances(data.instances || []);
+            populateBgpForm(data.settings || {}, data.interfaces || []);
+            if (!editing) {
+                resetBgpForm();
+            }
+            setBgpStatus("", false);
+            await showWorkRequests();
+            markSidebarRoutingView("global-config");
+        } catch (error) {
+            setBgpStatus(error.message, true);
+        }
+    }
+
+    function confirmDeleteBgpInstance(instanceId) {
+        openActionModal(
+            "delete-bgp-config",
+            `Delete BGP instance bgp${HF.text(instanceId)}?`,
+            () => deleteBgpInstance(instanceId),
+            "Delete instance",
+        );
+    }
+
+    async function deleteBgpInstance(instanceId) {
+        setBgpStatus("Deleting BGP instance...", false);
+        try {
+            const data = await HF.fetchJson(`/api/network/routing-protocols/bird/bgp-settings/${encodeURIComponent(instanceId)}`, {
+                method: "DELETE",
+            });
+            renderBgpInstances(data.instances || []);
+            if (Number(bgpCurrentInstanceId) === Number(instanceId)) {
+                resetBgpForm();
+            }
+            setBgpStatus("", false);
+            await showWorkRequests();
+            markSidebarRoutingView("global-config");
+        } catch (error) {
+            setBgpStatus(error.message, true);
         }
     }
 
@@ -1060,6 +1397,34 @@ ${HF.escapeHtml(output)}</pre>`;
     if (ripForm) {
         ripForm.addEventListener("submit", confirmSaveRip);
     }
+    if (bgpForm) {
+        bgpForm.addEventListener("submit", confirmSaveBgp);
+    }
+    if (bgpCancelEditButton) {
+        bgpCancelEditButton.addEventListener("click", resetBgpForm);
+    }
+    if (fields.bgp.multihop) {
+        fields.bgp.multihop.addEventListener("change", () => syncBgpTransportControls("multihop"));
+    }
+    if (fields.bgp.direct) {
+        fields.bgp.direct.addEventListener("change", () => syncBgpTransportControls("direct"));
+    }
+    if (fields.bgp.local_as) {
+        fields.bgp.local_as.addEventListener("input", sanitizeBgpAsInput);
+    }
+    if (fields.bgp.neighbor_as) {
+        fields.bgp.neighbor_as.addEventListener("input", sanitizeBgpAsInput);
+    }
+    if (fields.bgp.source_address) {
+        fields.bgp.source_address.addEventListener("beforeinput", allowBgpAddressBeforeInput);
+        fields.bgp.source_address.addEventListener("paste", sanitizeBgpAddressPaste);
+        fields.bgp.source_address.addEventListener("input", sanitizeBgpAddressInput);
+    }
+    if (fields.bgp.neighbor_ip) {
+        fields.bgp.neighbor_ip.addEventListener("beforeinput", allowBgpAddressBeforeInput);
+        fields.bgp.neighbor_ip.addEventListener("paste", sanitizeBgpAddressPaste);
+        fields.bgp.neighbor_ip.addEventListener("input", sanitizeBgpAddressInput);
+    }
     if (fields.rip.version) {
         fields.rip.version.addEventListener("change", applyRipVersionDefaults);
     }
@@ -1087,6 +1452,22 @@ ${HF.escapeHtml(output)}</pre>`;
             const label = action === "start-restart" ? "START / RESTART BIRD service" : `${HF.text(action).toUpperCase()} BIRD service`;
             openActionModal(action, label, () => runServiceAction(action));
             return;
+        }
+        const bgpActionButton = event.target.closest("[data-bgp-instance-action]");
+        if (bgpActionButton) {
+            const action = bgpActionButton.dataset.bgpInstanceAction;
+            const instanceId = Number(bgpActionButton.dataset.bgpInstanceId || 0);
+            if (!instanceId) {
+                return;
+            }
+            if (action === "edit") {
+                loadBgp(instanceId);
+                return;
+            }
+            if (action === "delete") {
+                confirmDeleteBgpInstance(instanceId);
+                return;
+            }
         }
         if (event.target.closest("[data-bird-modal-cancel]") || event.target === actionModal) {
             closeActionModal();

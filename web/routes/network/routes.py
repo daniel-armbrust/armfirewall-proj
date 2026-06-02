@@ -90,6 +90,34 @@ async def api_save_bird_rip_settings(request: Request) -> dict[str, Any]:
     return routing_protocols_api.save_rip_settings(payload)
 
 
+
+
+@router.get("/api/network/routing-protocols/bird/bgp-settings")
+def api_bird_bgp_settings(instance_id: int | None = None) -> dict[str, Any]:
+    """Return BIRD BGP protocol settings."""
+    return routing_protocols_api.get_bgp_settings(instance_id)
+
+
+@router.post("/api/network/routing-protocols/bird/bgp-settings")
+async def api_add_bird_bgp_settings(request: Request) -> dict[str, Any]:
+    """Create one BIRD BGP protocol instance."""
+    payload = await request.json()
+    return routing_protocols_api.add_bgp_settings(payload)
+
+
+@router.put("/api/network/routing-protocols/bird/bgp-settings/{instance_id}")
+async def api_save_bird_bgp_settings(instance_id: int, request: Request) -> dict[str, Any]:
+    """Update one BIRD BGP protocol instance."""
+    payload = await request.json()
+    return routing_protocols_api.save_bgp_settings(payload, instance_id)
+
+
+@router.delete("/api/network/routing-protocols/bird/bgp-settings/{instance_id}")
+def api_delete_bird_bgp_settings(instance_id: int) -> dict[str, Any]:
+    """Delete one BIRD BGP protocol instance."""
+    return routing_protocols_api.delete_bgp_settings(instance_id)
+
+
 @router.post("/api/network/policy-routing/tables")
 async def api_create_policy_routing_table(request: Request) -> dict[str, Any]:
     """Create a policy routing table entry."""

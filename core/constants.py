@@ -36,6 +36,7 @@ BIRD_CHANNEL_FAMILIES = {"ipv4", "ipv6", "ipv4/ipv6"}
 BIRD_RIP_VERSIONS = {"1", "2", "ng"}
 BIRD_RIP_MODES = {"multicast", "broadcast"}
 BIRD_RIP_AUTHENTICATIONS = {"none", "plaintext", "cryptographic"}
+BIRD_BGP_SESSION_TYPES = {"auto", "ibgp", "ebgp"}
 
 RRD_DIR = ROOT_DIR / "rrd"
 RRD_IMG_DIR = RRD_DIR / "img"
