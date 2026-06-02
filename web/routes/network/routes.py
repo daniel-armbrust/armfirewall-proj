@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -93,7 +93,7 @@ async def api_save_bird_rip_settings(request: Request) -> dict[str, Any]:
 
 
 @router.get("/api/network/routing-protocols/bird/bgp-settings")
-def api_bird_bgp_settings(instance_id: int | None = None) -> dict[str, Any]:
+def api_bird_bgp_settings(instance_id: Optional[int] = None) -> dict[str, Any]:
     """Return BIRD BGP protocol settings."""
     return routing_protocols_api.get_bgp_settings(instance_id)
 
