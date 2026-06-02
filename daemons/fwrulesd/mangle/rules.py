@@ -230,12 +230,15 @@ def sanitize_mangle_payload(payload: dict[str, Any]) -> dict[str, Any]:
     is_icmp = protocol in {"icmp", "icmpv6"}
     is_all = protocol == "all"
 
+    iface_in = str(payload.get("iface_in", "")).strip().upper() or "ANY"
+    iface_out = str(payload.get("iface_out", "")).strip().upper() or "ANY"
+
     rule = {
         "family": family,
         "chain": chain,
         "table": MANGLE_CHAIN_TABLES[chain],
-        "iface_in": str(payload.get("iface_in", "")).strip(),
-        "iface_out": str(payload.get("iface_out", "")).strip(),
+        "iface_in": iface_in,
+        "iface_out": iface_out,
         "ct_new": normalize_enabled(payload.get("ct_new", 0)),
         "ct_established": normalize_enabled(payload.get("ct_established", 0)),
         "ct_related": normalize_enabled(payload.get("ct_related", 0)),

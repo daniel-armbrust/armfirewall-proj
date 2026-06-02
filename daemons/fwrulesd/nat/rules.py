@@ -205,12 +205,15 @@ def sanitize_nat_payload(payload: dict[str, Any]) -> dict[str, Any]:
     is_icmp = protocol in {"icmp", "icmpv6"}
     is_all = protocol == "all"
 
+    iface_in = str(payload.get("iface_in", "")).strip().upper() or "ANY"
+    iface_out = str(payload.get("iface_out", "")).strip().upper() or "ANY"
+
     rule = {
         "family": family,
         "chain": chain,
         "table": NAT_CHAIN_TABLES[chain],
-        "iface_in": str(payload.get("iface_in", "")).strip(),
-        "iface_out": str(payload.get("iface_out", "")).strip(),
+        "iface_in": iface_in,
+        "iface_out": iface_out,
         "src_addr": str(payload.get("src_addr") or default_address(family)).strip(),
         "src_port": None if is_icmp or is_all else optional_int(payload.get("src_port", 0)),
         "dst_addr": str(payload.get("dst_addr") or default_address(family)).strip(),

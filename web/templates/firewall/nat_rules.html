@@ -99,7 +99,10 @@
                 </select>
             </label>
         </div>
-    </section>
+        </section>
+    <div class="form-actions policy-route-actions" data-nat-chain-apply-panel="{{ chain }}" {% if chain != "PREROUTING" %}hidden{% endif %}>
+        <button class="text-button primary policy-apply-button" type="button" data-nat-chain-apply="{{ chain }}">Apply</button>
+    </div>
     {% endfor %}
 </section>
 
@@ -188,7 +191,7 @@
             </div>
         </section>
         <div class="form-actions policy-route-actions">
-            <button class="text-button primary policy-apply-button" type="submit" id="nat-submit-button">Apply</button>
+            <button class="text-button primary policy-apply-button" type="submit" id="nat-submit-button">Add</button>
         </div>
     </form>
 </section>
@@ -261,5 +264,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/nat_rules.js') }}?v=20260609-nat-filter-layout" defer></script>
+<script src="{{ url_for('static', path='/js/nat_rules.js') }}?v=20260613-nat-pending-apply" defer></script>
 {% endblock %}

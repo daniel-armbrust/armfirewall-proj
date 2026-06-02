@@ -103,6 +103,9 @@
             </label>
         </div>
     </section>
+    <div class="form-actions policy-route-actions" data-filter-chain-apply-panel="{{ chain }}" {% if chain != "INPUT" %}hidden{% endif %}>
+        <button class="text-button primary policy-apply-button" type="button" data-filter-chain-apply="{{ chain }}">Apply</button>
+    </div>
     {% endfor %}
 </section>
 
@@ -206,7 +209,7 @@
             </div>
         </section>
         <div class="form-actions policy-route-actions">
-            <button class="text-button primary policy-apply-button" id="filter-submit-button" type="submit">Apply</button>
+            <button class="text-button primary policy-apply-button" id="filter-submit-button" type="submit">Add</button>
         </div>
     </form>
 </section>
@@ -279,5 +282,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/filter_rules.js') }}?v=20260613-filter-any-interface" defer></script>
+<script src="{{ url_for('static', path='/js/filter_rules.js') }}?v=20260613-filter-apply-outside-panel" defer></script>
 {% endblock %}

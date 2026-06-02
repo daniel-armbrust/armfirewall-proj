@@ -24,8 +24,10 @@
     const createButtons = Array.from(document.querySelectorAll("[data-nat-create-for]"));
     const chainButtons = Array.from(document.querySelectorAll("[data-nat-chain-tab]"));
     const chainPanels = Array.from(document.querySelectorAll("[data-nat-chain-panel]"));
+    const chainApplyPanels = Array.from(document.querySelectorAll("[data-nat-chain-apply-panel]"));
+    const applyChainButtons = Array.from(document.querySelectorAll("[data-nat-chain-apply]"));
     const NAT_CHAINS = ["PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"];
-    let pendingApplyChain = "";
+    let pendingApplyRequest = null;
     let pendingDeleteButton = null;
     let editingRule = null;
     let currentRulesByKey = new Map();
@@ -73,6 +75,9 @@
         });
         chainPanels.forEach((panel) => {
             panel.hidden = panel.dataset.natChainPanel !== activeChain;
+        });
+        chainApplyPanels.forEach((panel) => {
+            panel.hidden = activeTab !== "rules" || panel.dataset.natChainApplyPanel !== activeChain;
         });
     }
 
@@ -184,7 +189,7 @@
     }
 
     function renderInterfaceChoices(interfaces) {
-        const options = [{value: "", label: "select interface"}].concat(
+        const options = [{value: "ANY", label: "any"}].concat(
             interfaces.map((iface) => ({
                 value: iface.name,
                 label: interfaceOptionLabel(iface),
@@ -253,7 +258,7 @@
     function setFormMode(rule) {
         editingRule = rule;
         if (submitButton) {
-            submitButton.textContent = rule ? "Save rule" : "Apply";
+            submitButton.textContent = rule ? "Save rule" : "Add";
         }
         setFormStatus(rule ? `editing=${rule.family}/${rule.chain}/${rule.id}` : "queue=idle");
     }
@@ -395,12 +400,31 @@
         return family === "IPV4" ? "IPv4" : "IPv6";
     }
 
+    function compareRulesForDisplay(left, right) {
+        const leftPending = String(left.apply_state || "") === "pending" ? 0 : 1;
+        const rightPending = String(right.apply_state || "") === "pending" ? 0 : 1;
+        if (leftPending !== rightPending) {
+            return leftPending - rightPending;
+        }
+
+        const leftOrder = HF.number(left.rule_order);
+        const rightOrder = HF.number(right.rule_order);
+        if (leftOrder !== rightOrder) {
+            return leftOrder - rightOrder;
+        }
+
+        return HF.number(left.id) - HF.number(right.id);
+    }
+
     function renderChain(chain, rules) {
         const body = rulesBodies[chain];
         const count = ruleCounts[chain];
         const chainRules = rules || [];
         const activeFamily = familyFilterSelects[chain] ? familyFilterSelects[chain].value : "IPV4";
-        const filteredRules = chainRules.filter((rule) => rule.family === activeFamily);
+        const filteredRules = chainRules
+            .filter((rule) => rule.family === activeFamily)
+            .slice()
+            .sort(compareRulesForDisplay);
         const pagination = chainPagination[chain] || {page: 1, pageSize: 25};
         const totalItems = filteredRules.length;
         const totalPages = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
@@ -495,15 +519,16 @@
         }).join("");
     }
 
-    function openApplyModal(chain) {
-        pendingApplyChain = chain;
-        const chainRules = Array.from(document.querySelectorAll(`#nat-${chain.toLowerCase()}-body tr:not(.firewall-family-row)`)).length;
+    function openApplyModal(chain, family) {
+        pendingApplyRequest = {chain, family};
+        const chainRules = Array.from(currentRulesByKey.values()).filter((rule) => rule.chain === chain && rule.family === family);
+        const pendingCount = chainRules.filter((rule) => String(rule.apply_state || "") === "pending").length;
 
         if (applyChainLabel) {
-            applyChainLabel.textContent = `chain=${chain}`;
+            applyChainLabel.textContent = `chain=${chain} family=${family}`;
         }
         if (applyMessage) {
-            applyMessage.textContent = `Are you sure you want to apply ${chainRules} rule row(s) from the ${chain} chain?`;
+            applyMessage.textContent = `Are you sure you want to apply ${pendingCount} pending rule(s) from the ${chain} chain for ${familyLabel(family)}?`;
         }
         if (applyModal) {
             applyModal.hidden = false;
@@ -511,7 +536,7 @@
     }
 
     function closeApplyModal() {
-        pendingApplyChain = "";
+        pendingApplyRequest = null;
         if (applyModal) {
             applyModal.hidden = true;
         }
@@ -589,7 +614,7 @@
     }
 
     async function applyChain() {
-        if (!pendingApplyChain) {
+        if (!pendingApplyRequest) {
             return;
         }
         try {
@@ -597,9 +622,11 @@
                 applyConfirmButton.disabled = true;
             }
             setFormStatus("queue=writing");
-            const chain = pendingApplyChain;
+            const {chain, family} = pendingApplyRequest;
             const result = await HF.fetchJson(`/api/firewall/nat-rules/${chain}/apply`, {
                 method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({family}),
             });
             setFormStatus(`queued=${result.work_request_count}`);
             closeApplyModal();
@@ -692,6 +719,14 @@
         button.addEventListener("click", () => {
             setActiveChain(button.dataset.natChainTab);
             setActiveTab("rules", true);
+        });
+    });
+
+    applyChainButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const chain = button.dataset.natChainApply;
+            const family = familyFilterSelects[chain] ? familyFilterSelects[chain].value : "IPV4";
+            openApplyModal(chain, family);
         });
     });
 
