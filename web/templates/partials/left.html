@@ -15,8 +15,8 @@
         <a class="menu-link child {% if current_path == '/network/policy-routing' %}active{% endif %}" href="/network/policy-routing">Policy Routing</a>
         <a class="menu-link child {% if current_path == '/network/qos' %}active{% endif %}" href="/network/qos">QoS</a>
 
-        <div class="menu-group">Routing Protocols</div>
         {% if request.app.state.service_installed('bird') %}
+        <div class="menu-group">Routing Protocols</div>
         {% set routing_view = request.query_params.get('view', 'global-config') if current_path == '/network/routing-protocols' else '' %}
         <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'global-config' %}active{% endif %}" href="/network/routing-protocols?view=global-config">BIRD Settings</a>
         <a class="menu-link child {% if current_path == '/network/routing-protocols' and routing_view == 'rip' %}active{% endif %}" href="/network/routing-protocols?view=rip">RIP</a>

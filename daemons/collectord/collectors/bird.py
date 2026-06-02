@@ -88,18 +88,28 @@ class BirdProtocolsCollector:
             prune_old_command_runs(conn, command_text)
 
             ensure_rip_route_tables(conn)
-            if not rip_protocol_enabled(conn):
+            rip_protocol_name = runtime_rip_protocol_name(rows)
+            if not rip_protocol_enabled(conn) or not rip_protocol_name:
                 clear_rip_routes(conn)
                 return
             for key, command in BIRD_RIP_DIAGNOSTIC_COMMANDS:
-                completed, duration_ms = run_bird_command(command)
-                command_text = " ".join(command)
+                resolved_command = [rip_protocol_name if part == "rip1" else part for part in command]
+                completed, duration_ms = run_bird_command(resolved_command)
+                command_text = " ".join(resolved_command)
                 command_id = insert_command_run(conn, command_text, completed, duration_ms)
                 if completed.returncode == 0 and key in {"learned-routes", "exported-routes"}:
                     table_name = "rip_imported_routes" if key == "learned-routes" else "rip_exported_routes"
                     rows = parse_show_routes(completed.stdout)
                     replace_rip_routes(conn, table_name, command_id, rows)
                 prune_old_command_runs(conn, command_text)
+
+
+def runtime_rip_protocol_name(rows: list[BirdProtocolRow]) -> str | None:
+    """Return the active BIRD RIP protocol name from show protocols output."""
+    for row in rows:
+        if row.proto.lower() == "rip":
+            return row.name
+    return None
 
 
 def run_bird_command(command: list[str]):

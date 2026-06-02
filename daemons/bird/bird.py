@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
+from pathlib import Path
 
 from .constants import BIRD_CONF, BIRD_DB_PATH, LOG_SOURCE, WORK_REQUEST_DB_PATH
 from .models import BirdWorkRequest
@@ -13,6 +14,8 @@ from .models import BirdWorkRequest
 from core import db
 from core import log as logger
 from core.payload import decode_json_payload
+from core.process import command_exists, run_command
+from core.supervisord import supervisor_status
 from web.services.routingprotocols import api as bird_config
 
 
@@ -53,12 +56,34 @@ def write_bird_conf(config_text: str) -> None:
     tmp_path.replace(BIRD_CONF)
 
 
+def reload_running_bird() -> None:
+    """Ask a running BIRD daemon to reload the rendered configuration."""
+    try:
+        state = supervisor_status("bird")
+    except Exception as exc:  # noqa: BLE001 - rendering should still work if supervisord is unavailable.
+        logger.log(f"Could not read BIRD supervisor status; skipping live configure: {exc}", source=LOG_SOURCE)
+        return
+
+    if state != "RUNNING":
+        logger.log(f"BIRD is {state}; rendered config will be applied on next start.", source=LOG_SOURCE)
+        return
+
+    birdcl = "/usr/sbin/birdcl" if Path("/usr/sbin/birdcl").exists() else "birdcl"
+    if birdcl == "birdcl" and not command_exists("birdcl"):
+        raise RuntimeError("birdcl was not found; could not apply rendered BIRD configuration")
+
+    completed = run_command([birdcl, "configure"], timeout=30)
+    output = (completed.stdout or completed.stderr or "").strip()
+    logger.log(f"BIRD live configuration reload requested. {output}", source=LOG_SOURCE)
+
+
 def apply_config() -> None:
     """Render SQLite BIRD settings to conf/bird.conf only."""
     settings = bird_config.settings_from_db()
     rip_settings = bird_config.rip_settings_from_db()
     
     write_bird_conf(bird_config.render_global_config(settings, rip_settings))
+    reload_running_bird()
     
     logger.log("BIRD configuration file was rendered from SQLite.", source=LOG_SOURCE)
 

@@ -14,6 +14,7 @@ from fastapi import HTTPException
 from core import db
 from core.iface import get_lan_primary_iface_name, get_lan_primary_ipv4_address, get_role_config
 from core.system import get_hostname
+from core.supervisord import supervisor_programs
 from core.constants import (
     BIRD_ANY_INTERFACE,
     BIRD_CHANNEL_FAMILIES,
@@ -66,17 +67,35 @@ def bird_version() -> str:
 
 
 def bird_status() -> dict[str, Any]:
-    """Return the persisted BIRD optional service status."""
+    """Return BIRD service status, preferring live supervisord state."""
     try:
-        return service_status_by_name("bird")
+        status = service_status_by_name("bird")
     except ValueError:
         return {
             "name": "bird",
             "display_name": "BIRD Routing Daemon",
             "installed": False,
             "state": "NOT INSTALLED",
+            "pid": "-",
+            "uptime": "-",
             "details": "Missing from service catalog.",
         }
+
+    try:
+        live = next((row for row in supervisor_programs() if row.get("name") == "bird"), None)
+    except Exception:
+        live = None
+
+    if live is not None:
+        status |= {
+            "installed": True,
+            "state": str(live.get("state") or status.get("state") or "UNKNOWN"),
+            "pid": str(live.get("pid") or "-"),
+            "uptime": str(live.get("uptime") or "-"),
+            "details": str(live.get("details") or "-"),
+        }
+
+    return status
 
 
 def int_setting(value: Any, *, default: int, minimum: int, maximum: int, field: str) -> int:
@@ -921,6 +940,34 @@ def get_bird_diagnostics() -> dict[str, Any]:
     }
 
 
+def latest_rip_protocol_name(conn: db.Connection) -> str | None:
+    """Return active RIP protocol name from the latest structured BIRD protocol snapshot."""
+    run = db.fetch_one_on(
+        conn,
+        """
+        SELECT id
+        FROM diagnostic_command_run
+        WHERE command = '/usr/sbin/birdcl show protocols'
+        ORDER BY collected_at DESC, id DESC
+        LIMIT 1
+        """,
+    )
+    if run is None:
+        return None
+    row = db.fetch_one_on(
+        conn,
+        """
+        SELECT name
+        FROM diagnostic_protocol
+        WHERE command_id = ? AND lower(proto) = 'rip'
+        ORDER BY name
+        LIMIT 1
+        """,
+        (int(run["id"]),),
+    )
+    return str(row["name"]) if row is not None else None
+
+
 def latest_diagnostic_command(conn: db.Connection, command: str) -> dict[str, Any]:
     """Return the latest collected diagnostic command output."""
     row = db.fetch_one_on(
@@ -999,14 +1046,17 @@ def rip_protocol_enabled(conn: db.Connection) -> bool:
 def get_rip_diagnostics() -> dict[str, Any]:
     """Return latest RIP diagnostics snapshots collected by collectord."""
     ensure_bird_db()
-    commands = [
-        {"key": "status", "title": "Status", "command": "/usr/sbin/birdcl show protocols all rip1"},
-        {"key": "learned_routes", "title": "Learned Routes", "command": "/usr/sbin/birdcl show route protocol rip1"},
-        {"key": "exported_routes", "title": "Exported Routes", "command": "/usr/sbin/birdcl show route export rip1"},
-    ]
     with db.connection(BIRD_DB_PATH) as conn:
         if not rip_protocol_enabled(conn):
-            return {"last_run": None, "sections": [], "enabled": False}
+            return {"last_run": None, "sections": [], "enabled": False, "active": False}
+        rip_protocol_name = latest_rip_protocol_name(conn)
+        if not rip_protocol_name:
+            return {"last_run": None, "sections": [], "enabled": True, "active": False}
+        commands = [
+            {"key": "status", "title": "Status", "command": f"/usr/sbin/birdcl show protocols all {rip_protocol_name}"},
+            {"key": "learned_routes", "title": "Learned Routes", "command": f"/usr/sbin/birdcl show route protocol {rip_protocol_name}"},
+            {"key": "exported_routes", "title": "Exported Routes", "command": f"/usr/sbin/birdcl show route export {rip_protocol_name}"},
+        ]
         sections = []
         for item in commands:
             section = latest_diagnostic_command(conn, item["command"])
@@ -1023,6 +1073,7 @@ def get_rip_diagnostics() -> dict[str, Any]:
         "last_run": latest_run,
         "sections": sections,
         "enabled": True,
+        "active": True,
     }
 
 

@@ -94,6 +94,7 @@
     let logsLoading = false;
     let ripLoading = false;
     let ripSelectedInterfaceValues = ["*"];
+    let ripEnabled = false;
     let workRequestsLoading = false;
 
     function setText(element, value) {
@@ -174,6 +175,19 @@
         return Boolean(workRequestsPanel && !workRequestsPanel.hidden);
     }
 
+    function syncQueryActionButtons() {
+        viewButtons.forEach((button) => {
+            const view = button.dataset.routingView;
+            const isBirdDiagnostics = routingSettingsContext === "global-config" && view === "diagnostics";
+            const isRipDiagnostics = routingSettingsContext === "rip" && view === "diagnostics";
+            const isRipRoutes = view === "rip-routes";
+            const birdStopped = currentServiceState !== "RUNNING";
+            const shouldDisable = (isBirdDiagnostics && birdStopped) || ((birdStopped || !ripEnabled) && (isRipDiagnostics || isRipRoutes));
+            button.setAttribute("aria-disabled", shouldDisable ? "true" : "false");
+            button.classList.toggle("disabled", shouldDisable);
+        });
+    }
+
     function diagnosticsVisible() {
         return Boolean(diagnosticsPanel && !diagnosticsPanel.hidden);
     }
@@ -195,6 +209,7 @@
         contextButtons.forEach((button) => {
             button.hidden = button.dataset.routingContextButton !== routingSettingsContext;
         });
+        syncQueryActionButtons();
     }
 
     function isRoutingButtonActive(button, selectedView) {
@@ -204,8 +219,33 @@
         return selectedView === "diagnostics" && button.dataset.routingView === "diagnostics";
     }
 
+    function markRoutingContextButtonActive(context) {
+        viewButtons.forEach((button) => {
+            if (button.dataset.routingContextButton) {
+                button.classList.toggle("active", button.dataset.routingContextButton === context);
+                return;
+            }
+            if (button.dataset.routingView === "work-requests") {
+                button.classList.remove("active");
+            }
+        });
+    }
+
+    function markSidebarRoutingView(view) {
+        document.querySelectorAll('.menu-link[href^="/network/routing-protocols"]').forEach((link) => {
+            const url = new URL(link.getAttribute("href"), window.location.origin);
+            link.classList.toggle("active", url.searchParams.get("view") === view);
+        });
+        const url = new URL(window.location.href);
+        url.searchParams.set("view", view);
+        window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+    }
+
     function setActiveView(viewName) {
-        const selectedView = panels[viewName] ? viewName : "global-config";
+        let selectedView = panels[viewName] ? viewName : "global-config";
+        if (routingSettingsContext === "rip" && !ripEnabled && (selectedView === "diagnostics" || selectedView === "rip-routes")) {
+            selectedView = "rip";
+        }
         setRoutingNavigationContext(selectedView);
         Object.entries(panels).forEach(([name, panel]) => {
             if (panel) {
@@ -246,10 +286,11 @@
         pendingAction = null;
         if (actionConfirm) {
             actionConfirm.disabled = false;
+            actionConfirm.hidden = false;
         }
     }
 
-    function openActionModal(action, label, run, title = "Confirm action") {
+    function openActionModal(action, label, run, title = "Confirm action", options = {}) {
         pendingAction = {action, run};
         if (actionTitle) {
             actionTitle.textContent = title;
@@ -259,10 +300,15 @@
         }
         if (actionConfirm) {
             actionConfirm.disabled = false;
+            actionConfirm.hidden = Boolean(options.hideConfirm);
         }
         if (actionModal) {
             actionModal.hidden = false;
         }
+    }
+
+    function openInfoModal(label, title = "Information") {
+        openActionModal("info", label, closeActionModal, title, {hideConfirm: true});
     }
 
     function setFieldValue(element, value) {
@@ -500,14 +546,22 @@
         setText(birdPid, installed ? service.pid : "-");
         setText(birdUptime, installed ? service.uptime : "-");
         populateForm(settings, data);
+        syncQueryActionButtons();
     }
 
+    let serviceSummaryLoading = false;
     async function load() {
+        if (serviceSummaryLoading) {
+            return;
+        }
+        serviceSummaryLoading = true;
         try {
             const data = await HF.fetchJson("/api/network/routing-protocols/bird/global-settings");
             render(data);
         } catch (error) {
             setStatus(error.message, true);
+        } finally {
+            serviceSummaryLoading = false;
         }
     }
 
@@ -544,6 +598,8 @@
         ripLoading = true;
         try {
             const data = await HF.fetchJson("/api/network/routing-protocols/bird/rip-settings");
+            ripEnabled = Boolean((data.settings || {}).enabled);
+            syncQueryActionButtons();
             populateRipForm(data.settings || {});
         } catch (error) {
             setRipStatus(error.message, true);
@@ -571,15 +627,19 @@
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(readRipForm()),
             });
+            ripEnabled = Boolean((data.settings || {}).enabled);
+            syncQueryActionButtons();
             populateRipForm(data.settings || {});
             setRipStatus("", false);
             await showWorkRequests();
+            markSidebarRoutingView("global-config");
         } catch (error) {
             setRipStatus(error.message, true);
         }
     }
 
     async function runServiceAction(action) {
+        const sourceContext = routingSettingsContext;
         const resolvedAction = action === "start-restart" && currentServiceState === "RUNNING" ? "restart" : action === "start-restart" ? "start" : action;
         setStatus("Queueing BIRD service action...", false);
         await HF.fetchJson("/api/services/status/bird/action", {
@@ -590,6 +650,9 @@
         setStatus("Service action queued.", false);
         await loadWorkRequests();
         await showWorkRequests();
+        if (sourceContext === "rip") {
+            markRoutingContextButtonActive("global-config");
+        }
     }
 
     function renderLogs(data) {
@@ -942,6 +1005,7 @@ ${HF.escapeHtml(output)}</pre>`;
         try {
             const data = await HF.fetchJson("/api/work-requests?category=SERVICE_MANAGEMENT.BIRD_CONFIG&category=SERVICE_MANAGEMENT.SERVICE_CONTROL&service_name=bird&include_payload=true");
             renderWorkRequests(data);
+            await load();
         } catch (error) {
             if (workRequestsBody) {
                 workRequestsBody.innerHTML = `
@@ -977,7 +1041,18 @@ ${HF.escapeHtml(output)}</pre>`;
     }
 
     viewButtons.forEach((button) => {
-        button.addEventListener("click", () => setActiveView(button.dataset.routingView || "global-config"));
+        button.addEventListener("click", () => {
+            const view = button.dataset.routingView || "global-config";
+            if (button.getAttribute("aria-disabled") === "true") {
+                if (currentServiceState !== "RUNNING") {
+                    openInfoModal("BIRD daemon is not running. Start BIRD before opening Diagnostics or Show Routes.", "BIRD stopped");
+                    return;
+                }
+                openInfoModal("RIP protocol is disabled. Enable RIP Settings before opening Diagnostics or Show Routes.", "RIP disabled");
+                return;
+            }
+            setActiveView(view);
+        });
     });
     if (form) {
         form.addEventListener("submit", confirmSave);
