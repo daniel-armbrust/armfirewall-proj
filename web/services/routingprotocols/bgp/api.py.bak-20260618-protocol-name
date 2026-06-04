@@ -164,7 +164,7 @@ def save_bgp_settings_to_db(settings: dict[str, Any], instance_id: Any | None = 
     active_families = import_families | export_families
     values = (
         1 if settings["enabled"] else 0,
-        settings["protocol_name"] or "",
+        settings["protocol_name"] or None,
         settings["description"] or None,
         settings["source_address"] or None,
         settings["local_as"],
