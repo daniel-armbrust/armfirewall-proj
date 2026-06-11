@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from daemons.fwrulesd.filter import rules as filter_core
 
+
 T = TypeVar("T")
 
 
@@ -37,9 +38,20 @@ def create_filter_rule(payload: dict[str, Any]) -> dict[str, Any]:
     return _call_core(filter_core.create_filter_rule, payload)
 
 
-def update_filter_rule(family: str, chain: str, rule_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+def update_filter_rule(
+    family: str,
+    chain: str,
+    rule_id: int,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
     """Update an editable filter rule without applying it to the operating system."""
-    return _call_core(filter_core.update_filter_rule, family, chain, rule_id, payload)
+    return _call_core(
+        filter_core.update_filter_rule,
+        family,
+        chain,
+        rule_id,
+        payload,
+    )
 
 
 def apply_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
@@ -47,7 +59,10 @@ def apply_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:
     return _call_core(filter_core.apply_filter_rule, family, chain, rule_id)
 
 
-def apply_filter_chain(chain: str, payload: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def apply_filter_chain(
+    chain: str,
+    payload: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Queue only filter families with pending changes for one chain."""
     return _call_core(filter_core.apply_filter_chain, chain, (payload or {}).get("family"))
 
@@ -57,9 +72,20 @@ def set_filter_chain_policy(chain: str, payload: dict[str, Any]) -> dict[str, An
     return _call_core(filter_core.set_filter_chain_policy, chain, payload)
 
 
-def set_filter_rule_enabled(family: str, chain: str, rule_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+def set_filter_rule_enabled(
+    family: str,
+    chain: str,
+    rule_id: int,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
     """Update the enabled flag for a filter rule without applying it."""
-    return _call_core(filter_core.set_filter_rule_enabled, family, chain, rule_id, payload)
+    return _call_core(
+        filter_core.set_filter_rule_enabled,
+        family,
+        chain,
+        rule_id,
+        payload,
+    )
 
 
 def delete_filter_rule(family: str, chain: str, rule_id: int) -> dict[str, Any]:

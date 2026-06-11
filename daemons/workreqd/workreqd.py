@@ -114,6 +114,8 @@ def command_for_request(request: QueuedWorkRequest) -> list[str]:
             command = [sys.executable, "-m", "daemons.proutesd.proutesd"]
         elif script_name in {"servicemgmt.py", "servicemgmtd.py", "svcmgmtd.py"}:
             command = [sys.executable, "-m", "daemons.svcmgmtd.svcmgmtd"]
+        elif script_name == "adamd.py":
+            command = [sys.executable, "-m", "daemons.adamd.adamd"]
         else:
             script_path = ROOT_DIR / "daemons" / script_name
 

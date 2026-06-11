@@ -124,6 +124,23 @@ def fetch_rule(args: Any, table: str, rule_id: int) -> dict[str, Any]:
     return rule
 
 
+def delete_configured_rule(args: Any, table: str, rule_id: int) -> None:
+    """Delete one non-protected rule after its runtime removal succeeds."""
+    with db.transaction(database_for_request(args.category, args.family)) as conn:
+        current = db.fetch_one_on(
+            conn,
+            f"SELECT protected FROM {table} WHERE id = ?",
+            (rule_id,),
+        )
+        if current is None:
+            raise RuntimeError(f"Rule not found: table={table}, id={rule_id}")
+        if int(current["protected"] or 0) == 1:
+            raise RuntimeError("Protected firewall rules cannot be deleted.")
+        cursor = db.execute_on(conn, f"DELETE FROM {table} WHERE id = ?", (rule_id,))
+        if int(cursor.rowcount) != 1:
+            raise RuntimeError(f"Rule could not be deleted: table={table}, id={rule_id}")
+
+
 def rules_for_payload(args: Any, payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Resolve the rules affected by a work request payload."""
     table = table_from_request(args, payload)

@@ -69,3 +69,53 @@ Ajuste a regra ICMP para aceitar ping apenas do endereço 208.67.220.220.,update
 Altere o bloqueio de echo-request para atuar também na interface bond0.,update_firewall_rule
 Remova a regra que impede ping para o servidor 192.168.240.50.,delete_firewall_rule
 Exclua a permissão de ICMP concedida à rede 10.88.0.0/16.,delete_firewall_rule
+Atualize a política da porta 25/UDP restringindo para o IP 172.16.0.10.,update_firewall_rule
+Valide se o acesso à porta 8443 (UDP) se encontra bloqueada.,check_firewall_rule
+Atualize a política da porta 80/UDP restringindo para o IP 10.1.1.50.,update_firewall_rule
+Delete a regra de acesso FTP que permite o tráfego de 1.1.1.1 para a subrede de homologação.,delete_firewall_rule
+Altere a regra que libera a porta 80/UDP para permitir o acesso somente da origem 8.8.4.4,update_firewall_rule
+Exclua a regra que libera o acesso FTP da origem 172.16.2.5 para o banco de dados.,delete_firewall_rule
+A porta 8080/ICMP no firewall está liberada?,check_firewall_rule
+Atualize a política da porta 8443/UDP restringindo para o IP 45.4.5.6.,update_firewall_rule
+Atualize a política da porta 995/UDP restringindo para o IP 172.16.2.5.,update_firewall_rule
+Modifique a regra atual do IP 1.1.1.1 para que aponte para a porta 123/TCP.,update_firewall_rule
+Crie uma regra de firewall que bloqueie a origem 200.100.3.4 para o destino 192.168.0.254 porta de destino 80/TCP.,create_block_traffic_rule
+A porta 53/TCP no firewall está ativa?,check_firewall_rule
+Atualize a política da porta 5432/TCP restringindo para o IP 45.4.5.6.,update_firewall_rule
+Exclua a regra que libera o acesso FTP da origem 172.16.0.10 para o servidor web.,delete_firewall_rule
+Atualize a política da porta 27017/UDP restringindo para o IP 192.168.100.45.,update_firewall_rule
+Delete a regra de acesso MySQL que permite o tráfego de 10.0.0.5 para a subrede de homologação.,delete_firewall_rule
+Modifique a regra atual do IP 10.0.0.5 para que aponte para a porta 22/TCP.,update_firewall_rule
+Altere a regra que libera a porta 6379/TCP para permitir o acesso somente da origem 192.168.1.1,update_firewall_rule
+Modifique a regra atual do IP 1.1.1.1 para que aponte para a porta 5432/TCP.,update_firewall_rule
+Atualize a política da porta 445/TCP restringindo para o IP 172.16.0.10.,update_firewall_rule
+Atualize a política da porta 53/UDP restringindo para o IP 10.0.0.5.,update_firewall_rule
+Delete a regra de acesso HTTP que permite o tráfego de 192.168.0.254 para a subrede de homologação.,delete_firewall_rule
+A porta 1433/UDP no firewall está liberada?,check_firewall_rule
+"Verifique se a porta 25 que utiliza o protocolo ICMP está bloqueada, por favor.",check_firewall_rule
+Exclua a regra que libera o acesso SSH da origem 10.20.30.40 para a subrede de homologação.,delete_firewall_rule
+Exclua a regra que libera o acesso SSH da origem 8.8.4.4 para o servidor web.,delete_firewall_rule
+Valide se o acesso à porta 6379 (ICMP) se encontra liberada.,check_firewall_rule
+Delete a regra de acesso SSH que permite o tráfego de 10.1.1.50 para a DMZ.,delete_firewall_rule
+Modifique a regra atual do IP 45.4.5.6 para que aponte para a porta 8443/UDP.,update_firewall_rule
+Atualize a política da porta 161/UDP restringindo para o IP 1.1.1.1.,update_firewall_rule
+Crie uma regra de firewall que bloqueie a origem 1.1.1.1 para o destino 192.168.100.45 porta de destino 22/UDP.,create_block_traffic_rule
+Altere a regra que libera a porta 23/TCP para permitir o acesso somente da origem 192.168.0.254,update_firewall_rule
+"Verifique se a porta 25 que utiliza o protocolo ICMP está liberada, por favor.",check_firewall_rule
+Valide se o acesso à porta 22 (TCP) se encontra liberada.,check_firewall_rule
+"Verifique se a porta 443 que utiliza o protocolo UDP está bloqueada, por favor.",check_firewall_rule
+Delete a regra de acesso FTP que permite o tráfego de 10.20.30.40 para toda a rede interna.,delete_firewall_rule
+"Verifique se a porta 6379 que utiliza o protocolo UDP está liberada, por favor.",check_firewall_rule
+Atualize a política da porta 53/TCP restringindo para o IP 200.100.3.4.,update_firewall_rule
+Exclua a regra que libera o acesso MySQL da origem 10.1.1.50 para a subrede de homologação.,delete_firewall_rule
+Modifique a regra atual do IP 10.0.0.5 para que aponte para a porta 6379/TCP.,update_firewall_rule
+Delete a regra de acesso HTTP que permite o tráfego de 8.8.4.4 para o servidor web.,delete_firewall_rule
+Atualize a política da porta 21/TCP restringindo para o IP 8.8.8.8.,update_firewall_rule
+Atualize a política da porta 8080/TCP restringindo para o IP 172.16.0.10.,update_firewall_rule
+Permita o tráfego originado em 10.0.0.5 com destino a a internet.,create_allow_traffic_rule
+Modifique a regra atual do IP 1.1.1.1 para que aponte para a porta 22/UDP.,update_firewall_rule
+Modifique a regra atual do IP 1.1.1.1 para que aponte para a porta 995/TCP.,update_firewall_rule
+Atualize a política da porta 27017/TCP restringindo para o IP 10.0.0.5.,update_firewall_rule
+Altere a regra que libera a porta 993/TCP para permitir o acesso somente da origem 200.100.3.4,update_firewall_rule
+Atualize a política da porta 123/TCP restringindo para o IP 8.8.4.4.,update_firewall_rule
+Altere a regra que libera a porta 1433/TCP para permitir o acesso somente da origem 192.168.100.45,update_firewall_rule

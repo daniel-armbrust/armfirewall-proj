@@ -7,6 +7,8 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
+
+
 DB_DIR = ROOT_DIR / "db"
 CONF_DIR = ROOT_DIR / "conf"
 LOG_DIR = ROOT_DIR / "logs"
@@ -22,6 +24,7 @@ LINKFAILOVER_DB_PATH = DB_DIR / "linkfailover.db"
 POLICY_ROUTING_DB_PATH = DB_DIR / "policy-routing.db"
 LIBRESWAN_DB_PATH = DB_DIR / "libreswan.db"
 POLICY_ROUTING_DDL_PATH = DB_DIR / "ddl" / "policy-routing.ddl"
+
 BIRD_DB_PATH = DB_DIR / "bird.db"
 BIRD_DDL_PATH = DB_DIR / "ddl" / "bird.ddl"
 BIRD_CONFIG_PATH = CONF_DIR / "bird.conf"
@@ -37,6 +40,9 @@ BIRD_RIP_VERSIONS = {"1", "2", "ng"}
 BIRD_RIP_MODES = {"multicast", "broadcast"}
 BIRD_RIP_AUTHENTICATIONS = {"none", "plaintext", "cryptographic"}
 BIRD_BGP_SESSION_TYPES = {"auto", "ibgp", "ebgp"}
+
+ADAM_DATASET_DIR = ROOT_DIR / "daemons" / "adamd" / "datasets"
+ADAM_MODELS_DIR = ROOT_DIR / "daemons" / "adamd" / "models"
 
 RRD_DIR = ROOT_DIR / "rrd"
 RRD_IMG_DIR = RRD_DIR / "img"

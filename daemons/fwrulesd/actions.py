@@ -12,6 +12,7 @@ from .constants import LOG_SOURCE
 from .filter import table as filter_table
 from .models import FirewallWorkRequest
 from .repository import (
+    delete_configured_rule,
     delete_failed_rule,
     fetch_protected_rules,
     purge_pending_delete_rules,
@@ -54,7 +55,11 @@ def execute_work_request(args: Any, payload: dict[str, Any]) -> tuple[int, int]:
     for rule in rules:
         try:
             if args.action_name == "remove":
+                if int(rule.get("protected") or 0) == 1:
+                    raise RuntimeError("Protected firewall rules cannot be deleted.")
                 removed += remove_rule(args, rule)
+                if payload.get("delete_from_database") is True:
+                    delete_configured_rule(args, table, int(rule["id"]))
             elif args.action_name == "change" and int(rule.get("enabled") or 0) == 0:
                 removed += remove_rule(args, rule)
             elif args.action_name in {"apply", "change"}:
