@@ -2,6 +2,32 @@
     const state = document.getElementById("adam-state");
     const datasetToggle = document.getElementById("adam-dataset-toggle");
     const datasetPanel = document.getElementById("adam-dataset-panel");
+    const textClassificationToggle = document.getElementById("adam-text-classification-toggle");
+    const textClassificationPanel = document.getElementById("adam-text-classification-panel");
+    const classificationModelState = document.getElementById("adam-classification-model-state");
+    const classificationEmpty = document.getElementById("adam-classification-empty");
+    const classificationDetails = document.getElementById("adam-classification-details");
+    const classificationModel = document.getElementById("adam-classification-model");
+    const classificationAlgorithm = document.getElementById("adam-classification-algorithm");
+    const classificationVectorizer = document.getElementById("adam-classification-vectorizer");
+    const classificationCompleted = document.getElementById("adam-classification-completed");
+    const classificationTrainingRecords = document.getElementById("adam-classification-training-records");
+    const classificationTestingRecords = document.getElementById("adam-classification-testing-records");
+    const classificationLabels = document.getElementById("adam-classification-labels");
+    const classificationDatasets = document.getElementById("adam-classification-datasets");
+    const classificationTrainingAccuracy = document.getElementById("adam-classification-training-accuracy");
+    const classificationTestingAccuracy = document.getElementById("adam-classification-testing-accuracy");
+    const classificationPrecision = document.getElementById("adam-classification-precision");
+    const classificationRecall = document.getElementById("adam-classification-recall");
+    const classificationF1 = document.getElementById("adam-classification-f1");
+    const classificationChartWrap = document.getElementById("adam-classification-chart-wrap");
+    const classificationChart = document.getElementById("adam-classification-chart");
+    const classificationDeleteActions = document.getElementById("adam-classification-delete-actions");
+    const classificationDelete = document.getElementById("adam-classification-delete");
+    const deleteModal = document.getElementById("adam-delete-modal");
+    const deleteModalCopy = document.getElementById("adam-delete-modal-copy");
+    const deleteCancel = document.getElementById("adam-delete-cancel");
+    const deleteConfirm = document.getElementById("adam-delete-confirm");
     const workRequestsToggle = document.getElementById("adam-work-requests-toggle");
     const workRequestsPanel = document.getElementById("adam-work-requests-panel");
     const workRequestsBody = document.getElementById("adam-work-requests-body");
@@ -24,22 +50,39 @@
     let uploadInProgress = false;
     let trainingInProgress = false;
     let workRequestsLoading = false;
+    let textClassificationLoading = false;
+    let activeTraining = null;
+    let deletionQueueing = false;
 
-    if (!datasetToggle || !datasetPanel || !workRequestsToggle || !workRequestsPanel
+    if (!datasetToggle || !datasetPanel || !textClassificationToggle
+            || !textClassificationPanel || !workRequestsToggle || !workRequestsPanel
             || !datasetCategory || !trainingInput || !testingInput || !trainingImport || !testingImport
-            || !trainingName || !testingName || !trainingModel) {
+            || !trainingName || !testingName || !trainingModel || !classificationDeleteActions
+            || !classificationDelete
+            || !deleteModal || !deleteModalCopy || !deleteCancel || !deleteConfirm) {
         return;
     }
 
     function setActiveView(view) {
         const datasetSelected = view === "dataset";
+        const textClassificationSelected = view === "text-classification";
+        const workRequestsSelected = view === "work-requests";
         datasetPanel.hidden = !datasetSelected;
-        workRequestsPanel.hidden = datasetSelected;
+        textClassificationPanel.hidden = !textClassificationSelected;
+        classificationDeleteActions.hidden = !textClassificationSelected || !activeTraining;
+        workRequestsPanel.hidden = !workRequestsSelected;
         datasetToggle.classList.toggle("active", datasetSelected);
-        workRequestsToggle.classList.toggle("active", !datasetSelected);
+        textClassificationToggle.classList.toggle("active", textClassificationSelected);
+        workRequestsToggle.classList.toggle("active", workRequestsSelected);
         datasetToggle.setAttribute("aria-expanded", datasetSelected ? "true" : "false");
+        textClassificationToggle.setAttribute(
+            "aria-expanded",
+            textClassificationSelected ? "true" : "false",
+        );
 
-        if (!datasetSelected) {
+        if (textClassificationSelected) {
+            loadTextClassification();
+        } else if (workRequestsSelected) {
             loadWorkRequests({force: true});
         }
     }
@@ -301,6 +344,180 @@
         }).join("");
     }
 
+    function formatScore(value) {
+        const numericValue = Number(value);
+
+        if (!Number.isFinite(numericValue)) {
+            return "-";
+        }
+
+        return `${(numericValue * 100).toFixed(2)}%`;
+    }
+
+    function renderTextClassification(training) {
+        const available = Boolean(training);
+        activeTraining = training || null;
+        classificationEmpty.hidden = available;
+        classificationDetails.hidden = !available;
+        classificationDeleteActions.hidden = !available || textClassificationPanel.hidden;
+        classificationDelete.disabled = !available || deletionQueueing;
+        classificationModelState.textContent = available
+            ? "model=active"
+            : "model=unavailable";
+
+        if (!available) {
+            classificationEmpty.querySelector("span:last-child").textContent =
+                "No trained model available.";
+            classificationChartWrap.hidden = true;
+            classificationChart.removeAttribute("src");
+            setState("Waiting for trained model");
+            return;
+        }
+
+        const metrics = training.metrics || {};
+        const datasets = training.datasets || [];
+        classificationModel.textContent = training.model_file || "-";
+        classificationAlgorithm.textContent = training.algorithm || "-";
+        classificationVectorizer.textContent = training.vectorizer || "-";
+        classificationCompleted.textContent = training.completed_at
+            ? new Date(`${training.completed_at}Z`).toLocaleString("en-US")
+            : "-";
+        classificationTrainingRecords.textContent = String(training.training_records || 0);
+        classificationTestingRecords.textContent = String(training.testing_records || 0);
+        classificationLabels.textContent = (training.labels || []).join(", ") || "-";
+        classificationDatasets.textContent = datasets.map((dataset) => (
+            `${dataset.category}/${dataset.purpose}: ${dataset.file_name} (${dataset.records})`
+        )).join(" | ") || "-";
+        classificationTrainingAccuracy.textContent = formatScore(metrics.training_accuracy);
+        classificationTestingAccuracy.textContent = formatScore(metrics.testing_accuracy);
+        classificationPrecision.textContent = formatScore(metrics.precision_macro);
+        classificationRecall.textContent = formatScore(metrics.recall_macro);
+        classificationF1.textContent = formatScore(metrics.f1_macro);
+        classificationChartWrap.hidden = !training.chart_url;
+
+        if (training.chart_url) {
+            classificationChart.src = training.chart_url;
+        } else {
+            classificationChart.removeAttribute("src");
+        }
+
+        setState("Model available");
+    }
+
+    function openDeleteModal() {
+        if (!activeTraining || deletionQueueing) {
+            return;
+        }
+
+        deleteModalCopy.textContent =
+            "Delete the active model, evaluation chart, and all datasets used to train it? "
+            + "This action cannot be undone.";
+        deleteConfirm.textContent = "Delete";
+        deleteConfirm.disabled = false;
+        deleteCancel.disabled = false;
+        deleteModal.hidden = false;
+        deleteCancel.focus();
+    }
+
+    function closeDeleteModal() {
+        if (deletionQueueing) {
+            return;
+        }
+
+        deleteModal.hidden = true;
+        classificationDelete.focus();
+    }
+
+    async function queueDeletion() {
+        if (!activeTraining || deletionQueueing) {
+            return;
+        }
+
+        deletionQueueing = true;
+        classificationDelete.disabled = true;
+        deleteCancel.disabled = true;
+        deleteConfirm.disabled = true;
+        deleteConfirm.textContent = "Queueing...";
+        setState("Queueing deletion");
+        let queued = false;
+
+        try {
+            const trainingUid = encodeURIComponent(activeTraining.training_uid);
+            const response = await fetch(
+                `/api/adam/text-classification?training_uid=${trainingUid}`,
+                {
+                    method: "DELETE",
+                    credentials: "same-origin",
+                    headers: {"Accept": "application/json"},
+                },
+            );
+
+            if (handleAuthentication(response)) {
+                return;
+            }
+
+            const payload = await parseResponse(response);
+
+            if (!response.ok) {
+                throw new Error(payload.detail || `HTTP ${response.status}`);
+            }
+
+            queued = true;
+            deleteModal.hidden = true;
+            setActiveView("work-requests");
+        } catch (error) {
+            deleteModalCopy.textContent = error.message;
+            setState("Error");
+        } finally {
+            deletionQueueing = false;
+            deleteCancel.disabled = false;
+            deleteConfirm.disabled = false;
+            deleteConfirm.textContent = "Delete";
+            classificationDelete.disabled = !activeTraining;
+
+            if (queued) {
+                deleteModal.hidden = true;
+            }
+        }
+    }
+
+    async function loadTextClassification() {
+        if (textClassificationPanel.hidden || textClassificationLoading) {
+            return;
+        }
+
+        textClassificationLoading = true;
+        classificationModelState.textContent = "model=loading";
+
+        try {
+            const response = await fetch("/api/adam/text-classification", {
+                cache: "no-store",
+                credentials: "same-origin",
+                headers: {"Accept": "application/json"},
+            });
+
+            if (handleAuthentication(response)) {
+                return;
+            }
+
+            const payload = await parseResponse(response);
+
+            if (!response.ok) {
+                throw new Error(payload.detail || `HTTP ${response.status}`);
+            }
+
+            renderTextClassification(payload.training || null);
+        } catch (error) {
+            classificationDetails.hidden = true;
+            classificationEmpty.hidden = false;
+            classificationEmpty.querySelector("span:last-child").textContent = error.message;
+            classificationModelState.textContent = "model=error";
+            setState("Error");
+        } finally {
+            textClassificationLoading = false;
+        }
+    }
+
     async function loadWorkRequests(options = {}) {
         if (workRequestsPanel.hidden || (workRequestsLoading && !options.force)) {
             return;
@@ -343,6 +560,10 @@
     }
 
     datasetToggle.addEventListener("click", () => setActiveView("dataset"));
+    textClassificationToggle.addEventListener(
+        "click",
+        () => setActiveView("text-classification"),
+    );
     workRequestsToggle.addEventListener("click", () => setActiveView("work-requests"));
     datasetCategory.addEventListener("change", () => {
         renderDataset(null);
@@ -352,6 +573,19 @@
     trainingImport.addEventListener("click", () => trainingInput.click());
     testingImport.addEventListener("click", () => testingInput.click());
     trainingModel.addEventListener("click", queueTraining);
+    classificationDelete.addEventListener("click", openDeleteModal);
+    deleteCancel.addEventListener("click", closeDeleteModal);
+    deleteConfirm.addEventListener("click", queueDeletion);
+    deleteModal.addEventListener("click", (event) => {
+        if (event.target === deleteModal) {
+            closeDeleteModal();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !deleteModal.hidden) {
+            closeDeleteModal();
+        }
+    });
 
     trainingInput.addEventListener("change", () => {
         const file = trainingInput.files && trainingInput.files[0];

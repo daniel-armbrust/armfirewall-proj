@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS adam_training_runs (
 
      model_id TEXT UNIQUE,
      model_joblib_filepath TEXT,
+     evaluation_chart_filepath TEXT,
      model_sha256 TEXT CHECK (
           model_sha256 IS NULL OR length(model_sha256) = 64
      ),

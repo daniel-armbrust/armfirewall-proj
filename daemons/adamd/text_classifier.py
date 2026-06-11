@@ -12,19 +12,26 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import joblib
+import matplotlib
 import sklearn
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 from sklearn.pipeline import Pipeline
 
 from core import db
 from core.constants import (
+    ADAM_CHARTS_DIR,
     ADAM_DATASET_DIR,
     ADAM_DATASET_REQUIRED_COLUMNS,
     ADAM_DB_PATH,
+    ADAM_DELETE_STAGING_DIR,
     ADAM_MODELS_DIR,
     ADAM_TEXT_CLASSIFIER_DATASET_CATEGORIES,
+    ADAM_TEXT_CLASSIFIER_CHART_DPI,
+    ADAM_TEXT_CLASSIFIER_CHART_FILENAME_PREFIX,
     ADAM_TEXT_CLASSIFIER_MAX_ITERATIONS,
     ADAM_TEXT_CLASSIFIER_MODEL_PATH,
     ADAM_TEXT_CLASSIFIER_RANDOM_STATE,
@@ -96,17 +103,190 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
             "random_state": ADAM_TEXT_CLASSIFIER_RANDOM_STATE,
         },
     }
+    evaluation_chart_path: Path | None = None
 
     try:
+        evaluation_chart_path = _publish_evaluation_chart(
+            str(training_run["training_uid"]),
+            metadata,
+            testing_labels,
+            predictions,
+        )
+        metadata["evaluation_chart_filepath"] = str(
+            evaluation_chart_path.relative_to(ROOT_DIR)
+        )
         _persist_success(int(training_run["id"]), metadata)
     except Exception:
         _restore_model(rollback_path)
+
+        if evaluation_chart_path is not None:
+            evaluation_chart_path.unlink(missing_ok=True)
         raise
     else:
         if rollback_path is not None:
             rollback_path.unlink(missing_ok=True)
 
     return metadata
+
+
+def delete_text_classifier(training_uid: str) -> dict[str, int]:
+    """Delete the active model, charts, datasets, and dependent training runs."""
+    normalized_training_uid = _normalize_uuid(
+        training_uid,
+        field_name="training_uid",
+    )
+    training_run = db.fetch_one(
+        """
+        SELECT id, model_joblib_filepath, evaluation_chart_filepath
+        FROM adam_training_runs
+        WHERE training_uid = ? AND is_active = 1 AND status = 'success'
+        """,
+        (normalized_training_uid,),
+        db_path=ADAM_DB_PATH,
+    )
+
+    if training_run is None:
+        raise ValueError("The active ADAM text classifier was not found.")
+
+    datasets = db.fetch_all(
+        """
+        SELECT d.id, d.dataset_uid, d.stored_filepath
+        FROM adam_training_run_datasets AS rd
+        JOIN adam_datasets AS d ON d.id = rd.dataset_id
+        WHERE rd.training_run_id = ?
+        ORDER BY d.id
+        """,
+        (training_run["id"],),
+        db_path=ADAM_DB_PATH,
+    )
+    dataset_ids = [int(dataset["id"]) for dataset in datasets]
+
+    if dataset_ids:
+        dataset_placeholders = ", ".join("?" for _ in dataset_ids)
+        affected_runs = db.fetch_all(
+            f"""
+            SELECT DISTINCT r.id, r.evaluation_chart_filepath
+            FROM adam_training_runs AS r
+            JOIN adam_training_run_datasets AS rd
+              ON rd.training_run_id = r.id
+            WHERE rd.dataset_id IN ({dataset_placeholders})
+            """,
+            tuple(dataset_ids),
+            db_path=ADAM_DB_PATH,
+        )
+    else:
+        affected_runs = []
+
+    affected_run_ids = {int(run["id"]) for run in affected_runs}
+    affected_run_ids.add(int(training_run["id"]))
+    artifact_paths: set[Path] = set()
+
+    if training_run["model_joblib_filepath"]:
+        artifact_paths.add(
+            _stored_artifact_path(
+                training_run["model_joblib_filepath"],
+                ADAM_MODELS_DIR,
+                "model",
+            )
+        )
+
+    if training_run["evaluation_chart_filepath"]:
+        artifact_paths.add(
+            _stored_artifact_path(
+                training_run["evaluation_chart_filepath"],
+                ADAM_CHARTS_DIR,
+                "chart",
+            )
+        )
+
+    for run in affected_runs:
+        if run["evaluation_chart_filepath"]:
+            artifact_paths.add(
+                _stored_artifact_path(
+                    run["evaluation_chart_filepath"],
+                    ADAM_CHARTS_DIR,
+                    "chart",
+                )
+            )
+
+    for dataset in datasets:
+        _normalize_uuid(dataset["dataset_uid"], field_name="dataset_id")
+        artifact_paths.add(
+            _stored_artifact_path(
+                dataset["stored_filepath"],
+                ADAM_DATASET_DIR,
+                "dataset",
+            )
+        )
+
+    ADAM_DELETE_STAGING_DIR.mkdir(parents=True, exist_ok=True, mode=0o750)
+    staging_path = Path(
+        tempfile.mkdtemp(prefix=".delete-", dir=ADAM_DELETE_STAGING_DIR)
+    )
+    staged_files: list[tuple[Path, Path]] = []
+
+    try:
+        for index, artifact_path in enumerate(sorted(artifact_paths)):
+            if not artifact_path.exists():
+                continue
+
+            if not artifact_path.is_file():
+                raise ValueError(
+                    f"The ADAM {artifact_path.name} artifact is not a regular file."
+                )
+
+            staged_path = staging_path / f"{index}-{artifact_path.name}"
+            os.replace(artifact_path, staged_path)
+            staged_files.append((artifact_path, staged_path))
+
+        run_ids = sorted(affected_run_ids)
+        run_placeholders = ", ".join("?" for _ in run_ids)
+
+        with db.transaction(ADAM_DB_PATH) as connection:
+            db.execute_on(
+                connection,
+                f"""
+                DELETE FROM adam_training_run_datasets
+                WHERE training_run_id IN ({run_placeholders})
+                """,
+                tuple(run_ids),
+            )
+            db.execute_on(
+                connection,
+                f"""
+                DELETE FROM adam_training_runs
+                WHERE id IN ({run_placeholders})
+                """,
+                tuple(run_ids),
+            )
+
+            if dataset_ids:
+                dataset_placeholders = ", ".join("?" for _ in dataset_ids)
+                db.execute_on(
+                    connection,
+                    f"""
+                    DELETE FROM adam_datasets
+                    WHERE id IN ({dataset_placeholders})
+                    """,
+                    tuple(dataset_ids),
+                )
+    except Exception:
+        for artifact_path, staged_path in reversed(staged_files):
+            if staged_path.exists():
+                os.replace(staged_path, artifact_path)
+
+        staging_path.rmdir()
+        raise
+
+    for _, staged_path in staged_files:
+        staged_path.unlink(missing_ok=True)
+
+    staging_path.rmdir()
+    return {
+        "training_runs": len(affected_run_ids),
+        "datasets": len(dataset_ids),
+        "files": len(staged_files),
+    }
 
 
 def mark_training_running(training_uid: str, request_uid: str) -> None:
@@ -225,6 +405,20 @@ def _dataset_path(dataset: dict[str, Any]) -> Path:
     return path
 
 
+def _stored_artifact_path(
+    stored_filepath: object,
+    artifact_root: Path,
+    artifact_name: str,
+) -> Path:
+    """Resolve one stored artifact inside its configured directory."""
+    path = (ROOT_DIR / str(stored_filepath)).resolve()
+
+    if not path.is_relative_to(artifact_root.resolve()):
+        raise ValueError(f"The ADAM {artifact_name} path is invalid.")
+
+    return path
+
+
 def _load_dataset(dataset: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Load one validated UTF-8 text,label CSV."""
     texts: list[str] = []
@@ -290,6 +484,127 @@ def _file_sha256(path: Path) -> str:
             digest.update(chunk)
 
     return digest.hexdigest()
+
+
+def _publish_evaluation_chart(
+    training_uid: str,
+    metadata: dict[str, Any],
+    expected_labels: list[str],
+    predicted_labels: Any,
+) -> Path:
+    """Generate and atomically publish one training evaluation chart."""
+    normalized_training_uid = _normalize_uuid(
+        training_uid,
+        field_name="training_uid",
+    )
+    labels = [str(value) for value in metadata["labels"]]
+    matrix = confusion_matrix(
+        expected_labels,
+        predicted_labels,
+        labels=labels,
+    )
+    metric_names = [
+        "Training accuracy",
+        "Testing accuracy",
+        "Precision macro",
+        "Recall macro",
+        "F1 macro",
+    ]
+    metric_values = [
+        metadata["training_accuracy"],
+        metadata["testing_accuracy"],
+        metadata["precision_macro"],
+        metadata["recall_macro"],
+        metadata["f1_macro"],
+    ]
+    chart_path = ADAM_CHARTS_DIR / (
+        f"{ADAM_TEXT_CLASSIFIER_CHART_FILENAME_PREFIX}_{normalized_training_uid}.png"
+    )
+    ADAM_CHARTS_DIR.mkdir(parents=True, exist_ok=True, mode=0o750)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=ADAM_CHARTS_DIR,
+        prefix=".text_classifier-",
+        suffix=".png.tmp",
+    )
+    os.close(descriptor)
+    temporary_path = Path(temporary_name)
+    figure = None
+
+    try:
+        figure_width = min(18.0, max(11.0, 8.0 + len(labels) * 0.45))
+        figure_height = min(12.0, max(5.2, 4.0 + len(labels) * 0.35))
+        figure, axes = plt.subplots(
+            1,
+            2,
+            figsize=(figure_width, figure_height),
+            gridspec_kw={"width_ratios": (1.0, 1.35)},
+        )
+        metric_axis, matrix_axis = axes
+        bars = metric_axis.barh(
+            metric_names,
+            metric_values,
+            color=["#30d878", "#15c5a5", "#40a9ff", "#ffb84d", "#d978ff"],
+        )
+        metric_axis.set_xlim(0.0, 1.0)
+        metric_axis.set_xlabel("Score")
+        metric_axis.set_title("Classifier metrics")
+        metric_axis.grid(axis="x", alpha=0.2)
+        metric_axis.invert_yaxis()
+
+        for bar, value in zip(bars, metric_values, strict=True):
+            metric_axis.text(
+                min(float(value) + 0.02, 0.98),
+                bar.get_y() + bar.get_height() / 2,
+                f"{float(value):.1%}",
+                va="center",
+                ha="left" if float(value) <= 0.9 else "right",
+                fontsize=9,
+            )
+
+        image = matrix_axis.imshow(matrix, interpolation="nearest", cmap="Greens")
+        matrix_axis.set_title("Testing confusion matrix")
+        matrix_axis.set_xlabel("Predicted label")
+        matrix_axis.set_ylabel("Expected label")
+        matrix_axis.set_xticks(range(len(labels)), labels, rotation=45, ha="right")
+        matrix_axis.set_yticks(range(len(labels)), labels)
+        annotation_size = max(5, 10 - len(labels) // 4)
+        threshold = float(matrix.max()) / 2 if matrix.size else 0.0
+
+        for row_index in range(matrix.shape[0]):
+            for column_index in range(matrix.shape[1]):
+                value = int(matrix[row_index, column_index])
+                matrix_axis.text(
+                    column_index,
+                    row_index,
+                    str(value),
+                    ha="center",
+                    va="center",
+                    color="white" if value > threshold else "black",
+                    fontsize=annotation_size,
+                )
+
+        figure.colorbar(image, ax=matrix_axis, fraction=0.046, pad=0.04)
+        figure.suptitle("Adam - Text Classifier Evaluation", fontweight="bold")
+        figure.tight_layout()
+        figure.savefig(
+            temporary_path,
+            format="png",
+            dpi=ADAM_TEXT_CLASSIFIER_CHART_DPI,
+            bbox_inches="tight",
+        )
+        os.chmod(temporary_path, 0o640)
+
+        with temporary_path.open("rb") as chart_file:
+            os.fsync(chart_file.fileno())
+
+        os.replace(temporary_path, chart_path)
+        return chart_path
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+    finally:
+        if figure is not None:
+            plt.close(figure)
 
 
 def _publish_model(classifier: Pipeline) -> tuple[str, Path | None]:
@@ -358,7 +673,8 @@ def _persist_success(
             """
             UPDATE adam_training_runs
             SET status = 'success', completed_at = CURRENT_TIMESTAMP,
-                model_id = ?, model_joblib_filepath = ?, model_sha256 = ?,
+                model_id = ?, model_joblib_filepath = ?,
+                evaluation_chart_filepath = ?, model_sha256 = ?,
                 training_records = ?, testing_records = ?, labels = ?,
                 labels_count = ?, training_accuracy = ?, testing_accuracy = ?,
                 precision_macro = ?, recall_macro = ?, f1_macro = ?,
@@ -370,6 +686,7 @@ def _persist_success(
             (
                 metadata["model_id"],
                 relative_model_path,
+                metadata["evaluation_chart_filepath"],
                 metadata["model_sha256"],
                 metadata["training_records"],
                 metadata["testing_records"],

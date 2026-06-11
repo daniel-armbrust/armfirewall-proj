@@ -15,7 +15,7 @@ from core.constants import (
 from daemons.adamd import adamd, text_classifier
 from daemons.workreqd import workreqd
 from daemons.workreqd.models import QueuedWorkRequest
-from web.adam import datasets
+from web.adam import datasets, text_classification
 
 
 TRAINING_CSV = b"""text,label
@@ -38,6 +38,8 @@ class AdamTextClassifierTests(unittest.TestCase):
         self.database_path = self.root / "db" / "adam.db"
         self.dataset_dir = self.root / "daemons" / "adamd" / "datasets"
         self.models_dir = self.root / "daemons" / "adamd" / "models"
+        self.charts_dir = self.root / "daemons" / "adamd" / "charts"
+        self.delete_staging_dir = self.root / "daemons" / "adamd" / ".delete-staging"
         self.model_path = self.models_dir / "text_classifier.joblib"
         self.database_path.parent.mkdir(parents=True)
         ddl_path = Path(__file__).resolve().parents[2] / "db" / "ddl" / "adam.ddl"
@@ -51,12 +53,21 @@ class AdamTextClassifierTests(unittest.TestCase):
             mock.patch.object(text_classifier, "ADAM_DB_PATH", self.database_path),
             mock.patch.object(text_classifier, "ADAM_DATASET_DIR", self.dataset_dir),
             mock.patch.object(text_classifier, "ADAM_MODELS_DIR", self.models_dir),
+            mock.patch.object(text_classifier, "ADAM_CHARTS_DIR", self.charts_dir),
+            mock.patch.object(
+                text_classifier,
+                "ADAM_DELETE_STAGING_DIR",
+                self.delete_staging_dir,
+            ),
             mock.patch.object(
                 text_classifier,
                 "ADAM_TEXT_CLASSIFIER_MODEL_PATH",
                 self.model_path,
             ),
             mock.patch.object(text_classifier, "ROOT_DIR", self.root),
+            mock.patch.object(text_classification, "ADAM_DB_PATH", self.database_path),
+            mock.patch.object(text_classification, "ADAM_CHARTS_DIR", self.charts_dir),
+            mock.patch.object(text_classification, "ROOT_DIR", self.root),
         ]
 
         for patcher in self.patches:
@@ -102,7 +113,8 @@ class AdamTextClassifierTests(unittest.TestCase):
         with sqlite3.connect(self.database_path) as connection:
             stored = connection.execute(
                 """
-                SELECT status, model_joblib_filepath, testing_accuracy,
+                SELECT status, model_joblib_filepath,
+                       evaluation_chart_filepath, testing_accuracy,
                        precision_macro, recall_macro, f1_macro, is_active
                 FROM adam_training_runs
                 WHERE training_uid = ?
@@ -117,11 +129,94 @@ class AdamTextClassifierTests(unittest.TestCase):
             stored[1],
             "daemons/adamd/models/text_classifier.joblib",
         )
-        self.assertIsNotNone(stored[2])
+        chart_path = self.root / stored[2]
+        self.assertTrue(chart_path.is_file())
+        self.assertEqual(chart_path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
         self.assertIsNotNone(stored[3])
         self.assertIsNotNone(stored[4])
         self.assertIsNotNone(stored[5])
-        self.assertEqual(stored[6], 1)
+        self.assertIsNotNone(stored[6])
+        self.assertEqual(stored[7], 1)
+
+        active_training = text_classification.active_training()
+        self.assertEqual(active_training["model_file"], "text_classifier.joblib")
+        self.assertEqual(active_training["testing_records"], 2)
+        self.assertIn(queued["training_uid"], active_training["chart_url"])
+        self.assertEqual(
+            text_classification.evaluation_chart(queued["training_uid"]),
+            chart_path,
+        )
+
+    def test_adamd_deletes_active_model_chart_and_associated_datasets(self) -> None:
+        datasets.store_dataset(TRAINING_CSV, "training.csv", "training")
+        datasets.store_dataset(TESTING_CSV, "testing.csv", "testing")
+        training_request_uid = "11111111-1111-4111-8111-111111111111"
+        queued = datasets.prepare_training(training_request_uid)
+        training_argv = [
+            "--work-request-id",
+            "1",
+            "--request-uid",
+            training_request_uid,
+            "--category-name",
+            "ADAM.MODEL_TRAINING",
+            "--category",
+            "ADAM",
+            "--family",
+            "",
+            "--target-name",
+            "model_training",
+            "--action-name",
+            "train",
+            "--target-rule-id",
+            "",
+            "--payload-json",
+            f'{{"training_uid":"{queued["training_uid"]}"}}',
+        ]
+
+        with mock.patch.object(adamd.logger, "info"):
+            adamd.main(training_argv)
+
+        chart_path = text_classification.evaluation_chart(queued["training_uid"])
+        delete_argv = [
+            "--work-request-id",
+            "2",
+            "--request-uid",
+            "22222222-2222-4222-8222-222222222222",
+            "--category-name",
+            "ADAM.MODEL_TRAINING",
+            "--category",
+            "ADAM",
+            "--family",
+            "",
+            "--target-name",
+            "model_training",
+            "--action-name",
+            "delete",
+            "--target-rule-id",
+            "",
+            "--payload-json",
+            f'{{"training_uid":"{queued["training_uid"]}"}}',
+        ]
+
+        with mock.patch.object(adamd.logger, "info"):
+            result = adamd.main(delete_argv)
+
+        with sqlite3.connect(self.database_path) as connection:
+            training_runs = connection.execute(
+                "SELECT COUNT(*) FROM adam_training_runs"
+            ).fetchone()[0]
+            stored_datasets = connection.execute(
+                "SELECT COUNT(*) FROM adam_datasets"
+            ).fetchone()[0]
+
+        self.assertEqual(result, 0)
+        self.assertFalse(self.model_path.exists())
+        self.assertFalse(chart_path.exists())
+        self.assertEqual(list(self.dataset_dir.rglob("*.csv")), [])
+        self.assertEqual(training_runs, 0)
+        self.assertEqual(stored_datasets, 0)
+        self.assertEqual(list(self.delete_staging_dir.iterdir()), [])
+        self.assertIsNone(text_classification.active_training())
 
 
 class AdamResourceLimitTests(unittest.TestCase):

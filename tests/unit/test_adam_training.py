@@ -150,6 +150,30 @@ class AdamWorkRequestTests(unittest.TestCase):
 
             self.assertEqual(stored, (request_uid, "queue"))
 
+    def test_adam_delete_action_can_be_queued(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_name:
+            root = Path(temporary_name)
+            database_path = root / "work-requests.db"
+            ddl_path = Path(__file__).resolve().parents[2] / "db" / "ddl" / "work-requests.ddl"
+
+            with sqlite3.connect(database_path) as connection:
+                connection.executescript(ddl_path.read_text(encoding="utf-8"))
+
+            with mock.patch.object(workrequests_api, "WORK_REQUEST_DB_PATH", database_path):
+                request_id = workrequests_api.queue_work_request(
+                    action="delete",
+                    payload={"training_uid": "11111111-1111-4111-8111-111111111111"},
+                    category_name="ADAM.MODEL_TRAINING",
+                )
+
+            with sqlite3.connect(database_path) as connection:
+                stored = connection.execute(
+                    "SELECT action_name, status FROM work_requests WHERE id = ?",
+                    (request_id,),
+                ).fetchone()
+
+            self.assertEqual(stored, ("delete", "queue"))
+
 
 if __name__ == "__main__":
     unittest.main()

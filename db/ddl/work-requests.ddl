@@ -96,6 +96,7 @@ INSERT OR IGNORE INTO work_request_actions (name, description) VALUES
      ('start', 'Start an ArmFirewall supervisord service.'),
      ('stop', 'Stop an ArmFirewall supervisord service.'),
      ('restart', 'Restart an ArmFirewall supervisord service.'),
+     ('delete', 'Delete ADAM model and training artifacts.'),
      ('train', 'Train an ADAM intent classifier model.');
 
 -- Stores asynchronous operating system changes requested by the GUI.

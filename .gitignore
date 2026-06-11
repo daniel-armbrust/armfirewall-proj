@@ -56,6 +56,8 @@ rrd/
 # ADAM uploaded datasets and generated model artifacts
 daemons/adamd/datasets/
 daemons/adamd/models/
+daemons/adamd/charts/
+daemons/adamd/.delete-staging/
 
 # Temporary, backup, and editor files
 tmp/
