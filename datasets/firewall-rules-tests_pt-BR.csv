@@ -1,0 +1,71 @@
+text,label
+Consulte se o tráfego para 192.168.88.10 na porta 445/TCP está permitido.,check_port_access
+Quero saber se existe alguma regra liberando o serviço personalizado em 3128/TCP.,check_port_access
+Cheque o estado da porta 7001/TCP na interface eth0.,check_port_access
+O firewall deixa passar conexões destinadas à porta 22/TCP?,check_port_access
+Valide se o serviço personalizado está acessível pela origem 10.77.0.0/20 usando 547/TCP.,check_port_access
+Pode verificar se a porta 3128/TCP no destino 192.0.2.220 está fechada?,check_port_access
+Há alguma política bloqueando o acesso à porta 80/TCP?,check_port_access
+"Informe o status de acesso do serviço personalizado, porta 21/UDP.",check_port_access
+A porta 547/TCP no firewall está liberada?,check_port_access
+Confirme se o serviço personalizado na porta 7001/TCP pode receber conexões.,check_port_access
+Autorize conexões de entrada para o serviço SMB na porta 445/TCP.,create_allow_port_rule
+Abra a porta 3128/TCP para o destino 192.0.2.220.,create_allow_port_rule
+Permita que a origem 172.31.9.8 acesse a porta 7001/TCP.,create_allow_port_rule
+Adicione uma regra permitindo a porta 22/TCP pela interface vlan20.,create_allow_port_rule
+Libere o serviço personalizado no firewall usando 547/TCP.,create_allow_port_rule
+Configure uma permissão para tráfego destinado à porta 3128/TCP.,create_allow_port_rule
+Inclua uma regra de entrada liberando 80/TCP em 192.168.88.10.,create_allow_port_rule
+Habilite o acesso da origem 172.22.16.0/21 à porta 21/UDP.,create_allow_port_rule
+Negue conexões para o serviço SMB na porta 445/TCP.,create_block_port_rule
+Feche a porta 3128/TCP no destino 192.0.2.220.,create_block_port_rule
+Impeça a origem 172.31.9.8 de acessar a porta 7001/TCP.,create_block_port_rule
+Adicione um bloqueio para 22/TCP na interface vlan20.,create_block_port_rule
+Proíba o tráfego de personalizado usando a porta 547/TCP.,create_block_port_rule
+Inclua uma regra de descarte para pacotes destinados à porta 3128/TCP.,create_block_port_rule
+Bloqueie novas conexões em 192.168.88.10 pela porta 80/TCP.,create_block_port_rule
+Crie uma negação da origem 172.22.16.0/21 para 21/UDP.,create_block_port_rule
+Libere a comunicação de 9.9.9.9 com 192.168.88.10 na porta 445/TCP.,create_allow_traffic_rule
+Autorize a origem 192.0.2.190 a acessar toda a rede interna.,create_allow_traffic_rule
+Permita o fluxo de 172.31.9.8 para 192.168.88.10 pela interface eth0.,create_allow_traffic_rule
+Adicione uma regra de aceite entre 208.67.222.222 e 192.0.2.220.,create_allow_traffic_rule
+Habilite conexões originadas em 10.77.0.0/20 com destino a 192.168.88.10 usando 547/TCP.,create_allow_traffic_rule
+Deixe passar os pacotes enviados por 203.0.113.99 para 192.0.2.220.,create_allow_traffic_rule
+"Inclua uma permissão de tráfego de 192.168.77.31 até 192.168.88.10, porta 80/TCP.",create_allow_traffic_rule
+Conceda acesso da rede 172.22.16.0/21 ao destino 192.0.2.220.,create_allow_traffic_rule
+Negue todo o tráfego de 9.9.9.9 para 192.168.88.10.,create_block_traffic_rule
+Bloqueie qualquer pacote proveniente da origem 192.0.2.190.,create_block_traffic_rule
+Descarte conexões de 172.31.9.8 destinadas a 192.168.88.10 em 7001/TCP.,create_block_traffic_rule
+Impeça a comunicação entre 208.67.222.222 e 192.0.2.220 pela interface vlan20.,create_block_traffic_rule
+Adicione uma regra de negação do endereço 10.77.0.0/20 para 192.168.88.10.,create_block_traffic_rule
+"Proíba o acesso de 203.0.113.99 ao destino 192.0.2.220, porta de destino 3128/TCP.",create_block_traffic_rule
+Interrompa o fluxo originado em 192.168.77.31 com destino a 192.168.88.10.,create_block_traffic_rule
+Inclua um bloqueio para pacotes de 172.22.16.0/21 até 192.0.2.220 usando 21/UDP.,create_block_traffic_rule
+Altere a regra que libera a porta 445/TCP para permitir acesso somente da origem 9.9.9.9.,update_firewall_rule
+Modifique a regra da origem 192.0.2.190 para trocar o destino por 192.0.2.220.,update_firewall_rule
+Atualize a regra existente para usar a porta 7001/TCP.,update_firewall_rule
+Edite a política entre 208.67.222.222 e 192.0.2.220 e defina a porta 22/TCP.,update_firewall_rule
+Exclua a regra de firewall que libera o endereço 192.168.88.10.,delete_firewall_rule
+Remova a regra que permite acesso da origem 192.0.2.190 à rede interna.,delete_firewall_rule
+Apague a regra relacionada à porta 7001/TCP.,delete_firewall_rule
+Elimine a política de firewall entre 208.67.222.222 e 192.0.2.220.,delete_firewall_rule
+Bloqueie todos os pings recebidos pela placa de internet.,create_block_traffic_rule
+Negue ICMP echo-request da origem 9.9.9.9 para o servidor 10.60.0.12.,create_block_traffic_rule
+Crie um bloqueio para mensagens de eco ICMP que entrarem pela WAN.,create_block_traffic_rule
+Impeça a rede 198.51.100.128/25 de executar ping na rede corporativa.,create_block_traffic_rule
+Descarte pacotes ICMP tipo 8 destinados ao endereço 192.168.88.25.,create_block_traffic_rule
+Proíba requisições de ping IPv6 originadas em 2001:db8:99::/64.,create_block_traffic_rule
+Bloqueie o tráfego ICMP entre a DMZ e a rede de servidores.,create_block_traffic_rule
+Rejeite respostas de ping enviadas pelo host 203.0.113.155.,create_block_traffic_rule
+Adicione uma negação para ICMP echo-reply na interface eth1.,create_block_traffic_rule
+Não permita ping da internet para o equipamento 172.19.4.10.,create_block_traffic_rule
+Libere ping para o servidor de homologação 10.70.0.30.,create_allow_traffic_rule
+Permita ICMP echo-request da rede 192.168.77.0/24 para a DMZ.,create_allow_traffic_rule
+Autorize o monitor 172.31.10.5 a testar os hosts internos com ping.,create_allow_traffic_rule
+Aceite mensagens ICMP de destino inalcançável na interface WAN.,create_allow_traffic_rule
+Habilite respostas echo-reply para solicitações iniciadas pela LAN.,create_allow_traffic_rule
+Crie uma permissão de ping IPv6 para o destino 2001:db8:77::40.,create_allow_traffic_rule
+Ajuste a regra ICMP para aceitar ping apenas do endereço 208.67.220.220.,update_firewall_rule
+Altere o bloqueio de echo-request para atuar também na interface bond0.,update_firewall_rule
+Remova a regra que impede ping para o servidor 192.168.240.50.,delete_firewall_rule
+Exclua a permissão de ICMP concedida à rede 10.88.0.0/16.,delete_firewall_rule

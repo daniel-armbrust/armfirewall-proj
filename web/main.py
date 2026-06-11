@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from core.constants import RRD_IMG_DIR
 
 from web import auth
+from web.adam import api as adam_api
 from web.constants import STATIC_DIR
 from web.routes.dashboard import routes as dashboard_routes
 from web.routes.firewall import routes as firewall_routes
@@ -42,4 +43,5 @@ app.include_router(settings_routes.router)
 app.include_router(service_routes.router)
 app.include_router(tools_routes.router)
 app.include_router(workrequest_routes.router)
+app.include_router(adam_api.router)
 app.include_router(menu_routes.router)

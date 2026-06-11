@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">armfirewall/adam</p>
+        <h1>Adam (AI)</h1>
+    </div>
+    <div class="refresh-state" id="adam-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Training dataset summary">
+    <div class="metric">
+        <span class="metric-label">Active dataset</span>
+        <strong id="adam-dataset-file">None</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Records</span>
+        <strong id="adam-dataset-rows">0</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Intents</span>
+        <strong id="adam-dataset-intentions">0</strong>
+    </div>
+    <div class="metric">
+        <span class="metric-label">Updated</span>
+        <strong id="adam-dataset-updated">-</strong>
+    </div>
+</section>
+
+<div class="routing-service-actions">
+    <nav class="local-tabs service-query-tabs" aria-label="ADAM tools">
+        <button class="local-tab" type="button" id="adam-dataset-toggle"
+                aria-controls="adam-dataset-panel" aria-expanded="false">
+            DATASETS
+        </button>
+    </nav>
+</div>
+
+<section id="adam-dataset-panel" hidden>
+<section class="panel">
+    <div class="panel-head">
+        <h2>Training data</h2>
+        <span>format=csv</span>
+    </div>
+    <div class="edit-form">
+        <p class="modal-copy">
+            Import the CSV file used to train ADAM's intent classifier.
+            A new import will replace the active dataset.
+        </p>
+        <div class="terminal-empty">
+            <span class="prompt">$</span>
+            <span>required header: text,label | encoding: UTF-8 | limit: 5 MB</span>
+        </div>
+        <input id="adam-dataset-input" type="file" accept=".csv,text/csv" hidden>
+    </div>
+</section>
+<div class="form-actions routing-global-actions">
+    <button class="text-button primary routing-apply-button" type="button" id="adam-dataset-import">
+        Import training CSV
+    </button>
+</div>
+<div class="form-status" id="adam-dataset-status" role="status" aria-live="polite"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260720-summary-visible" defer></script>
+{% endblock %}

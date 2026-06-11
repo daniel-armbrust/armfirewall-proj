@@ -133,41 +133,47 @@ FAMILY_CHOICES = ("none", "ipv4", "ipv6", "ipv4/ipv6")
 
 def add_bgp_options(parser: argparse.ArgumentParser) -> None:
     """Add BGP instance options accepted by the web GUI to a parser."""
-    parser.add_argument("--enabled", choices=BOOLEAN_CHOICES)
-    parser.add_argument("--protocol-name")
-    parser.add_argument("--description")
-    parser.add_argument("--source-address")
-    parser.add_argument("--local-as")
-    parser.add_argument("--neighbor-ip")
-    parser.add_argument("--neighbor-as")
-    parser.add_argument("--iface-name")
-    parser.add_argument("--session-type", choices=sorted(routing_common.BIRD_BGP_SESSION_TYPES))
-    parser.add_argument("--direct", choices=BOOLEAN_CHOICES)
-    parser.add_argument("--multihop", choices=BOOLEAN_CHOICES)
-    parser.add_argument("--multihop-ttl")
-    parser.add_argument("--passive", choices=BOOLEAN_CHOICES)
-    parser.add_argument("--password")
-    parser.add_argument("--import-policy", choices=FAMILY_CHOICES)
-    parser.add_argument("--export-policy", choices=FAMILY_CHOICES)
+    parser.add_argument("--enabled", choices=BOOLEAN_CHOICES, help="Enable or disable the BGP session.")
+    parser.add_argument("--protocol-name", help="Optional display name for the BGP instance.")
+    parser.add_argument("--description", help="Optional free-form description.")
+    parser.add_argument("--source-address", help="Local source IP address used for the BGP session.")
+    parser.add_argument("--local-as", help="Local ASN.")
+    parser.add_argument("--neighbor-ip", help="Neighbor IP address.")
+    parser.add_argument("--neighbor-as", help="Neighbor ASN.")
+    parser.add_argument("--iface-name", help="Interface name used for direct sessions.")
+    parser.add_argument(
+        "--session-type",
+        choices=sorted(routing_common.BIRD_BGP_SESSION_TYPES),
+        help="Session type validation mode: auto, ebgp, or ibgp.",
+    )
+    parser.add_argument("--direct", choices=BOOLEAN_CHOICES, help="Render the session as direct when multihop is disabled.")
+    parser.add_argument("--multihop", choices=BOOLEAN_CHOICES, help="Enable multihop mode for non-direct peers.")
+    parser.add_argument("--multihop-ttl", help="Multihop TTL, used only when --multihop is enabled.")
+    parser.add_argument("--passive", choices=BOOLEAN_CHOICES, help="Keep the session passive until the peer initiates it.")
+    parser.add_argument("--password", help="Optional BGP MD5 password.")
+    parser.add_argument("--import-policy", choices=FAMILY_CHOICES, help="Address families accepted from the peer.")
+    parser.add_argument("--export-policy", choices=FAMILY_CHOICES, help="Address families announced to the peer.")
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the main BIRD/BGP command-line parser."""
+    class BirdHelpFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
+        pass
+
     examples = textwrap.dedent(
-        """\
-        Examples:
-          bird.sh bgp add \
-            --protocol-name edge-oracle \
-            --description "Oracle OCI edge" \
-            --enabled yes \
-            --local-as 65001 \
-            --neighbor-ip 192.0.2.1 \
-            --neighbor-as 31898 \
-            --iface-name enp0s8 \
-            --session-type ebgp \
-            --direct yes \
-            --multihop no \
-            --import-policy ipv4 \
+        """        Examples:
+          bird.sh bgp add
+            --protocol-name edge-oracle
+            --description "Oracle OCI edge"
+            --enabled yes
+            --source-address 169.254.10.2
+            --local-as 65001
+            --neighbor-ip 169.254.10.1
+            --neighbor-as 31898
+            --iface-name vti1
+            --session-type ebgp
+            --direct yes
+            --import-policy ipv4
             --export-policy none
 
           bird.sh bgp update --id 1 --multihop yes --multihop-ttl 32
@@ -179,14 +185,15 @@ def build_parser() -> argparse.ArgumentParser:
         prog="bird.sh",
         description="Create and manage ArmFirewall BIRD BGP instances.",
         epilog=examples,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=BirdHelpFormatter,
     )
     section_parsers = root.add_subparsers(dest="section", metavar="SECTION", required=True)
 
     bgp_parser = section_parsers.add_parser(
         "bgp",
         help="Manage BIRD BGP instances.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Create, inspect, update, enable, disable, and delete managed BGP sessions.",
+        formatter_class=BirdHelpFormatter,
     )
     subparsers = bgp_parser.add_subparsers(dest="command", metavar="COMMAND", required=True)
 
@@ -194,16 +201,18 @@ def build_parser() -> argparse.ArgumentParser:
         "add",
         aliases=("create",),
         help="Create a BGP instance and queue BIRD configuration apply.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="Create one managed BGP session and queue a BIRD config apply work request.",
+        formatter_class=BirdHelpFormatter,
     )
     add_bgp_options(add_parser)
 
     update_parser = subparsers.add_parser(
         "update",
         help="Update a BGP instance and queue BIRD configuration apply.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="Update one managed BGP session and queue a BIRD config apply work request.",
+        formatter_class=BirdHelpFormatter,
     )
-    update_parser.add_argument("--id", type=int, required=True)
+    update_parser.add_argument("--id", type=int, required=True, help="Existing BGP instance ID.")
     add_bgp_options(update_parser)
 
     for command, help_text in {
@@ -212,10 +221,10 @@ def build_parser() -> argparse.ArgumentParser:
         "disable": "Disable a BGP instance and queue BIRD configuration apply.",
         "show": "Print one BGP instance as JSON.",
     }.items():
-        command_parser = subparsers.add_parser(command, help=help_text)
-        command_parser.add_argument("--id", type=int, required=True)
+        command_parser = subparsers.add_parser(command, help=help_text, formatter_class=BirdHelpFormatter)
+        command_parser.add_argument("--id", type=int, required=True, help="Existing BGP instance ID.")
 
-    subparsers.add_parser("list", help="List BGP instances.")
+    subparsers.add_parser("list", help="List BGP instances.", formatter_class=BirdHelpFormatter)
     return root
 
 
