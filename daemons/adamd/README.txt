@@ -8,18 +8,19 @@ is not a persistent daemon and must not be registered in Supervisor.
 Execution Flow
 --------------
 
-1. The web application stores an immutable dataset under
-   ROOT_DIR/daemons/adamd/datasets/<UUID>/.
-2. The web application queues a work request containing the dataset_id.
+1. The web application stores each immutable CSV under
+   ROOT_DIR/daemons/adamd/datasets/<UUID>.csv.
+2. The web application creates one training run associated with every complete
+   active dataset category and queues its training_uid.
 3. workreqd dispatches the request to adamd.
-4. adamd validates the request and loads source.csv by UUID.
+4. adamd validates the request and loads every associated CSV.
 5. A TfidfVectorizer and LogisticRegression pipeline trains the classifier.
 6. adamd atomically saves the joblib pipeline under
    ROOT_DIR/daemons/adamd/models/ and exits.
 
 Required payload:
 
-    {"dataset_id": "5b6789b4-36a2-4e33-96fe-cc98cc9cf236"}
+    {"training_uid": "5b6789b4-36a2-4e33-96fe-cc98cc9cf236"}
 
 For manual diagnostics, use:
 
@@ -32,7 +33,7 @@ For manual diagnostics, use:
         --target-name model_training \
         --action-name train \
         --target-rule-id "" \
-        --payload-json '{"dataset_id":"5b6789b4-36a2-4e33-96fe-cc98cc9cf236"}'
+        --payload-json '{"training_uid":"5b6789b4-36a2-4e33-96fe-cc98cc9cf236"}'
 
 Artifacts
 ---------

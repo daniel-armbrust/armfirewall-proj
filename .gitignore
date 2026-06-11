@@ -53,6 +53,10 @@ logs/
 # Monitoring runtime data and generated graph images
 rrd/
 
+# ADAM uploaded datasets and generated model artifacts
+daemons/adamd/datasets/
+daemons/adamd/models/
+
 # Temporary, backup, and editor files
 tmp/
 temp/

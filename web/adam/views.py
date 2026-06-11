@@ -8,6 +8,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from core.constants import ADAM_DATASET_MAX_BYTES
 from web import auth
 from web.constants import TEMPLATE_DIR
 from web.context import menu_context
@@ -25,6 +26,7 @@ def page_context(request: Request, title: str) -> dict[str, Any]:
         "user_name": current_user.get("username", "admin"),
         "current_path": request.url.path,
         "menu": menu_context(),
+        "adam_dataset_max_mb": ADAM_DATASET_MAX_BYTES // (1024 * 1024),
     }
 
 

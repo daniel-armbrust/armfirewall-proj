@@ -1961,6 +1961,51 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     margin-left: 12px;
 }
 
+.adam-training-data-panel .edit-form {
+    padding: 10px 14px;
+}
+
+.adam-dataset-fields {
+    display: grid;
+    gap: 8px;
+    max-width: 840px;
+}
+
+.adam-dataset-category-field {
+    max-width: 586px;
+}
+
+.adam-dataset-requirements {
+    min-height: 0;
+    padding: 8px 0 0;
+}
+
+.adam-dataset-row {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) auto;
+    gap: 24px;
+    align-items: end;
+}
+
+.adam-dataset-row .text-button {
+    min-width: 230px;
+}
+
+.adam-training-actions {
+    justify-content: flex-start;
+}
+
+@media (max-width: 860px) {
+    .adam-dataset-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .adam-dataset-row .text-button {
+        width: 100%;
+    }
+}
+
 .firewall-form-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
 }

@@ -12,13 +12,13 @@ from web.settings import users as user_views
 router = APIRouter()
 
 
-@router.get("/settings/users", response_class=HTMLResponse)
+@router.get("/armfirewall/users", response_class=HTMLResponse)
 def settings_users(request: Request) -> HTMLResponse:
     """Render the Settings / Users page."""
     return user_views.render_users(request)
 
 
-@router.get("/settings/system-logs", response_class=HTMLResponse)
+@router.get("/armfirewall/system-logs", response_class=HTMLResponse)
 def settings_system_logs(request: Request) -> HTMLResponse:
     """Render the ArmFirewall / System Logs page."""
     return system_logs_views.render_system_logs(request)

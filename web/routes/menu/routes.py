@@ -10,8 +10,7 @@ from web.services.routingprotocols import views as routingprotocols_views
 router = APIRouter()
 
 PAGES = {
-    "/settings/users": "Users",
-    "/settings/system": "Settings",
+    "/armfirewall/settings": "Settings",
     "/network/interfaces": "Interfaces",
     "/network/neighbor-table": "Neighbor Table",
     "/network/policy-routing": "Policy Routing",

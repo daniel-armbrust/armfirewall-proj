@@ -12,7 +12,7 @@
 <section class="summary-grid compact" aria-label="Training dataset summary">
     <div class="metric">
         <span class="metric-label">Active dataset</span>
-        <strong id="adam-dataset-file">None</strong>
+        <strong id="adam-dataset-file">-</strong>
     </div>
     <div class="metric">
         <span class="metric-label">Records</span>
@@ -28,42 +28,100 @@
     </div>
 </section>
 
-<div class="routing-service-actions">
-    <nav class="local-tabs service-query-tabs" aria-label="ADAM tools">
-        <button class="local-tab" type="button" id="adam-dataset-toggle"
-                aria-controls="adam-dataset-panel" aria-expanded="false">
-            DATASETS
-        </button>
-    </nav>
-</div>
+<nav class="local-tabs" aria-label="ADAM tools">
+    <button class="local-tab active" type="button" id="adam-dataset-toggle"
+            aria-controls="adam-dataset-panel" aria-expanded="true">
+        DATASETS
+    </button>
+    <button class="local-tab" type="button" id="adam-text-classification-toggle">
+        TEXT CLASSIFICATION
+    </button>
+    <button class="local-tab firewall-work-tab" type="button" id="adam-work-requests-toggle">
+        WORK REQUESTS
+    </button>
+</nav>
 
-<section id="adam-dataset-panel" hidden>
-<section class="panel">
+<section id="adam-dataset-panel">
+<section class="panel adam-training-data-panel">
     <div class="panel-head">
         <h2>Training data</h2>
         <span>format=csv</span>
     </div>
     <div class="edit-form">
-        <p class="modal-copy">
-            Import the CSV file used to train ADAM's intent classifier.
-            A new import will replace the active dataset.
-        </p>
-        <div class="terminal-empty">
-            <span class="prompt">$</span>
-            <span>required header: text,label | encoding: UTF-8 | limit: 5 MB</span>
+        <div class="adam-dataset-fields">
+            <label class="field adam-dataset-category-field">
+                <span>Dataset category</span>
+                <select id="adam-dataset-category">
+                    <option value="adam_misc">Adam Misc</option>
+                    <option value="firewall" selected>Firewall</option>
+                    <option value="ner">NER</option>
+                </select>
+            </label>
+            <div class="adam-dataset-row">
+                <label class="field">
+                    <span>Training dataset</span>
+                    <input id="adam-training-dataset-name" type="text"
+                           value="" placeholder="No training dataset loaded" readonly>
+                </label>
+                <button class="text-button" type="button" id="adam-training-dataset-import">
+                    Load Training Dataset
+                </button>
+            </div>
+            <div class="adam-dataset-row">
+                <label class="field">
+                    <span>Testing dataset</span>
+                    <input id="adam-testing-dataset-name" type="text"
+                           value="" placeholder="No testing dataset loaded" readonly>
+                </label>
+                <button class="text-button" type="button" id="adam-testing-dataset-import">
+                    Load Test Dataset
+                </button>
+            </div>
         </div>
-        <input id="adam-dataset-input" type="file" accept=".csv,text/csv" hidden>
+        <div class="terminal-empty adam-dataset-requirements">
+            <span class="prompt">$</span>
+            <span>required header: text,label | encoding: UTF-8 | limit: {{ adam_dataset_max_mb }} MB</span>
+        </div>
+        <input id="adam-training-dataset-input" type="file" accept=".csv,text/csv" hidden>
+        <input id="adam-testing-dataset-input" type="file" accept=".csv,text/csv" hidden>
     </div>
 </section>
-<div class="form-actions routing-global-actions">
-    <button class="text-button primary routing-apply-button" type="button" id="adam-dataset-import">
-        Import training CSV
+<div class="form-actions routing-global-actions adam-training-actions">
+    <button class="text-button primary routing-apply-button" type="button"
+            id="adam-training-model" disabled>
+        Train Model
     </button>
 </div>
-<div class="form-status" id="adam-dataset-status" role="status" aria-live="polite"></div>
+</section>
+
+<section class="panel" id="adam-work-requests-panel" hidden>
+    <div class="panel-head">
+        <h2>Work Requests</h2>
+        <span id="adam-work-requests-count">requests=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                    <th>Updated</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="adam-work-requests-body">
+                <tr>
+                    <td colspan="5">
+                        <div class="terminal-empty"><span class="prompt">$</span><span>no ADAM work requests</span></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260720-summary-visible" defer></script>
+<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260721-dataset-categories" defer></script>
 {% endblock %}

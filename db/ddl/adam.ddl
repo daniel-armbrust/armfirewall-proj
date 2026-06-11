@@ -1,26 +1,47 @@
 PRAGMA foreign_keys = ON;
 
--- Stores each ADAM intent classifier training execution and its artifacts.
+-- Stores every CSV uploaded for ADAM independently from model training runs.
 -- File paths are always relative to ROOT_DIR.
--- work_request_uid is an external reference to work_requests.request_uid in
--- work-requests.db because SQLite cannot enforce foreign keys across databases.
+CREATE TABLE IF NOT EXISTS adam_datasets (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     dataset_uid TEXT NOT NULL UNIQUE,
+     category TEXT NOT NULL CHECK (
+          category IN ('adam_misc', 'firewall', 'ner')
+     ),
+     purpose TEXT NOT NULL CHECK (purpose IN ('training', 'testing')),
+     original_filename TEXT NOT NULL,
+     stored_filepath TEXT NOT NULL UNIQUE,
+     chart_filepath TEXT,
+     sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+     records INTEGER NOT NULL CHECK (records > 0),
+     labels TEXT NOT NULL DEFAULT '[]',
+     labels_count INTEGER NOT NULL DEFAULT 0 CHECK (labels_count >= 2),
+     status TEXT NOT NULL DEFAULT 'uploaded' CHECK (
+          status IN ('uploaded', 'archived')
+     ),
+     is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+     CHECK (is_active = 0 OR status = 'uploaded')
+);
+
+-- Only one current training and testing CSV is allowed per dataset category.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_adam_datasets_active_category_purpose
+ON adam_datasets (category, purpose)
+WHERE is_active = 1;
+
+CREATE INDEX IF NOT EXISTS idx_adam_datasets_category_purpose_created_at
+ON adam_datasets (category, purpose, created_at);
+
+-- Stores asynchronous training executions and their single model artifact.
+-- work_request_uid references another SQLite database and cannot use a FK.
 CREATE TABLE IF NOT EXISTS adam_training_runs (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      training_uid TEXT NOT NULL UNIQUE,
-     work_request_uid TEXT NOT NULL UNIQUE,
-
-     dataset_id TEXT NOT NULL,
-     dataset_csv_filepath TEXT NOT NULL,
-     dataset_csv_filename TEXT NOT NULL,
-     dataset_sha256 TEXT NOT NULL CHECK (length(dataset_sha256) = 64),
-
+     work_request_uid TEXT UNIQUE,
      status TEXT NOT NULL DEFAULT 'queue' CHECK (
-          status IN (
-               'queue',
-               'running',
-               'success',
-               'failed'
-          )
+          status IN ('queue', 'running', 'success', 'failed')
      ),
 
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -87,24 +108,43 @@ CREATE TABLE IF NOT EXISTS adam_training_runs (
      CHECK (is_active = 0 OR status = 'success')
 );
 
--- Speeds up the training history view and pending/running lookups.
+-- Associates every dataset used by one training execution.
+CREATE TABLE IF NOT EXISTS adam_training_run_datasets (
+     training_run_id INTEGER NOT NULL,
+     dataset_id INTEGER NOT NULL,
+     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+     PRIMARY KEY (training_run_id, dataset_id),
+     FOREIGN KEY (training_run_id)
+          REFERENCES adam_training_runs (id) ON DELETE CASCADE,
+     FOREIGN KEY (dataset_id)
+          REFERENCES adam_datasets (id) ON DELETE RESTRICT
+);
+
 CREATE INDEX IF NOT EXISTS idx_adam_training_runs_status_created_at
 ON adam_training_runs (status, created_at);
 
--- Speeds up lookup of every training execution for one dataset.
-CREATE INDEX IF NOT EXISTS idx_adam_training_runs_dataset_id
-ON adam_training_runs (dataset_id, created_at);
-
--- Speeds up correlation with the asynchronous work request dispatcher.
 CREATE INDEX IF NOT EXISTS idx_adam_training_runs_work_request_uid
 ON adam_training_runs (work_request_uid);
+
+CREATE INDEX IF NOT EXISTS idx_adam_training_run_datasets_dataset_id
+ON adam_training_run_datasets (dataset_id, training_run_id);
 
 -- Guarantees that only one successfully trained model is active for inference.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_adam_training_runs_active
 ON adam_training_runs (is_active)
 WHERE is_active = 1;
 
--- Maintains the row modification timestamp.
+CREATE TRIGGER IF NOT EXISTS adam_datasets_touch_updated_at
+AFTER UPDATE ON adam_datasets
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+     UPDATE adam_datasets
+        SET updated_at = CURRENT_TIMESTAMP
+      WHERE id = OLD.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS adam_training_runs_touch_updated_at
 AFTER UPDATE ON adam_training_runs
 FOR EACH ROW

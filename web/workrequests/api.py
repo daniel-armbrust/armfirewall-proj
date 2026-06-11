@@ -116,6 +116,7 @@ def queue_work_request(
     allowed_actions: Sequence[str] | None = None,
     allowed_categories: Sequence[str] | None = None,
     event_message: str | None = None,
+    request_uid: str | None = None,
 ) -> int:
     """Insert one work request and its queue event."""
     if allowed_actions is not None and action not in set(allowed_actions):
@@ -124,7 +125,7 @@ def queue_work_request(
     if allowed_categories is not None and category_name not in set(allowed_categories):
         raise ValueError("Unsupported work request category.")
 
-    request_uid = str(uuid.uuid4())
+    request_uid = request_uid or str(uuid.uuid4())
     rendered_payload = json.dumps(payload, sort_keys=True)
 
     with db.transaction(WORK_REQUEST_DB_PATH) as conn:

@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS work_request_categories (
                'NAT_RULES',
                'MANGLE_RULES',
                'POLICY_ROUTING',
-               'SERVICE_MANAGEMENT'
+               'SERVICE_MANAGEMENT',
+               'ADAM'
           )
      ),
      family TEXT CHECK (family IN ('IPV4', 'IPV6')),
@@ -48,7 +49,8 @@ INSERT OR IGNORE INTO work_request_categories (name, category, family, target_na
      ('SERVICE_MANAGEMENT.SERVICE_CONTROL', 'SERVICE_MANAGEMENT', NULL, 'service_control', 'ArmFirewall supervisord service control actions.'),
      ('SERVICE_MANAGEMENT.BIRD_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'bird_config', 'BIRD routing daemon configuration changes.'),
      ('SERVICE_MANAGEMENT.DNSMASQ_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'dnsmasq_config', 'Dnsmasq DNS and DHCP configuration changes.'),
-     ('SERVICE_MANAGEMENT.LIBRESWAN_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'libreswan_config', 'Libreswan IPsec tunnel configuration changes.');
+     ('SERVICE_MANAGEMENT.LIBRESWAN_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'libreswan_config', 'Libreswan IPsec tunnel configuration changes.'),
+     ('ADAM.MODEL_TRAINING', 'ADAM', NULL, 'model_training', 'ADAM intent classifier model training.');
 
 -- Stores daemon handlers used to execute each work request category.
 CREATE TABLE IF NOT EXISTS work_request_handlers (
@@ -58,7 +60,8 @@ CREATE TABLE IF NOT EXISTS work_request_handlers (
                'NAT_RULES',
                'MANGLE_RULES',
                'POLICY_ROUTING',
-               'SERVICE_MANAGEMENT'
+               'SERVICE_MANAGEMENT',
+               'ADAM'
           )
      ),
      script_name TEXT NOT NULL CHECK (
@@ -75,7 +78,8 @@ INSERT OR IGNORE INTO work_request_handlers (category, script_name, enabled, des
      ('NAT_RULES', 'fwrulesd.py', 1, 'Applies NAT table firewall rules.'),
      ('MANGLE_RULES', 'fwrulesd.py', 1, 'Applies mangle table firewall rules.'),
      ('POLICY_ROUTING', 'proutesd.py', 1, 'Applies policy routing changes.'),
-     ('SERVICE_MANAGEMENT', 'svcmgmtd.py', 1, 'Installs and removes optional ArmFirewall service packages and service configuration changes.');
+     ('SERVICE_MANAGEMENT', 'svcmgmtd.py', 1, 'Installs and removes optional ArmFirewall service packages and service configuration changes.'),
+     ('ADAM', 'adamd.py', 1, 'Trains and publishes ADAM intent classifier models.');
 
 -- Stores allowed operations accepted by the work queue.
 CREATE TABLE IF NOT EXISTS work_request_actions (
@@ -91,7 +95,8 @@ INSERT OR IGNORE INTO work_request_actions (name, description) VALUES
      ('uninstall', 'Uninstall an optional ArmFirewall service package.'),
      ('start', 'Start an ArmFirewall supervisord service.'),
      ('stop', 'Stop an ArmFirewall supervisord service.'),
-     ('restart', 'Restart an ArmFirewall supervisord service.');
+     ('restart', 'Restart an ArmFirewall supervisord service.'),
+     ('train', 'Train an ADAM intent classifier model.');
 
 -- Stores asynchronous operating system changes requested by the GUI.
 CREATE TABLE IF NOT EXISTS work_requests (

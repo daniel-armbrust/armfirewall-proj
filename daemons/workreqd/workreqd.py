@@ -8,7 +8,18 @@ import time
 
 from core import db
 from core import log as logger
-from core.constants import ROOT_DIR
+from core.constants import (
+    ADAM_SYSTEMD_RUN_PATH,
+    ADAM_TRAINING_CPU_QUOTA_PERCENT,
+    ADAM_TRAINING_MAX_THREADS,
+    ADAM_TRAINING_MEMORY_HIGH_BYTES,
+    ADAM_TRAINING_MEMORY_MAX_BYTES,
+    ADAM_TRAINING_NICE,
+    ADAM_TRAINING_OOM_POLICY,
+    ADAM_TRAINING_RUNTIME_MAX_SECONDS,
+    ADAM_TRAINING_TASKS_MAX,
+    ROOT_DIR,
+)
 from core.process import run_command
 
 from .constants import (
@@ -115,7 +126,30 @@ def command_for_request(request: QueuedWorkRequest) -> list[str]:
         elif script_name in {"servicemgmt.py", "servicemgmtd.py", "svcmgmtd.py"}:
             command = [sys.executable, "-m", "daemons.svcmgmtd.svcmgmtd"]
         elif script_name == "adamd.py":
-            command = [sys.executable, "-m", "daemons.adamd.adamd"]
+            command = [
+                str(ADAM_SYSTEMD_RUN_PATH),
+                "--quiet",
+                "--wait",
+                "--collect",
+                "--pipe",
+                "--no-ask-password",
+                f"--unit=armfirewall-adamd-{request.id}",
+                f"--working-directory={ROOT_DIR}",
+                f"--property=CPUQuota={ADAM_TRAINING_CPU_QUOTA_PERCENT}%",
+                f"--property=MemoryHigh={ADAM_TRAINING_MEMORY_HIGH_BYTES}",
+                f"--property=MemoryMax={ADAM_TRAINING_MEMORY_MAX_BYTES}",
+                f"--property=TasksMax={ADAM_TRAINING_TASKS_MAX}",
+                f"--property=Nice={ADAM_TRAINING_NICE}",
+                f"--property=RuntimeMaxSec={ADAM_TRAINING_RUNTIME_MAX_SECONDS}s",
+                f"--property=OOMPolicy={ADAM_TRAINING_OOM_POLICY}",
+                f"--setenv=OMP_NUM_THREADS={ADAM_TRAINING_MAX_THREADS}",
+                f"--setenv=OPENBLAS_NUM_THREADS={ADAM_TRAINING_MAX_THREADS}",
+                f"--setenv=MKL_NUM_THREADS={ADAM_TRAINING_MAX_THREADS}",
+                f"--setenv=NUMEXPR_NUM_THREADS={ADAM_TRAINING_MAX_THREADS}",
+                sys.executable,
+                "-m",
+                "daemons.adamd.adamd",
+            ]
         else:
             script_path = ROOT_DIR / "daemons" / script_name
 
