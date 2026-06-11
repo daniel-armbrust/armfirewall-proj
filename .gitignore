@@ -62,6 +62,8 @@ tmp/
 temp/
 *.tmp
 *.bak
+*.bak.*
+*.bak-*
 *.backup
 *.swp
 *.swo
