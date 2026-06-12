@@ -32,7 +32,7 @@
     const preRollMs = Number.parseInt(copilot.dataset.preRollMs, 10) || 1600;
     const commandMinCaptureMs = Number.parseInt(copilot.dataset.commandMinCaptureMs, 10) || 1200;
     const commandSampleRate = Number.parseInt(copilot.dataset.commandSampleRate, 10) || 16000;
-    const commandSilenceThreshold = Number.parseFloat(copilot.dataset.commandSilenceThreshold) || 0.012;
+    const commandSilenceThreshold = Number.parseFloat(copilot.dataset.commandSilenceThreshold) || 0.004;
     const commandTimeoutMs = Number.parseInt(copilot.dataset.commandTimeoutMs, 10) || 8000;
     const commandTrailingSilenceMs = Number.parseInt(
         copilot.dataset.commandTrailingSilenceMs,
@@ -41,6 +41,7 @@
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const debugLog = (...args) => console.log("[Adam]", ...args);
     let trackingTimer = null;
     let wakeAlertTimer = null;
     let modelPromise = null;
@@ -57,9 +58,11 @@
     let recognizerChannel = null;
     let commandTimeout = null;
     let commandSilenceTimer = null;
+    let commandFinalizeTimer = null;
     let commandStartedAt = 0;
     let commandSpeechDetected = false;
     let commandResultSegments = [];
+    let commandPartialTranscript = "";
     let recognizerRemovalRequested = false;
     let commandConfidence = 0;
     let listeningEnabled = false;
@@ -136,7 +139,7 @@
         copilot.setAttribute("aria-disabled", "false");
     }
 
-    function setWakeAlertState() {
+    function setWakeAlertState({ autoTransition = true } = {}) {
         window.clearTimeout(wakeAlertTimer);
         copilot.dataset.state = "wake-alert";
         copilot.setAttribute(
@@ -146,12 +149,14 @@
         if (status) {
             status.textContent = "!";
         }
-        wakeAlertTimer = window.setTimeout(() => {
-            wakeAlertTimer = null;
-            if (copilot.dataset.state === "wake-alert") {
-                setSilentState("command", "listening for command");
-            }
-        }, 1200);
+        if (autoTransition) {
+            wakeAlertTimer = window.setTimeout(() => {
+                wakeAlertTimer = null;
+                if (copilot.dataset.state === "wake-alert") {
+                    setSilentState("command", "listening for command");
+                }
+            }, 1200);
+        }
     }
 
     function normalizeText(text) {
@@ -238,15 +243,40 @@
         if (!commandRecognitionActive || recognizerRemovalRequested) {
             return;
         }
-        if (!commandSpeechDetected || !recognizer) {
+        if (!recognizer) {
+            debugLog("command capture ended without an active recognizer");
             stopCommandRecognition();
             return;
         }
+        debugLog("command capture finishing", {
+            speechDetected: commandSpeechDetected,
+            finalSegments: commandResultSegments.length,
+            partial: commandPartialTranscript,
+        });
         recognizerRemovalRequested = true;
         if (audioProcessor) {
             audioProcessor.port.postMessage({ action: "stopRecognizer" });
         }
-        recognizer.remove();
+        // Give Vosk time to emit the final result before freeing the recognizer.
+        // This is important when Firefox delivers the last audio chunk slightly
+        // later than Chromium-based browsers.
+        commandFinalizeTimer = window.setTimeout(() => {
+            commandFinalizeTimer = null;
+            if (!commandRecognitionActive) {
+                return;
+            }
+            if (recognizer) {
+                recognizer.remove();
+            }
+            const transcript = (commandResultSegments.join(" ").trim() || commandPartialTranscript).trim();
+            const command = commandAfterWakeWord(transcript);
+            debugLog("command capture finalized", { transcript, command });
+            if (command) {
+                acceptCommand(transcript, command);
+            } else {
+                stopCommandRecognition();
+            }
+        }, 450);
     }
 
     function scheduleEnrollmentSample(sampleNumber, delay = 700) {
@@ -277,8 +307,10 @@
     async function stopCommandRecognition({ resumeDetector = true } = {}) {
         window.clearTimeout(commandTimeout);
         window.clearTimeout(commandSilenceTimer);
+        window.clearTimeout(commandFinalizeTimer);
         commandTimeout = null;
         commandSilenceTimer = null;
+        commandFinalizeTimer = null;
         commandRecognitionActive = false;
         if (audioProcessor) {
             audioProcessor.port.postMessage({ action: "stopRecognizer" });
@@ -291,6 +323,7 @@
         commandStartedAt = 0;
         commandSpeechDetected = false;
         commandResultSegments = [];
+        commandPartialTranscript = "";
         if (recognizerChannel) {
             recognizerChannel.port1.close();
             recognizerChannel = null;
@@ -318,16 +351,20 @@
     async function sendTranscription(event) {
         const text = (event.detail.command || event.detail.transcript || "").trim();
         if (!text) {
+            debugLog("transcription skipped because the command is empty", event.detail);
             return;
         }
+        debugLog("sending transcription", { text, language: speechLanguage });
         try {
-            await window.fetch("/api/adam/transcription", {
+            const response = await window.fetch("/api/adam/transcription", {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ text, language: speechLanguage }),
             });
+            debugLog("transcription response", response.status);
         } catch {
+            debugLog("transcription request failed");
             // Transcription delivery is intentionally silent in this initial version.
         }
     }
@@ -341,11 +378,12 @@
         const segment = (message.result.text || "").trim();
         if (segment && commandResultSegments.at(-1) !== segment) {
             commandResultSegments.push(segment);
+            debugLog("Vosk final result", segment);
         }
         if (!recognizerRemovalRequested) {
             return;
         }
-        const transcript = commandResultSegments.join(" ").trim();
+        const transcript = (commandResultSegments.join(" ").trim() || commandPartialTranscript).trim();
         if (!transcript) {
             stopCommandRecognition();
             return;
@@ -353,6 +391,18 @@
         const command = commandAfterWakeWord(transcript);
         if (command) {
             acceptCommand(transcript, command);
+        }
+    }
+
+    function processCommandPartialResult(message) {
+        if (!commandRecognitionActive
+            || !recognizer
+            || message.recognizerId !== recognizer.id) {
+            return;
+        }
+        commandPartialTranscript = (message.result.partial || "").trim();
+        if (commandPartialTranscript) {
+            debugLog("Vosk partial result", commandPartialTranscript);
         }
     }
 
@@ -365,7 +415,13 @@
         commandStartedAt = performance.now();
         commandSpeechDetected = false;
         commandResultSegments = [];
+        commandPartialTranscript = "";
         recognizerRemovalRequested = false;
+        debugLog("starting command recognizer", {
+            wakeScore: message.score,
+            sampleRate: commandSampleRate,
+            preRollSamples: message.preRoll ? message.preRoll.length : 0,
+        });
         setWakeAlertState();
         copilot.classList.add("is-pulsing");
         window.setTimeout(() => copilot.classList.remove("is-pulsing"), 700);
@@ -377,10 +433,16 @@
             recognizerChannel = new MessageChannel();
             model.registerPort(recognizerChannel.port1);
             recognizer = new model.KaldiRecognizer(commandSampleRate);
+            debugLog("command recognizer ready", { recognizerId: recognizer.id });
             const activeRecognizer = recognizer;
             recognizer.on("result", (result) => {
                 if (recognizer === activeRecognizer) {
                     processCommandResult(result);
+                }
+            });
+            recognizer.on("partialresult", (result) => {
+                if (recognizer === activeRecognizer) {
+                    processCommandPartialResult(result);
                 }
             });
             audioProcessor.port.postMessage({
@@ -398,6 +460,7 @@
                 finishCommandCapture();
             }, commandTimeoutMs);
         } catch {
+            debugLog("command recognizer failed to start");
             stopCommandRecognition();
         }
     }
@@ -428,11 +491,22 @@
             detectorEnrolled = true;
             setListeningState();
         } else if (message.type === "wakeWord") {
+            debugLog("wake word detected", {
+                score: message.score,
+                threshold: minConfidence,
+            });
+            // Show the visual confirmation for every detector event, even when
+            // the confidence gate rejects it as a command trigger.
+            setWakeAlertState({ autoTransition: message.score >= minConfidence });
             if (message.score >= minConfidence) {
                 startCommandRecognition(message);
             } else if (detectorWorker) {
-                detectorWorker.postMessage({ type: "resumeDetection" });
-                setListeningState();
+                window.setTimeout(() => {
+                    if (detectorWorker && !commandRecognitionActive) {
+                        detectorWorker.postMessage({ type: "resumeDetection" });
+                        setListeningState();
+                    }
+                }, 1200);
             }
         }
     }

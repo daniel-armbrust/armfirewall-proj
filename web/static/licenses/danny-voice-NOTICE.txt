@@ -1,0 +1,21 @@
+Third-party voice model attribution
+===================================
+
+Asset: en_US-danny-low.onnx and en_US-danny-low.onnx.json
+Voice: Danny, U.S. English, low quality, 16 kHz, one speaker
+
+The voice model is distributed under the Creative Commons
+Attribution-ShareAlike 4.0 International license (CC BY-SA 4.0).
+
+Source project and dataset:
+https://github.com/MycroftAI/mimic3-voices
+
+Model card:
+https://huggingface.co/rhasspy/piper-voices/blob/main/en/en_US/danny/low/MODEL_CARD
+
+License text:
+https://creativecommons.org/licenses/by-sa/4.0/
+
+The model files are included as a separate, unmodified third-party asset.
+Any adapted version of this voice model must retain CC BY-SA 4.0 and must
+indicate the changes made.

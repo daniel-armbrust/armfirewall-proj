@@ -1,4 +1,5 @@
 const TARGET_SAMPLE_RATE = 16000;
+const DETECTION_WINDOW_MS = 1600;
 const DATABASE_NAME = "armfirewall-adam-wake-word";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "profiles";
@@ -219,7 +220,14 @@ function detectWakeWord() {
     if (now - lastDetectionAt < 3000 || rootMeanSquare(audioBuffer) < 0.01) {
         return;
     }
-    const features = extractFeatures(audioBuffer);
+    // Keep a long rolling buffer for the command recognizer, but compare only
+    // the short window that contains the enrolled wake word. Otherwise a
+    // command spoken after "Adam" delays or degrades wake-word matching.
+    const detectionWindowSamples = Math.floor(
+        (DETECTION_WINDOW_MS / 1000) * TARGET_SAMPLE_RATE,
+    );
+    const detectionAudio = audioBuffer.slice(-detectionWindowSamples);
+    const features = extractFeatures(detectionAudio);
     if (!features) {
         return;
     }

@@ -4,7 +4,8 @@ class AdamAudioProcessor extends AudioWorkletProcessor {
         this.recognizerId = null;
         this.recognizerPort = null;
         this.recognizerSampleRate = 16000;
-        this.resampleOffset = 0;
+        this.detectorResampleOffset = 0;
+        this.recognizerResampleOffset = 0;
         this.detectorBuffer = new Float32Array(2048);
         this.detectorOffset = 0;
         this.port.onmessage = (event) => {
@@ -12,7 +13,7 @@ class AdamAudioProcessor extends AudioWorkletProcessor {
                 this.recognizerId = event.data.recognizerId;
                 this.recognizerPort = event.ports[0];
                 this.recognizerSampleRate = event.data.sampleRate || 16000;
-                this.resampleOffset = 0;
+                this.recognizerResampleOffset = 0;
             } else if (event.data.action === "stopRecognizer") {
                 if (this.recognizerPort) {
                     this.recognizerPort.close();
@@ -31,20 +32,21 @@ class AdamAudioProcessor extends AudioWorkletProcessor {
         };
     }
 
-    resampleForRecognizer(samples) {
-        if (sampleRate === this.recognizerSampleRate) {
+    resampleToTarget(samples, offsetName) {
+        const inputSampleRate = globalThis.sampleRate || 48000;
+        if (inputSampleRate === 16000) {
             return samples;
         }
-        const ratio = sampleRate / this.recognizerSampleRate;
+        const ratio = inputSampleRate / 16000;
         const output = new Float32Array(Math.ceil(samples.length / ratio) + 1);
-        let sourcePosition = this.resampleOffset;
+        let sourcePosition = this[offsetName];
         let outputOffset = 0;
         while (sourcePosition < samples.length) {
             output[outputOffset] = samples[Math.floor(sourcePosition)];
             outputOffset += 1;
             sourcePosition += ratio;
         }
-        this.resampleOffset = sourcePosition - samples.length;
+        this[offsetName] = sourcePosition - samples.length;
         return output.subarray(0, outputOffset);
     }
 
@@ -58,7 +60,7 @@ class AdamAudioProcessor extends AudioWorkletProcessor {
             sourceOffset += length;
             if (this.detectorOffset === this.detectorBuffer.length) {
                 const chunk = this.detectorBuffer;
-                this.port.postMessage({ action: "audio", data: chunk, sampleRate }, [chunk.buffer]);
+                this.port.postMessage({ action: "audio", data: chunk, sampleRate: 16000 }, [chunk.buffer]);
                 this.detectorBuffer = new Float32Array(2048);
                 this.detectorOffset = 0;
             }
@@ -70,15 +72,15 @@ class AdamAudioProcessor extends AudioWorkletProcessor {
         if (!samples) {
             return true;
         }
-        this.sendToDetector(samples);
+        this.sendToDetector(this.resampleToTarget(samples, "detectorResampleOffset"));
         if (this.recognizerPort) {
-            const resampled = this.resampleForRecognizer(samples);
+            const resampled = this.resampleToTarget(samples, "recognizerResampleOffset");
             const audio = resampled.map((sample) => sample * 0x8000);
             this.recognizerPort.postMessage({
                 action: "audioChunk",
                 data: audio,
                 recognizerId: this.recognizerId,
-                sampleRate: this.recognizerSampleRate,
+                sampleRate: 16000,
             }, [audio.buffer]);
         }
         return true;
