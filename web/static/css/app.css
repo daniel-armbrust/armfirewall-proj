@@ -417,6 +417,7 @@ a {
     --copilot-eye-x: 0px;
     --copilot-eye-y: 0px;
     --copilot-glow: 0.55;
+    --copilot-state-color: var(--muted);
     position: fixed;
     z-index: 60;
     right: 28px;
@@ -432,6 +433,39 @@ a {
     background: transparent;
     font: inherit;
     cursor: pointer;
+}
+
+.fw-copilot[aria-disabled="true"] {
+    cursor: default;
+}
+
+.fw-copilot[data-state="listening"] {
+    --copilot-state-color: #34f28a;
+}
+
+.fw-copilot[data-state="starting"],
+.fw-copilot[data-state="awake"],
+.fw-copilot[data-state="command"] {
+    --copilot-state-color: #31d5ff;
+}
+
+.fw-copilot[data-state="retry"] {
+    --copilot-state-color: #ffb347;
+}
+
+.fw-copilot[data-state="error"] {
+    --copilot-state-color: #ff5f68;
+}
+
+.fw-copilot[data-state="awake"] .fw-copilot-head,
+.fw-copilot.is-pulsing .fw-copilot-head {
+    animation: fw-copilot-awake 520ms ease-in-out infinite alternate;
+}
+
+.fw-copilot[data-state="retry"] .fw-copilot-eye,
+.fw-copilot[data-state="error"] .fw-copilot-eye {
+    background: var(--copilot-state-color);
+    box-shadow: 0 0 12px var(--copilot-state-color);
 }
 
 .fw-copilot-head {
@@ -463,6 +497,40 @@ a {
     transform: translate(-50%, 4px);
     transition: opacity 120ms ease, transform 120ms ease;
     box-shadow: 0 0 14px var(--shadow);
+}
+
+.fw-copilot-status {
+    position: absolute;
+    right: calc(100% + 10px);
+    bottom: 50%;
+    width: max-content;
+    max-width: min(310px, calc(100vw - 140px));
+    padding: 7px 10px;
+    border: 1px solid var(--copilot-state-color);
+    border-radius: 3px;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--page) 94%, transparent);
+    box-shadow: 0 0 14px var(--shadow);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.35;
+    text-align: left;
+    pointer-events: none;
+    transform: translateY(50%);
+}
+
+.fw-copilot-status:empty {
+    display: none;
+}
+
+.fw-copilot-status::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    width: 10px;
+    height: 1px;
+    background: var(--copilot-state-color);
 }
 
 .fw-copilot:hover .fw-copilot-name,
@@ -641,6 +709,15 @@ a {
     100% {
         transform: scale(1.32);
         opacity: 0;
+    }
+}
+
+@keyframes fw-copilot-awake {
+    from {
+        transform: translateY(0) scale(1);
+    }
+    to {
+        transform: translateY(-3px) scale(1.04);
     }
 }
 
@@ -2056,6 +2133,45 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     justify-content: flex-start;
 }
 
+.adam-playground-form {
+    display: grid;
+    gap: 12px;
+    max-width: 900px;
+}
+
+.adam-playground-mode {
+    max-width: 420px;
+}
+
+.adam-playground-form textarea {
+    min-height: 112px;
+    resize: vertical;
+}
+
+.adam-playground-actions {
+    justify-content: flex-start;
+    margin-top: 0;
+}
+
+.adam-playground-result {
+    max-width: 900px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.adam-playground-result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.adam-playground-result .terminal-empty {
+    min-height: 0;
+    margin-top: 10px;
+    padding: 12px;
+}
+
 #adam-delete-modal .modal-dialog {
     width: min(760px, 100%);
 }
@@ -2097,6 +2213,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
     .adam-model-detail-wide {
         grid-column: auto;
+    }
+
+    .adam-playground-result-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -2709,7 +2829,8 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 @media (prefers-reduced-motion: reduce) {
     .fw-copilot-eye,
-    .fw-copilot.is-pulsing .fw-copilot-head {
+    .fw-copilot.is-pulsing .fw-copilot-head,
+    .fw-copilot[data-state="awake"] .fw-copilot-head {
         animation: none;
     }
 

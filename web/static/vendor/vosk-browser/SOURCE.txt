@@ -1,0 +1,5 @@
+Package: vosk-browser 0.0.4
+Source: https://github.com/ccoreilly/vosk-browser
+Distribution: https://registry.npmjs.org/vosk-browser/-/vosk-browser-0.0.4.tgz
+License: Apache-2.0
+SHA-256: ceb039ca76cdc54ab967a1501d46a79e5d250e2490cb83e2ae9f5e6f692518e8

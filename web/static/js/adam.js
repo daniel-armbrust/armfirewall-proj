@@ -4,6 +4,8 @@
     const datasetPanel = document.getElementById("adam-dataset-panel");
     const textClassificationToggle = document.getElementById("adam-text-classification-toggle");
     const textClassificationPanel = document.getElementById("adam-text-classification-panel");
+    const playgroundToggle = document.getElementById("adam-playground-toggle");
+    const playgroundPanel = document.getElementById("adam-playground-panel");
     const classificationModelState = document.getElementById("adam-classification-model-state");
     const classificationEmpty = document.getElementById("adam-classification-empty");
     const classificationDetails = document.getElementById("adam-classification-details");
@@ -55,7 +57,8 @@
     let deletionQueueing = false;
 
     if (!datasetToggle || !datasetPanel || !textClassificationToggle
-            || !textClassificationPanel || !workRequestsToggle || !workRequestsPanel
+            || !textClassificationPanel || !playgroundToggle || !playgroundPanel
+            || !workRequestsToggle || !workRequestsPanel
             || !datasetCategory || !trainingInput || !testingInput || !trainingImport || !testingImport
             || !trainingName || !testingName || !trainingModel || !classificationDeleteActions
             || !classificationDelete
@@ -66,18 +69,25 @@
     function setActiveView(view) {
         const datasetSelected = view === "dataset";
         const textClassificationSelected = view === "text-classification";
+        const playgroundSelected = view === "playground";
         const workRequestsSelected = view === "work-requests";
         datasetPanel.hidden = !datasetSelected;
         textClassificationPanel.hidden = !textClassificationSelected;
         classificationDeleteActions.hidden = !textClassificationSelected || !activeTraining;
+        playgroundPanel.hidden = !playgroundSelected;
         workRequestsPanel.hidden = !workRequestsSelected;
         datasetToggle.classList.toggle("active", datasetSelected);
         textClassificationToggle.classList.toggle("active", textClassificationSelected);
+        playgroundToggle.classList.toggle("active", playgroundSelected);
         workRequestsToggle.classList.toggle("active", workRequestsSelected);
         datasetToggle.setAttribute("aria-expanded", datasetSelected ? "true" : "false");
         textClassificationToggle.setAttribute(
             "aria-expanded",
             textClassificationSelected ? "true" : "false",
+        );
+        playgroundToggle.setAttribute(
+            "aria-expanded",
+            playgroundSelected ? "true" : "false",
         );
 
         if (textClassificationSelected) {
@@ -564,6 +574,7 @@
         "click",
         () => setActiveView("text-classification"),
     );
+    playgroundToggle.addEventListener("click", () => setActiveView("playground"));
     workRequestsToggle.addEventListener("click", () => setActiveView("work-requests"));
     datasetCategory.addEventListener("change", () => {
         renderDataset(null);

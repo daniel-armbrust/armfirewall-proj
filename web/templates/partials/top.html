@@ -22,7 +22,7 @@
         </label>
         <div class="topbar-user">
             <span>{{ request.state.current_user.username if request.state.current_user else user_name }}</span>
-            <a href="/logout" aria-label="Logout">logout</a>
+            <a href="/logout" aria-label="Logout" data-armfirewall-logout>logout</a>
         </div>
     </div>
 </header>

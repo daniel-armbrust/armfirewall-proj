@@ -1,8 +1,18 @@
-<button class="fw-copilot" type="button" aria-label="Adam (IA)" data-fw-copilot>
+<button class="fw-copilot" type="button"
+        aria-label="Adam"
+        aria-pressed="false"
+        data-fw-copilot
+        data-state="muted"
+        data-listening-storage-key="{{ menu.adam_listening_storage_key }}"
+        data-wake-word="{{ menu.adam_wake_word }}"
+        data-min-confidence="{{ menu.adam_wake_word_min_confidence }}"
+        data-model-url="{{ menu.adam_wake_word_model_url }}"
+        data-worklet-url="{{ menu.adam_wake_word_worklet_url }}">
     <span class="fw-copilot-head" aria-hidden="true">
         <span class="fw-copilot-eye left"></span>
         <span class="fw-copilot-eye right"></span>
         <img class="fw-copilot-portrait" src="{{ url_for('static', path='/img/adam-copilot-cutout.png') }}?v=20260608-adam-sent-style" alt="">
     </span>
     <span class="fw-copilot-name" aria-hidden="true">Adam</span>
+    <span class="fw-copilot-status" role="status" aria-live="polite"></span>
 </button>
