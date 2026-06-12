@@ -445,6 +445,7 @@ a {
 
 .fw-copilot[data-state="starting"],
 .fw-copilot[data-state="awake"],
+.fw-copilot[data-state="wake-alert"],
 .fw-copilot[data-state="command"] {
     --copilot-state-color: #31d5ff;
 }
@@ -458,6 +459,7 @@ a {
 }
 
 .fw-copilot[data-state="awake"] .fw-copilot-head,
+.fw-copilot[data-state="wake-alert"] .fw-copilot-head,
 .fw-copilot.is-pulsing .fw-copilot-head {
     animation: fw-copilot-awake 520ms ease-in-out infinite alternate;
 }
@@ -521,6 +523,20 @@ a {
 
 .fw-copilot-status:empty {
     display: none;
+}
+
+.fw-copilot[data-state="wake-alert"] .fw-copilot-status {
+    min-width: 28px;
+    min-height: 28px;
+    display: grid;
+    place-items: center;
+    padding: 3px;
+    color: var(--copilot-state-color);
+    font-size: 18px;
+    line-height: 1;
+    text-align: center;
+    transform-origin: right center;
+    animation: fw-copilot-wake-alert 560ms ease-in-out infinite alternate;
 }
 
 .fw-copilot-status::after {
@@ -718,6 +734,19 @@ a {
     }
     to {
         transform: translateY(-3px) scale(1.04);
+    }
+}
+
+@keyframes fw-copilot-wake-alert {
+    from {
+        opacity: 0.62;
+        transform: translateY(50%) scale(0.9);
+        box-shadow: 0 0 8px var(--shadow);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(50%) scale(1.08);
+        box-shadow: 0 0 18px var(--copilot-state-color);
     }
 }
 
@@ -2830,7 +2859,9 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 @media (prefers-reduced-motion: reduce) {
     .fw-copilot-eye,
     .fw-copilot.is-pulsing .fw-copilot-head,
-    .fw-copilot[data-state="awake"] .fw-copilot-head {
+    .fw-copilot[data-state="awake"] .fw-copilot-head,
+    .fw-copilot[data-state="wake-alert"] .fw-copilot-head,
+    .fw-copilot[data-state="wake-alert"] .fw-copilot-status {
         animation: none;
     }
 

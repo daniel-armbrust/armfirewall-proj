@@ -1,4 +1,4 @@
-"""HTTP routes for loading ADAM training datasets."""
+"""HTTP routes for ADAM."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from core.constants import (
     ADAM_WORK_REQUEST_CATEGORY,
     ADAM_WORK_REQUEST_DELETE_ACTION,
 )
-from web.adam import datasets, text_classification, views
+from web.adam import datasets, models, text_classification, views
 from web.workrequests import api as workrequests_api
 
 
@@ -25,6 +25,14 @@ router = APIRouter()
 def adam_page(request: Request) -> HTMLResponse:
     """Render the ADAM page."""
     return views.render_adam(request)
+
+
+@router.post("/api/adam/transcription")
+def api_receive_transcription(
+    payload: models.AdamTranscriptionPayload,
+) -> dict[str, str]:
+    """Receive an ADAM voice transcription without processing it."""
+    return {"status": "received"}
 
 
 @router.get("/api/adam/dataset")

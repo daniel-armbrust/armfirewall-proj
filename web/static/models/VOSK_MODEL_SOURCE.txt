@@ -1,5 +1,11 @@
-Model: vosk-model-small-pt-0.3
+Portuguese model: vosk-model-small-pt-0.3
 Source: https://alphacephei.com/vosk/models
 Browser packaging: https://github.com/ccoreilly/vosk-browser/tree/gh-pages/models
 License: Apache-2.0
 SHA-256: 499771532fc4c5fc9d7657003a4193275c7f3561a6ccda9226f1d427c010887c
+
+English model: vosk-model-small-en-us-0.15
+Source: https://alphacephei.com/vosk/models
+Browser package: https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz
+License: Apache-2.0
+SHA-256: f0b24bb92a48ca575b6a96500d6b543f0f079c573dfe85bbe16001fc0404e1d8

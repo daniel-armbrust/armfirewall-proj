@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ title }} - ArmFirewall</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='/img/favicon.svg') }}?v=20260511-af-transparent">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}?v=20260722-adam-non-toggle">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}?v=20260722-adam-wake-alert-pulse">
 </head>
 <body>
     <div class="app-shell">
@@ -20,8 +20,8 @@
     </div>
     {% include "partials/fw_copilot.html" %}
     <script src="{{ url_for('static', path='/js/globals.js') }}?v=20260512-http-error-detail" defer></script>
-    <script src="{{ menu.adam_wake_word_engine_url }}?v=0.0.4" defer></script>
-    <script src="{{ url_for('static', path='/js/fw_copilot.js') }}?v=20260722-adam-console-diagnostics" defer></script>
+    <script src="{{ menu.adam_wake_word_engine_url }}?v=0.0.5-armfirewall-silent-3" defer></script>
+    <script src="{{ url_for('static', path='/js/fw_copilot.js') }}?v=20260722-adam-confidence-gate" defer></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

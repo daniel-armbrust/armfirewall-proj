@@ -80,8 +80,9 @@ dist/
 *.tgz
 *.zip
 
-# Bundled offline Portuguese voice model required by Adam
+# Bundled offline voice models required by Adam
 !web/static/models/vosk-model-small-pt-0.3.tar.gz
+!web/static/models/vosk-model-small-en-us-0.15.tar.gz
 
 # Local IDE/editor metadata
 .idea/
