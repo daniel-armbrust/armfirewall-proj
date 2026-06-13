@@ -43,12 +43,15 @@ async def api_upload_dataset(
         raise HTTPException(status_code=415, detail="Upload a file in CSV format.")
 
     content = bytearray()
+
     async for chunk in request.stream():
         content.extend(chunk)
+
         if len(content) > ADAM_DATASET_MAX_BYTES:
             raise HTTPException(status_code=413, detail="The CSV file exceeds the 5 MB limit.")
 
     original_filename = unquote(request.headers.get("x-file-name", ""))
+
     try:
         dataset = datasets.store_dataset(
             bytes(content), original_filename, dataset_type, dataset_category
@@ -70,6 +73,7 @@ async def api_upload_dataset(
 def api_training(dataset_category: str = "firewall") -> dict[str, object]:
     """Queue asynchronous ADAM model training for the active dataset pair."""
     request_uid = str(uuid4())
+    
     try:
         dataset = datasets.prepare_training(request_uid, dataset_category)
     except datasets.DatasetUploadError as exc:

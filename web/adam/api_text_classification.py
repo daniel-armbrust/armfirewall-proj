@@ -47,6 +47,7 @@ def api_delete_text_classification(training_uid: str) -> dict[str, object]:
         )
 
     request_uid = str(uuid4())
+    
     try:
         work_request_id = workrequests_api.queue_work_request(
             action=ADAM_WORK_REQUEST_DELETE_ACTION,
