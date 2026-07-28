@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core import db
-from core.constants import POLICY_ROUTING_DB_PATH, POLICY_ROUTING_DDL_PATH, WORK_REQUEST_DB_PATH
+from core.constants import POLICY_ROUTING_DB_PATH, WORK_REQUEST_DB_PATH
 from web.constants import TEMPLATE_DIR
 from web.context import menu_context
 
@@ -17,7 +17,6 @@ from web.context import menu_context
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 POLICY_DB_PATH = POLICY_ROUTING_DB_PATH
-POLICY_DDL_PATH = POLICY_ROUTING_DDL_PATH
 
 ADDR_FAMILIES = {"ipv4", "ipv6"}
 ROUTE_TYPES = {"unicast", "local", "broadcast", "multicast", "throw", "unreachable", "prohibit", "blackhole", "anycast"}
@@ -47,11 +46,9 @@ def render_policy_routing(request: Request) -> HTMLResponse:
 
 
 def ensure_policy_db() -> None:
-    """Create the policy routing database from DDL when needed."""
-    if not POLICY_DDL_PATH.exists():
-        raise RuntimeError(f"Policy routing DDL not found: {POLICY_DDL_PATH}")
-    with db.transaction(POLICY_DB_PATH, require_existing=False) as conn:
-        conn.executescript(POLICY_DDL_PATH.read_text(encoding="utf-8"))
+    """Verify the installed policy-routing database before using it."""
+    db.verify_database(POLICY_DB_PATH)
+    with db.transaction(POLICY_DB_PATH) as conn:
         ensure_applied_columns(conn)
 
 

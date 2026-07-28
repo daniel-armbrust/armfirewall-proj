@@ -1657,7 +1657,8 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
     width: 100%;
     min-height: 36px;
     padding: 8px 10px;
@@ -1669,12 +1670,22 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     outline: none;
 }
 
+.field textarea {
+    min-height: 144px;
+    resize: vertical;
+}
+
+#oci-authentication-type {
+    width: min(340px, 100%);
+}
+
 .field select[multiple] {
     min-height: 124px;
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
     border-color: var(--line-hot);
     box-shadow: 0 0 0 2px var(--shadow);
 }
@@ -1694,6 +1705,52 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     margin: 14px 0 0;
     display: flex;
     justify-content: flex-start;
+}
+
+.runtime-file-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.runtime-file-row .text-button {
+    min-width: 230px;
+}
+
+.runtime-settings-actions {
+    justify-content: flex-start;
+}
+
+.runtime-upload-button {
+    width: 236px;
+    min-width: 236px !important;
+    min-height: 68px;
+    font-size: 20px;
+}
+
+.runtime-file-name {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.field.is-disabled {
+    opacity: 0.58;
+}
+
+@media (max-width: 860px) {
+    .runtime-file-row .text-button {
+        width: 100%;
+    }
+
+    .runtime-upload-button {
+        width: 100%;
+        min-width: 0 !important;
+    }
 }
 
 .users-add-button {
@@ -2020,6 +2077,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     display: flex;
     gap: 8px;
     overflow-x: auto;
+}
+
+.local-tabs.runtime-settings-menu {
+    margin: 22px 0 14px;
 }
 
 .dnsmasq-action-tabs,

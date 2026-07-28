@@ -11,6 +11,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 
 DB_DIR = ROOT_DIR / "db"
 CONF_DIR = ROOT_DIR / "conf"
+OCI_CONF_DIR = CONF_DIR / "oci"
+OCI_PRIVATE_KEY_PATH = OCI_CONF_DIR / "oci_privatekey.pem"
+OCI_CONFIG_PATH = OCI_CONF_DIR / "oci.config"
 LOG_DIR = ROOT_DIR / "logs"
 SUPERVISOR_CONF = CONF_DIR / "supervisord.conf"
 IFACE_DB_PATH = DB_DIR / "iface.db"
@@ -23,7 +26,7 @@ LATENCY_DB_PATH = DB_DIR / "latency.db"
 LINKFAILOVER_DB_PATH = DB_DIR / "linkfailover.db"
 POLICY_ROUTING_DB_PATH = DB_DIR / "policy-routing.db"
 LIBRESWAN_DB_PATH = DB_DIR / "libreswan.db"
-POLICY_ROUTING_DDL_PATH = DB_DIR / "ddl" / "policy-routing.ddl"
+RUNTIME_SETTINGS_DB_PATH = DB_DIR / "runtime_settings.db"
 
 BIRD_DB_PATH = DB_DIR / "bird.db"
 BIRD_DDL_PATH = DB_DIR / "ddl" / "bird.ddl"

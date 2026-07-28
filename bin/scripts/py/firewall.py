@@ -188,7 +188,9 @@ from daemons.fwrulesd.filter import rules as filter_core  # noqa: E402
 from daemons.fwrulesd.mangle import rules as mangle_core  # noqa: E402
 from daemons.fwrulesd.nat import rules as nat_core  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
-from web.firewall import api_filter_rules, api_mangle_rules, api_nat_rules  # noqa: E402
+from web.firewall.filter_rules import api as api_filter_rules  # noqa: E402
+from web.firewall.mangle_rules import api as api_mangle_rules  # noqa: E402
+from web.firewall.nat_rules import api as api_nat_rules  # noqa: E402
 
 
 def configure_database_overrides() -> None:

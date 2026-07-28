@@ -2,40 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-
-from web import auth
 from core import db
 from core.constants import LOG_DB_PATH
-from web.constants import TEMPLATE_DIR
-from web.context import menu_context
-
-
-templates = Jinja2Templates(directory=TEMPLATE_DIR)
 LOGS_DB_PATH = LOG_DB_PATH
-
-
-def page_context(request: Request, title: str) -> dict[str, Any]:
-    """Create shared template context for ArmFirewall pages."""
-    current_user = auth.get_current_user(request) or {}
-    return {
-        "request": request,
-        "title": title,
-        "user_name": current_user.get("username", "admin"),
-        "current_path": request.url.path,
-        "menu": menu_context(),
-    }
-
-
-def render_system_logs(request: Request) -> HTMLResponse:
-    """Render the ArmFirewall system logs page."""
-    return templates.TemplateResponse(
-        request,
-        "settings/system_logs.html",
-        context=page_context(request, "System Logs"),
-    )
 
 
 def normalize_limit(value: Any) -> int:

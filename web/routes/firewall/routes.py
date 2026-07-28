@@ -5,12 +5,12 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from web.firewall import api_filter_rules as firewall_filter_api
-from web.firewall import api_mangle_rules as firewall_mangle_api
-from web.firewall import api_nat_rules as firewall_nat_api
-from web.firewall import view_filter_rules as firewall_filter_views
-from web.firewall import view_mangle_rules as firewall_mangle_views
-from web.firewall import view_nat_rules as firewall_nat_views
+from web.firewall.filter_rules import api as firewall_filter_api
+from web.firewall.filter_rules import views as firewall_filter_views
+from web.firewall.mangle_rules import api as firewall_mangle_api
+from web.firewall.mangle_rules import views as firewall_mangle_views
+from web.firewall.nat_rules import api as firewall_nat_api
+from web.firewall.nat_rules import views as firewall_nat_views
 
 
 router = APIRouter()
@@ -26,6 +26,13 @@ def api_firewall_filter_rules() -> dict[str, Any]:
 def api_firewall_filter_work_requests() -> dict[str, Any]:
     """Return recent work requests for firewall filter rules."""
     return firewall_filter_api.get_filter_work_requests()
+
+
+@router.post("/api/firewall/filter-rules/state")
+async def api_firewall_filter_rule_state(request: Request) -> dict[str, Any]:
+    """Return the state of a persisted filter rule matched by its attributes."""
+    payload = await request.json()
+    return firewall_filter_api.get_filter_rule_state(payload)
 
 
 @router.get("/api/firewall/nat-rules")
