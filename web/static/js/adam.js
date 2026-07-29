@@ -24,6 +24,7 @@
     const classificationF1 = document.getElementById("adam-classification-f1");
     const classificationChartWrap = document.getElementById("adam-classification-chart-wrap");
     const classificationChart = document.getElementById("adam-classification-chart");
+    const classificationDataset = document.getElementById("adam-classification-dataset");
     const classificationDeleteActions = document.getElementById("adam-classification-delete-actions");
     const classificationDelete = document.getElementById("adam-classification-delete");
     const deleteModal = document.getElementById("adam-delete-modal");
@@ -61,7 +62,7 @@
             || !workRequestsToggle || !workRequestsPanel
             || !datasetCategory || !trainingInput || !testingInput || !trainingImport || !testingImport
             || !trainingName || !testingName || !trainingModel || !classificationDeleteActions
-            || !classificationDelete
+            || !classificationDelete || !classificationDataset
             || !deleteModal || !deleteModalCopy || !deleteCancel || !deleteConfirm) {
         return;
     }
@@ -371,11 +372,14 @@
         classificationDetails.hidden = !available;
         classificationDeleteActions.hidden = !available || textClassificationPanel.hidden;
         classificationDelete.disabled = !available || deletionQueueing;
+        classificationDataset.disabled = !available;
         classificationModelState.textContent = available
             ? "model=active"
             : "model=unavailable";
 
         if (!available) {
+            classificationDataset.innerHTML = '<option value="">All datasets</option>';
+            classificationDataset.value = "";
             classificationEmpty.querySelector("span:last-child").textContent =
                 "No trained model available.";
             classificationChartWrap.hidden = true;
@@ -386,6 +390,15 @@
 
         const metrics = training.metrics || {};
         const datasets = training.datasets || [];
+        const categoryOptions = training.dataset_categories || [];
+        const selectedCategory = training.selected_category || "";
+        classificationDataset.innerHTML = [
+            '<option value="">All datasets</option>',
+            ...categoryOptions.map((category) => (
+                `<option value="${HF.escapeHtml(category.value)}">${HF.escapeHtml(category.label)}</option>`
+            )),
+        ].join("");
+        classificationDataset.value = selectedCategory;
         classificationModel.textContent = training.model_file || "-";
         classificationAlgorithm.textContent = training.algorithm || "-";
         classificationVectorizer.textContent = training.vectorizer || "-";
@@ -395,8 +408,11 @@
         classificationTrainingRecords.textContent = String(training.training_records || 0);
         classificationTestingRecords.textContent = String(training.testing_records || 0);
         classificationLabels.textContent = (training.labels || []).join(", ") || "-";
-        classificationDatasets.textContent = datasets.map((dataset) => (
-            `${dataset.category}/${dataset.purpose}: ${dataset.file_name} (${dataset.records})`
+        const visibleDatasets = selectedCategory
+            ? datasets.filter((dataset) => dataset.category === selectedCategory)
+            : datasets;
+        classificationDatasets.textContent = visibleDatasets.map((dataset) => (
+            `${dataset.category_name || dataset.category}/${dataset.purpose}: ${dataset.file_name} (${dataset.records})`
         )).join(" | ") || "-";
         classificationTrainingAccuracy.textContent = formatScore(metrics.training_accuracy);
         classificationTestingAccuracy.textContent = formatScore(metrics.testing_accuracy);
@@ -500,7 +516,11 @@
         classificationModelState.textContent = "model=loading";
 
         try {
-            const response = await fetch("/api/adam/text-classification", {
+            const category = classificationDataset.value;
+            const query = category
+                ? `?dataset_category=${encodeURIComponent(category)}`
+                : "";
+            const response = await fetch(`/api/adam/text-classification${query}`, {
                 cache: "no-store",
                 credentials: "same-origin",
                 headers: {"Accept": "application/json"},
@@ -584,6 +604,7 @@
     trainingImport.addEventListener("click", () => trainingInput.click());
     testingImport.addEventListener("click", () => testingInput.click());
     trainingModel.addEventListener("click", queueTraining);
+    classificationDataset.addEventListener("change", loadTextClassification);
     classificationDelete.addEventListener("click", openDeleteModal);
     deleteCancel.addEventListener("click", closeDeleteModal);
     deleteConfirm.addEventListener("click", queueDeletion);

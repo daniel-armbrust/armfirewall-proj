@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS adam_datasets (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      dataset_uid TEXT NOT NULL UNIQUE,
      category TEXT NOT NULL CHECK (
-          category IN ('adam_misc', 'firewall', 'ner')
+          category IN ('adam_misc', 'firewall', 'greetings', 'ner')
      ),
      purpose TEXT NOT NULL CHECK (purpose IN ('training', 'testing')),
      original_filename TEXT NOT NULL,

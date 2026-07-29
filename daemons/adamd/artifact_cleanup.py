@@ -80,7 +80,7 @@ def _collect_delete_context(
 
     datasets = db.fetch_all(
         """
-        SELECT d.id, d.dataset_uid, d.stored_filepath
+        SELECT d.id, d.dataset_uid, d.stored_filepath, d.chart_filepath
         FROM adam_training_run_datasets AS rd
         JOIN adam_datasets AS d ON d.id = rd.dataset_id
         WHERE rd.training_run_id = ?
@@ -105,6 +105,10 @@ def _collect_delete_context(
     for dataset in datasets:
         normalize_uuid(dataset["dataset_uid"], "dataset_id")
         artifact_paths.add(stored_artifact_path(dataset["stored_filepath"], dataset_dir, "dataset"))
+        if dataset["chart_filepath"]:
+            artifact_paths.add(
+                stored_artifact_path(dataset["chart_filepath"], charts_dir, "chart")
+            )
 
     return {"run_ids": run_ids, "dataset_ids": dataset_ids, "artifact_paths": artifact_paths}
 

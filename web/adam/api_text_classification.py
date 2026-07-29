@@ -19,10 +19,14 @@ router = APIRouter()
 
 
 @router.get("/api/adam/text-classification")
-def api_text_classification() -> dict[str, object]:
-    """Return details for the active trained text classifier."""
+def api_text_classification(dataset_category: str | None = None) -> dict[str, object]:
+    """Return active shared-model details, optionally for one dataset category."""
     try:
-        return {"training": text_classification.active_training()}
+        return {
+            "training": text_classification.active_training(
+                dataset_category=dataset_category
+            )
+        }
     except text_classification.TextClassificationStorageError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -75,10 +79,16 @@ def api_delete_text_classification(training_uid: str) -> dict[str, object]:
 
 
 @router.get("/api/adam/text-classification/chart", response_class=FileResponse)
-def api_text_classification_chart(training_uid: str) -> FileResponse:
-    """Return the active classifier evaluation chart."""
+def api_text_classification_chart(
+    training_uid: str,
+    dataset_category: str | None = None,
+) -> FileResponse:
+    """Return the shared-model evaluation chart for all data or one category."""
     try:
-        chart_path = text_classification.evaluation_chart(training_uid)
+        chart_path = text_classification.evaluation_chart(
+            training_uid,
+            dataset_category=dataset_category,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except text_classification.TextClassificationStorageError as exc:

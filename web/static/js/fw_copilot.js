@@ -41,7 +41,7 @@
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-    const debugLog = (...args) => console.log("[Adam]", ...args);
+    const debugLog = () => {};
     let trackingTimer = null;
     let wakeAlertTimer = null;
     let modelPromise = null;
@@ -68,6 +68,92 @@
     let listeningEnabled = false;
     let commandRecognitionActive = false;
     let sessionId = 0;
+    let adamWebSocket = null;
+    let socketReconnectTimer = null;
+    let socketHeartbeatTimer = null;
+    let pageIsClosing = false;
+    let adamDisabled = false;
+
+    function websocketUrl() {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        return `${protocol}//${window.location.host}/ws/adam`;
+    }
+
+    function createRequestId() {
+        if (window.crypto?.randomUUID) {
+            return window.crypto.randomUUID();
+        }
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+            const random = Math.floor(Math.random() * 16);
+            const value = character === "x" ? random : (random & 0x3) | 0x8;
+            return value.toString(16);
+        });
+    }
+
+    function clearWebSocketTimers() {
+        window.clearTimeout(socketReconnectTimer);
+        window.clearInterval(socketHeartbeatTimer);
+        socketReconnectTimer = null;
+        socketHeartbeatTimer = null;
+    }
+
+    function closeAdamWebSocket() {
+        clearWebSocketTimers();
+        if (adamWebSocket) {
+            adamWebSocket.close();
+            adamWebSocket = null;
+        }
+    }
+
+    function scheduleWebSocketReconnect() {
+        if (pageIsClosing || adamDisabled || socketReconnectTimer) {
+            return;
+        }
+        socketReconnectTimer = window.setTimeout(() => {
+            socketReconnectTimer = null;
+            connectAdamWebSocket();
+        }, 3000);
+    }
+
+    function connectAdamWebSocket() {
+        if (pageIsClosing || adamDisabled || (adamWebSocket && [WebSocket.CONNECTING, WebSocket.OPEN].includes(adamWebSocket.readyState))) {
+            return;
+        }
+        const socket = new WebSocket(websocketUrl());
+        adamWebSocket = socket;
+        socket.addEventListener("open", () => {
+            debugLog("ADAM WebSocket connected");
+            socketHeartbeatTimer = window.setInterval(() => {
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({type: "session.ping"}));
+                }
+            }, 25000);
+        });
+        socket.addEventListener("message", (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                debugLog("ADAM WebSocket event", message.type, message.request_id || "");
+            } catch (_error) {
+                debugLog("ADAM WebSocket returned an invalid event");
+            }
+        });
+        socket.addEventListener("close", (event) => {
+            if (adamWebSocket === socket) {
+                adamWebSocket = null;
+            }
+            window.clearInterval(socketHeartbeatTimer);
+            socketHeartbeatTimer = null;
+            if (event.code === 4403) {
+                adamDisabled = true;
+                debugLog("ADAM WebSocket closed because ADAM is disabled");
+                return;
+            }
+            scheduleWebSocketReconnect();
+        });
+        socket.addEventListener("error", () => {
+            debugLog("ADAM WebSocket connection failed");
+        });
+    }
 
     function listeningPreference() {
         try {
@@ -355,6 +441,16 @@
             return;
         }
         debugLog("sending transcription", { text, language: speechLanguage });
+        if (adamWebSocket && adamWebSocket.readyState === WebSocket.OPEN) {
+            const requestId = createRequestId();
+            adamWebSocket.send(JSON.stringify({
+                type: "command.submit",
+                request_id: requestId,
+                text,
+                language: speechLanguage,
+            }));
+            return;
+        }
         try {
             const response = await window.fetch("/api/adam/transcription", {
                 method: "POST",
@@ -648,6 +744,8 @@
     if (logoutLink) {
         logoutLink.addEventListener("click", (event) => {
             event.preventDefault();
+            pageIsClosing = true;
+            closeAdamWebSocket();
             listeningEnabled = false;
             sessionId += 1;
             stopAudio().finally(() => {
@@ -658,6 +756,7 @@
     }
 
     const savedListeningPreference = listeningPreference();
+    connectAdamWebSocket();
     if (savedListeningPreference === "true") {
         enableListening();
     } else if (savedListeningPreference === null) {
@@ -668,6 +767,8 @@
     }
 
     window.addEventListener("pagehide", () => {
+        pageIsClosing = true;
+        closeAdamWebSocket();
         listeningEnabled = false;
         sessionId += 1;
         stopAudio();

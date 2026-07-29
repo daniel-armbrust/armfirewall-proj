@@ -22,12 +22,14 @@ from web.adam.api_transcription import (
     api_receive_transcription,
     router as transcription_router,
 )
+from web.adam.websocket import router as websocket_router
 
 
 router = APIRouter()
 router.include_router(transcription_router)
 router.include_router(datasets_router)
 router.include_router(text_classification_router)
+router.include_router(websocket_router)
 
 
 @router.get("/armfirewall/adam", response_class=HTMLResponse)

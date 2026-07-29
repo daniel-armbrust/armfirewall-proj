@@ -50,6 +50,8 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
     training_labels: list[str] = []
     testing_texts: list[str] = []
     testing_labels: list[str] = []
+    training_by_category: dict[str, tuple[list[str], list[str]]] = {}
+    testing_by_category: dict[str, tuple[list[str], list[str]]] = {}
 
     for dataset in datasets:
         texts, labels = _load_dataset(dataset)
@@ -57,9 +59,11 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
         if dataset["purpose"] == "training":
             training_texts.extend(texts)
             training_labels.extend(labels)
+            training_by_category[str(dataset["category"])] = (texts, labels)
         elif dataset["purpose"] == "testing":
             testing_texts.extend(texts)
             testing_labels.extend(labels)
+            testing_by_category[str(dataset["category"])] = (texts, labels)
 
     if not training_texts or not testing_texts:
         raise ValueError("Training and testing datasets are required.")
@@ -109,6 +113,7 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
     }
 
     evaluation_chart_path: Path | None = None
+    category_chart_paths: list[Path] = []
 
     try:
         evaluation_chart_path = _publish_evaluation_chart(
@@ -122,12 +127,60 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
             evaluation_chart_path.relative_to(ROOT_DIR)
         )
 
+        metadata["category_results"] = []
+        for category in sorted(testing_by_category):
+            category_training_texts, category_training_labels = training_by_category[category]
+            category_testing_texts, category_testing_labels = testing_by_category[category]
+            category_predictions = classifier.predict(category_testing_texts)
+            category_labels = sorted(
+                set(category_training_labels)
+                | set(category_testing_labels)
+                | {str(value) for value in category_predictions}
+            )
+            category_precision, category_recall, category_f1, _ = (
+                precision_recall_fscore_support(
+                    category_testing_labels,
+                    category_predictions,
+                    average="macro",
+                    zero_division=0,
+                )
+            )
+            category_metadata = {
+                "labels": category_labels,
+                "training_accuracy": float(
+                    classifier.score(category_training_texts, category_training_labels)
+                ),
+                "testing_accuracy": float(
+                    classifier.score(category_testing_texts, category_testing_labels)
+                ),
+                "precision_macro": float(category_precision),
+                "recall_macro": float(category_recall),
+                "f1_macro": float(category_f1),
+            }
+            category_chart_path = _publish_evaluation_chart(
+                f"category-{category}",
+                category_metadata,
+                category_testing_labels,
+                category_predictions,
+            )
+            category_chart_paths.append(category_chart_path)
+            metadata["category_results"].append(
+                {
+                    "category": category,
+                    "evaluation_chart_filepath": str(
+                        category_chart_path.relative_to(ROOT_DIR)
+                    ),
+                }
+            )
+
         _persist_success(int(training_run["id"]), metadata)
     except Exception:
         _restore_model(rollback_path)
 
         if evaluation_chart_path is not None:
             evaluation_chart_path.unlink(missing_ok=True)
+        for category_chart_path in category_chart_paths:
+            category_chart_path.unlink(missing_ok=True)
         raise
     else:
         if rollback_path is not None:

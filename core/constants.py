@@ -52,9 +52,10 @@ ADAM_DATASET_TYPES = {"training", "testing"}
 ADAM_DATASET_CATEGORIES = {
     "adam_misc": "Adam Misc",
     "firewall": "Firewall",
+    "greetings": "Greetings",
     "ner": "NER",
 }
-ADAM_TEXT_CLASSIFIER_DATASET_CATEGORIES = {"adam_misc", "firewall"}
+ADAM_TEXT_CLASSIFIER_DATASET_CATEGORIES = {"adam_misc", "firewall", "greetings"}
 ADAM_MODELS_DIR = ROOT_DIR / "daemons" / "adamd" / "models"
 ADAM_CHARTS_DIR = ROOT_DIR / "daemons" / "adamd" / "charts"
 ADAM_DELETE_STAGING_DIR = ROOT_DIR / "daemons" / "adamd" / ".delete-staging"

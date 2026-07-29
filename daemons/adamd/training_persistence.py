@@ -69,3 +69,25 @@ def persist_success(
 
         if cursor.rowcount != 1:
             raise ValueError("The ADAM training result could not be persisted.")
+
+        for category_result in metadata.get("category_results", []):
+            db.execute_on(
+                connection,
+                """
+                UPDATE adam_datasets
+                SET chart_filepath = ?
+                WHERE id IN (
+                    SELECT d.id
+                    FROM adam_training_run_datasets AS rd
+                    JOIN adam_datasets AS d ON d.id = rd.dataset_id
+                    WHERE rd.training_run_id = ?
+                      AND d.category = ?
+                      AND d.purpose = 'testing'
+                )
+                """,
+                (
+                    category_result["evaluation_chart_filepath"],
+                    training_run_id,
+                    category_result["category"],
+                ),
+            )

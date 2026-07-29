@@ -62,6 +62,7 @@
                 <select id="adam-dataset-category">
                     <option value="adam_misc">Adam Misc</option>
                     <option value="firewall" selected>Firewall</option>
+                    <option value="greetings">Greetings</option>
                     <option value="ner">NER</option>
                 </select>
             </label>
@@ -109,6 +110,12 @@
         <span id="adam-classification-model-state">model=unavailable</span>
     </div>
     <div class="edit-form">
+        <label class="field adam-classification-dataset-field">
+            <span>Trained dataset</span>
+            <select id="adam-classification-dataset" disabled>
+                <option value="">All datasets</option>
+            </select>
+        </label>
         <div class="terminal-empty" id="adam-classification-empty">
             <span class="prompt">$</span>
             <span>No trained model available.</span>
@@ -197,6 +204,7 @@
                 <span>Inference mode</span>
                 <select id="adam-playground-mode">
                     <option value="text-classification" selected>Text Classification</option>
+                    <option value="llm">LLM</option>
                 </select>
             </label>
             <label class="field">
@@ -280,5 +288,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260722-playground-view" defer></script>
+<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260729-category-metrics" defer></script>
 {% endblock %}

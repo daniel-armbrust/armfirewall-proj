@@ -2223,6 +2223,11 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     justify-content: flex-start;
 }
 
+.adam-classification-dataset-field {
+    max-width: 420px;
+    margin-bottom: 14px;
+}
+
 .adam-playground-form {
     display: grid;
     gap: 12px;

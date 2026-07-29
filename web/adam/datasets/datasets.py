@@ -40,7 +40,9 @@ def _normalize_category(value: str) -> str:
     category = value.strip().lower()
 
     if category not in ADAM_DATASET_CATEGORIES:
-        raise DatasetUploadError("Dataset category must be Adam Misc, Firewall, or NER.")
+        raise DatasetUploadError(
+            "Dataset category must be Adam Misc, Firewall, Greetings, or NER."
+        )
 
     return category
 
