@@ -12,3 +12,9 @@ class AdamTranscriptionPayload(BaseModel):
 
     text: str = Field(min_length=1, max_length=ADAM_TRANSCRIPTION_MAX_CHARS)
     language: str = Field(min_length=2, max_length=16)
+
+
+class AdamPlaygroundInferencePayload(BaseModel):
+    """Text submitted to the ADAM Playground classifier."""
+
+    text: str = Field(min_length=1, max_length=ADAM_TRANSCRIPTION_MAX_CHARS)

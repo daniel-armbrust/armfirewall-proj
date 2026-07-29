@@ -12,6 +12,10 @@ from web.adam.api_datasets import (
     api_upload_dataset,
     router as datasets_router,
 )
+from web.adam.api_playground import (
+    api_playground_text_classification,
+    router as playground_router,
+)
 from web.adam.api_text_classification import (
     api_delete_text_classification,
     api_text_classification,
@@ -28,6 +32,7 @@ from web.adam.websocket import router as websocket_router
 router = APIRouter()
 router.include_router(transcription_router)
 router.include_router(datasets_router)
+router.include_router(playground_router)
 router.include_router(text_classification_router)
 router.include_router(websocket_router)
 
@@ -43,6 +48,7 @@ def adam_page(request: Request) -> HTMLResponse:
 __all__ = [
     "api_dataset",
     "api_delete_text_classification",
+    "api_playground_text_classification",
     "api_receive_transcription",
     "api_text_classification",
     "api_text_classification_chart",

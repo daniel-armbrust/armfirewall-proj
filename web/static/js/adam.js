@@ -6,6 +6,12 @@
     const textClassificationPanel = document.getElementById("adam-text-classification-panel");
     const playgroundToggle = document.getElementById("adam-playground-toggle");
     const playgroundPanel = document.getElementById("adam-playground-panel");
+    const playgroundMode = document.getElementById("adam-playground-mode");
+    const playgroundInput = document.getElementById("adam-playground-input");
+    const playgroundRun = document.getElementById("adam-playground-run");
+    const playgroundIntent = document.getElementById("adam-playground-intent");
+    const playgroundConfidence = document.getElementById("adam-playground-confidence");
+    const playgroundMessage = document.getElementById("adam-playground-message");
     const classificationModelState = document.getElementById("adam-classification-model-state");
     const classificationEmpty = document.getElementById("adam-classification-empty");
     const classificationDetails = document.getElementById("adam-classification-details");
@@ -56,9 +62,12 @@
     let textClassificationLoading = false;
     let activeTraining = null;
     let deletionQueueing = false;
+    let playgroundInferenceRunning = false;
 
     if (!datasetToggle || !datasetPanel || !textClassificationToggle
             || !textClassificationPanel || !playgroundToggle || !playgroundPanel
+            || !playgroundMode || !playgroundInput || !playgroundRun
+            || !playgroundIntent || !playgroundConfidence || !playgroundMessage
             || !workRequestsToggle || !workRequestsPanel
             || !datasetCategory || !trainingInput || !testingInput || !trainingImport || !testingImport
             || !trainingName || !testingName || !trainingModel || !classificationDeleteActions
@@ -111,6 +120,76 @@
 
         status.textContent = message || "";
         status.classList.toggle("error", Boolean(isError));
+    }
+
+    function setPlaygroundMessage(message, isError = false) {
+        playgroundMessage.textContent = message;
+        playgroundMessage.parentElement.classList.toggle("error", isError);
+    }
+
+    function syncPlaygroundControls() {
+        const text = playgroundInput.value.trim();
+        const textClassification = playgroundMode.value === "text-classification";
+        playgroundInput.disabled = playgroundInferenceRunning;
+        playgroundMode.disabled = playgroundInferenceRunning;
+        playgroundRun.disabled = playgroundInferenceRunning || !textClassification || !text;
+
+        if (!playgroundInferenceRunning && !textClassification) {
+            setPlaygroundMessage("LLM inference is not available yet.");
+        } else if (!playgroundInferenceRunning && !text) {
+            setPlaygroundMessage("Enter text to run inference.");
+        }
+    }
+
+    async function runPlaygroundInference() {
+        if (playgroundInferenceRunning || playgroundMode.value !== "text-classification") {
+            return;
+        }
+
+        const text = playgroundInput.value.trim();
+        if (!text) {
+            syncPlaygroundControls();
+            return;
+        }
+
+        playgroundInferenceRunning = true;
+        playgroundRun.textContent = "Running...";
+        playgroundIntent.textContent = "-";
+        playgroundConfidence.textContent = "-";
+        setPlaygroundMessage("Running text classification inference.");
+        syncPlaygroundControls();
+
+        try {
+            const response = await fetch("/api/adam/playground/text-classification", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({text}),
+            });
+
+            if (handleAuthentication(response)) {
+                return;
+            }
+
+            const payload = await parseResponse(response);
+            if (!response.ok) {
+                throw new Error(payload.detail || `HTTP ${response.status}`);
+            }
+
+            const prediction = payload.prediction || {};
+            playgroundIntent.textContent = prediction.intent || "-";
+            playgroundConfidence.textContent = formatScore(prediction.confidence);
+            setPlaygroundMessage("Inference completed.");
+        } catch (error) {
+            setPlaygroundMessage(error.message, true);
+        } finally {
+            playgroundInferenceRunning = false;
+            playgroundRun.textContent = "Run Inference";
+            syncPlaygroundControls();
+        }
     }
 
     function syncControls() {
@@ -604,6 +683,9 @@
     trainingImport.addEventListener("click", () => trainingInput.click());
     testingImport.addEventListener("click", () => testingInput.click());
     trainingModel.addEventListener("click", queueTraining);
+    playgroundInput.addEventListener("input", syncPlaygroundControls);
+    playgroundMode.addEventListener("change", syncPlaygroundControls);
+    playgroundRun.addEventListener("click", runPlaygroundInference);
     classificationDataset.addEventListener("change", loadTextClassification);
     classificationDelete.addEventListener("click", openDeleteModal);
     deleteCancel.addEventListener("click", closeDeleteModal);
@@ -644,5 +726,6 @@
 
     setActiveView("dataset");
     renderDataset(null);
+    syncPlaygroundControls();
     loadDataset();
 })();

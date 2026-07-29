@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS adam_datasets (
      sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
      records INTEGER NOT NULL CHECK (records > 0),
      labels TEXT NOT NULL DEFAULT '[]',
-     labels_count INTEGER NOT NULL DEFAULT 0 CHECK (labels_count >= 2),
+     labels_count INTEGER NOT NULL DEFAULT 0 CHECK (labels_count >= 1),
      status TEXT NOT NULL DEFAULT 'uploaded' CHECK (
           status IN ('uploaded', 'archived')
      ),

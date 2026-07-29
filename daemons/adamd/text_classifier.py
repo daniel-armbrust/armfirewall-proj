@@ -158,10 +158,11 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
                 "f1_macro": float(category_f1),
             }
             category_chart_path = _publish_evaluation_chart(
-                f"category-{category}",
+                str(training_run["training_uid"]),
                 category_metadata,
                 category_testing_labels,
                 category_predictions,
+                chart_suffix=f"category-{category}",
             )
             category_chart_paths.append(category_chart_path)
             metadata["category_results"].append(
@@ -280,10 +281,21 @@ def _build_classifier() -> Pipeline:
     )
 
 
-def _publish_evaluation_chart(training_uid: str, metadata: dict[str, Any], expected_labels: list[str], predicted_labels: Any,) -> Path:
+def _publish_evaluation_chart(
+    training_uid: str,
+    metadata: dict[str, Any],
+    expected_labels: list[str],
+    predicted_labels: Any,
+    *,
+    chart_suffix: str = "",
+) -> Path:
     """Generate and atomically publish one training evaluation chart."""
+    chart_identifier = _normalize_uuid(training_uid, field_name="training_uid")
+    if chart_suffix:
+        chart_identifier = f"{chart_identifier}-{chart_suffix}"
+
     return publish_evaluation_chart(
-        _normalize_uuid(training_uid, field_name="training_uid"),
+        chart_identifier,
         metadata,
         expected_labels,
         predicted_labels,

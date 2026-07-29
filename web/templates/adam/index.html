@@ -223,16 +223,16 @@
             <div class="adam-playground-result-grid">
                 <div class="adam-model-detail">
                     <span>Predicted intent</span>
-                    <strong>-</strong>
+                    <strong id="adam-playground-intent">-</strong>
                 </div>
                 <div class="adam-model-detail">
                     <span>Confidence</span>
-                    <strong>-</strong>
+                    <strong id="adam-playground-confidence">-</strong>
                 </div>
             </div>
             <div class="terminal-empty">
                 <span class="prompt">$</span>
-                <span>Inference is not available yet.</span>
+                <span id="adam-playground-message">Enter text to run inference.</span>
             </div>
         </div>
     </div>
@@ -288,5 +288,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260729-category-metrics" defer></script>
+<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260730-playground-inference" defer></script>
 {% endblock %}

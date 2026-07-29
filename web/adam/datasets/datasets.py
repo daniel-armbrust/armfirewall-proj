@@ -107,8 +107,8 @@ def _inspect_csv(content: bytes) -> tuple[int, list[str]]:
     if not records:
         raise DatasetUploadError("The dataset does not contain records.")
 
-    if len(labels) < 2:
-        raise DatasetUploadError("The dataset must contain at least two labels.")
+    if not labels:
+        raise DatasetUploadError("The dataset must contain at least one label.")
 
     return records, sorted(labels)
 
