@@ -9,18 +9,22 @@ from web.services.catalog import main_service_public_catalog, optional_service_p
 
 def service_status_payload(service: dict[str, Any], *, optional: bool = False) -> dict[str, Any]:
     """Return one service status payload from persisted runtime fields."""
-    installed = bool(service.get("runtime_installed"))
+    feature_toggle = service["name"] == "armfirewall-adam"
+    enabled = bool(service.get("enabled"))
+    installed = enabled if feature_toggle else bool(service.get("runtime_installed"))
 
     payload = {
         "name": service["name"],
         "kind": service["kind"],
         "description": service["description"],
         "installed": installed,
-        "state": service.get("runtime_state") if installed else "NOT INSTALLED",
-        "pid": service.get("runtime_pid") if installed else "-",
-        "uptime": service.get("runtime_uptime") if installed else "-",
-        "details": service.get("runtime_details") if installed else "Missing from supervisord.conf",
+        "state": "ENABLED" if feature_toggle and enabled else "DISABLED" if feature_toggle else service.get("runtime_state") if installed else "NOT INSTALLED",
+        "pid": "-" if feature_toggle else service.get("runtime_pid") if installed else "-",
+        "uptime": "-" if feature_toggle else service.get("runtime_uptime") if installed else "-",
+        "details": "ADAM menu and copilot are enabled." if feature_toggle and enabled else "ADAM menu and copilot are disabled." if feature_toggle else service.get("runtime_details") if installed else "Missing from supervisord.conf",
         "runtime_updated_at": service.get("runtime_updated_at"),
+        "enabled": enabled,
+        "feature_toggle": feature_toggle,
     }
 
     if optional:
@@ -85,7 +89,15 @@ def service_status_by_name(name: str) -> dict[str, Any]:
 def service_installed(name: str) -> bool:
     """Return whether one service is installed according to persisted runtime state."""
     service = service_by_name(name)
+    if service and service["name"] == "armfirewall-adam":
+        return bool(service.get("enabled"))
     return bool(service and service.get("runtime_installed"))
+
+
+def service_enabled(name: str) -> bool:
+    """Return whether a catalog service feature is enabled."""
+    service = service_by_name(name)
+    return bool(service and service.get("enabled"))
 
 
 def get_expected_service(name: str) -> dict[str, Any]:
@@ -114,6 +126,20 @@ def control_service(name: str, action: str) -> dict[str, Any]:
 
     if service is None:
         raise ValueError("Unknown ArmFirewall service.")
+
+    if service["name"] == "armfirewall-adam":
+        if action not in {"enable", "disable"}:
+            raise ValueError("ADAM supports only enable and disable actions.")
+        return {
+            "name": name,
+            "action": action,
+            "category_name": "SERVICE_MANAGEMENT.SERVICE_CONTROL",
+            "payload": {
+                "service_name": service["name"],
+                "display_name": service["display_name"],
+                "kind": service["kind"],
+            },
+        }
 
     if service.get("service_group") == "main":
         if service["protected"] and not (action == "restart" and service.get("restart_allowed")):

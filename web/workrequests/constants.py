@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-SERVICE_WORK_REQUEST_ACTIONS = {"install", "uninstall", "start", "stop", "restart"}
+SERVICE_WORK_REQUEST_ACTIONS = {"disable", "enable", "install", "uninstall", "start", "stop", "restart"}
 
 SERVICE_WORK_REQUEST_CATEGORIES = {
     "SERVICE_MANAGEMENT.OPTIONAL_SERVICES",

@@ -3,13 +3,13 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-import oci
 from oci import regions
 
 from core import db
 from core.constants import OCI_CONFIG_PATH, OCI_PRIVATE_KEY_PATH, RUNTIME_SETTINGS_DB_PATH
 
 from . import repository
+from .client import create_object_storage_client
 from .utils import atomic_write, required_single_line
 
 
@@ -45,21 +45,6 @@ def delete_oci_integration() -> dict[str, bool]:
     return {"deleted": True}
 
 
-def _object_storage_client(configuration: dict[str, Any]) -> Any:
-    """Create an Object Storage client using the selected OCI authentication mode."""
-    if configuration["authentication_type"] == "api_key":
-        sdk_config = oci.config.from_file(file_location=str(OCI_CONFIG_PATH), profile_name="DEFAULT")
-        return oci.object_storage.ObjectStorageClient(sdk_config, timeout=(5, 20))
-
-    signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
-    signer_region = getattr(signer, "region", None)
-
-    if not signer_region:
-        raise ValueError("Could not determine the OCI region for Instance Principal.")
-
-    return oci.object_storage.ObjectStorageClient({"region": signer_region}, signer=signer, timeout=(5, 20))
-
-
 def test_oci_integration() -> dict[str, str]:
     """Test OCI authentication through Object Storage GetNamespace."""
     configuration = repository.get_saved_integration()
@@ -75,7 +60,7 @@ def test_oci_integration() -> dict[str, str]:
             raise ValueError("OCI private key file is missing or empty.")
 
     try:
-        _object_storage_client(configuration).get_namespace()
+        create_object_storage_client(configuration).get_namespace()
     except Exception as exc:
         repository.record_authentication_test(status="failed", error=type(exc).__name__[:500])
         raise ValueError("OCI authentication test failed.") from exc

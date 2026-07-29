@@ -39,6 +39,7 @@ INSERT OR IGNORE INTO services (
     ('armfirewall-monitord', 'armfirewall-monitord', 'daemon', 'RRD monitoring collector and graph generator.', 'main', 0, 0, 30),
     ('armfirewall-collectord', 'armfirewall-collectord', 'daemon', 'Operating-system state collector for web GUI snapshots.', 'main', 1, 0, 35),
     ('armfirewall-workreqd', 'armfirewall-workreqd', 'daemon', 'Work request executor for operating system changes.', 'main', 1, 0, 40),
+    ('armfirewall-adam', 'armfirewall-adam', 'ai', 'ADAM AI menu and copilot feature.', 'main', 0, 0, 45),
     ('armfirewall-linkfailover', 'armfirewall-linkfailover', 'daemon', 'Ping-based default route failover daemon.', 'main', 0, 0, 50);
 
 INSERT OR IGNORE INTO services (

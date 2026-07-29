@@ -16,7 +16,8 @@ PUBLIC_SERVICE_COLUMNS = """
     service_group,
     protected,
     restart_allowed,
-    package_name
+    package_name,
+    enabled
 """
 
 
@@ -49,16 +50,17 @@ def service_runtime_columns_available() -> bool:
     }.issubset(columns)
 
 
-def service_public_catalog(service_group: str) -> list[dict[str, Any]]:
+def service_public_catalog(service_group: str, *, include_disabled: bool = False) -> list[dict[str, Any]]:
     """Return enabled service metadata that the web layer may display."""
     runtime_available = service_runtime_columns_available()
     selected_columns = f"{PUBLIC_SERVICE_COLUMNS}, {RUNTIME_SERVICE_COLUMNS}" if runtime_available else PUBLIC_SERVICE_COLUMNS
+    enabled_filter = "" if include_disabled else "AND enabled = 1"
     rows = db.fetch_all(
         f"""
         SELECT {selected_columns}
         FROM services
         WHERE service_group = ?
-          AND enabled = 1
+          {enabled_filter}
         ORDER BY sort_order, name
         """,
         (service_group,),
@@ -90,7 +92,6 @@ def service_by_name(name: str) -> dict[str, Any] | None:
         SELECT name, service_group
         FROM services
         WHERE name = ?
-          AND enabled = 1
         """,
         (name,),
         db_path=SERVICES_DB_PATH,
@@ -98,13 +99,13 @@ def service_by_name(name: str) -> dict[str, Any] | None:
     if row is None:
         return None
 
-    services = service_public_catalog(str(row["service_group"]))
+    services = service_public_catalog(str(row["service_group"]), include_disabled=True)
     return next((item for item in services if item["name"] == name), None)
 
 
 def main_service_public_catalog() -> list[dict[str, Any]]:
     """Return enabled main service metadata for GUI status pages."""
-    return service_public_catalog("main")
+    return service_public_catalog("main", include_disabled=True)
 
 
 def optional_service_public_catalog() -> list[dict[str, Any]]:

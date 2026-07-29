@@ -3,7 +3,9 @@
     <nav class="menu">
         <div class="menu-group">ArmFirewall</div>
         <a class="menu-link child {% if current_path in ['/', '/dashboard'] %}active{% endif %}" href="/">Dashboard</a>
+        {% if menu.adam_enabled %}
         <a class="menu-link child {% if current_path == '/armfirewall/adam' %}active{% endif %}" href="/armfirewall/adam">Adam (IA)</a>
+        {% endif %}
         <a class="menu-link child {% if current_path == '/armfirewall/users' %}active{% endif %}" href="/armfirewall/users">Users</a>
         <a class="menu-link child {% if current_path == '/armfirewall/settings' %}active{% endif %}" href="/armfirewall/settings">Runtime Settings</a>
         <a class="menu-link child {% if current_path == '/armfirewall/system-logs' %}active{% endif %}" href="/armfirewall/system-logs">System Logs</a>

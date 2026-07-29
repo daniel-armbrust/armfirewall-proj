@@ -143,6 +143,11 @@
         integrationPanel.hidden = false;
         integrationOpenButton.setAttribute("aria-expanded", "true");
         integrationOpenButton.classList.add("active");
+
+        if (savedConfiguration) {
+            showSavedConfiguration(savedConfiguration);
+            setStatus("Saved OCI integration configuration.");
+        }
     });
 
     authenticationType.addEventListener("change", () => {

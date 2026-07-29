@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import sys
 
+from core import db
 from core import log as logger
-from core.constants import CONF_DIR, ROOT_DIR
+from core.constants import CONF_DIR, ROOT_DIR, SERVICES_DB_PATH
 
 from .constants import LOG_SOURCE
 from .models import ControllableService, OptionalService
@@ -112,3 +113,21 @@ def control_service(service: ControllableService, action: str) -> None:
 
     sync_supervisor_statuses()
     logger.log(f"Service {service_name} {action} completed.", source=LOG_SOURCE)
+
+
+def set_feature_enabled(service_name: str, enabled: bool) -> None:
+    """Persist visibility of a GUI-managed feature service."""
+    with db.transaction(SERVICES_DB_PATH) as conn:
+        cursor = db.execute_on(
+            conn,
+            "UPDATE services SET enabled = ? WHERE name = ?",
+            (1 if enabled else 0, service_name),
+        )
+
+        if cursor.rowcount != 1:
+            raise RuntimeError(f"Feature service was not found: {service_name}")
+
+    logger.log(
+        f"Feature service {service_name} {'enabled' if enabled else 'disabled'}.",
+        source=LOG_SOURCE,
+    )

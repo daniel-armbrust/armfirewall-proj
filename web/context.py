@@ -29,7 +29,7 @@ from core.constants import (
     ADAM_WAKE_WORD_MODEL_URL,
     ADAM_WAKE_WORD_WORKLET_URL,
 )
-from web.services.api import service_installed
+from web.services.api import service_enabled, service_installed
 
 
 def menu_context() -> dict[str, Any]:
@@ -44,9 +44,15 @@ def menu_context() -> dict[str, Any]:
     except (FileNotFoundError, db.DatabaseError):
         libreswan_installed = False
 
+    try:
+        adam_enabled = service_enabled("armfirewall-adam")
+    except (FileNotFoundError, db.DatabaseError):
+        adam_enabled = False
+
     return {
         "squid_installed": squid_installed,
         "libreswan_installed": libreswan_installed,
+        "adam_enabled": adam_enabled,
         "adam_listening_storage_key": ADAM_LISTENING_STORAGE_KEY,
         "adam_command_min_capture_ms": ADAM_COMMAND_MIN_CAPTURE_MS,
         "adam_command_sample_rate": ADAM_COMMAND_SAMPLE_RATE,

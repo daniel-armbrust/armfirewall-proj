@@ -156,6 +156,23 @@
             return;
         }
         servicesBody.innerHTML = services.map((service) => {
+            if (service.feature_toggle) {
+                const enabled = Boolean(service.enabled);
+                return `
+                    <tr>
+                        <td><strong>${HF.escapeHtml(service.name)}</strong></td>
+                        <td>${HF.escapeHtml(service.kind)}</td>
+                        <td><span class="status ${statusClass(service.state)}">${HF.escapeHtml(service.state)}</span></td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>${HF.escapeHtml(service.description)}</td>
+                        <td>
+                            <button class="text-button compact primary" type="button" data-service-action="enable" data-service-name="${HF.escapeHtml(service.name)}" ${enabled ? "disabled" : ""}>Enable</button>
+                            <button class="text-button compact danger" type="button" data-service-action="disable" data-service-name="${HF.escapeHtml(service.name)}" ${enabled ? "" : "disabled"}>Disable</button>
+                        </td>
+                    </tr>
+                `;
+            }
             const protectedService = Boolean(service.protected);
             const restartAllowed = Boolean(service.restart_allowed);
             const running = String(service.state || "").toUpperCase() === "RUNNING";
@@ -288,7 +305,7 @@
         }
     }
 
-    function reloadWhenPendingServiceStateChanges(optionalServices) {
+    function reloadWhenPendingServiceStateChanges(services, optionalServices) {
         const pending = pendingServiceMenuRefresh();
         if (!pending) {
             return;
@@ -298,6 +315,16 @@
         if (
             (pending.action === "install" && installed) ||
             (pending.action === "uninstall" && !installed)
+        ) {
+            sessionStorage.removeItem(SERVICE_REFRESH_KEY);
+            window.location.reload();
+        }
+
+        const featureService = services.find((item) => item.name === pending.serviceName);
+        const enabled = Boolean(featureService && featureService.enabled);
+        if (
+            pending.serviceName === "armfirewall-adam" &&
+            ((pending.action === "enable" && enabled) || (pending.action === "disable" && !enabled))
         ) {
             sessionStorage.removeItem(SERVICE_REFRESH_KEY);
             window.location.reload();
@@ -327,7 +354,7 @@
             }
             renderArmFirewallServices(services);
             renderOptionalServices(optionalServices);
-            reloadWhenPendingServiceStateChanges(optionalServices);
+            reloadWhenPendingServiceStateChanges(services, optionalServices);
             setState("Live", summary.updated_at || "-");
             if (workRequestsPanel && !workRequestsPanel.hidden) {
                 loadWorkRequests();
@@ -359,6 +386,9 @@
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({action}),
             });
+            if (action === "enable" || action === "disable") {
+                rememberPendingServiceRefresh(serviceName, action);
+            }
             closeActionModal();
             showWorkRequests();
             await loadWorkRequests();

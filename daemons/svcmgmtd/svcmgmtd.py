@@ -9,9 +9,9 @@ import sys
 from core import log as logger
 from core.payload import decode_json_payload
 
-from .actions import control_service, install_service, uninstall_service
+from .actions import control_service, install_service, set_feature_enabled, uninstall_service
 from .constants import LOG_SOURCE
-from .services import validate_control_service, validate_service
+from .services import validate_control_service, validate_feature_toggle, validate_service
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -48,6 +48,9 @@ def main() -> int:
     elif args.action_name in {"start", "stop", "restart"}:
         service = validate_control_service(payload, args.action_name)
         control_service(service, args.action_name)
+    elif args.action_name in {"enable", "disable"}:
+        service_name = validate_feature_toggle(payload)
+        set_feature_enabled(service_name, enabled=args.action_name == "enable")
     else:
         raise RuntimeError(f"Unsupported service management action: {args.action_name}")
     

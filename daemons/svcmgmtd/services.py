@@ -34,3 +34,11 @@ def validate_control_service(payload: Payload, action: str) -> ControllableServi
         raise RuntimeError(f"Unsupported controllable service: {service_name}")
     
     return ControllableService(name=service_name)
+
+
+def validate_feature_toggle(payload: Payload) -> str:
+    """Return the only GUI-managed feature service that can be toggled."""
+    service_name = str(payload.get("service_name") or "").strip()
+    if service_name != "armfirewall-adam":
+        raise RuntimeError(f"Unsupported feature service: {service_name}")
+    return service_name
