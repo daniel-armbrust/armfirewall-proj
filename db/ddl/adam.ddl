@@ -155,3 +155,29 @@ BEGIN
         SET updated_at = CURRENT_TIMESTAMP
       WHERE id = OLD.id;
 END;
+
+-- Stores per-user wake-word detector templates. No raw microphone audio is kept.
+CREATE TABLE IF NOT EXISTS adam_wake_word_profiles (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     user_id INTEGER NOT NULL,
+     profile_key TEXT NOT NULL,
+     templates_json TEXT NOT NULL,
+     threshold REAL NOT NULL CHECK (threshold > 0.0 AND threshold <= 1.0),
+     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+     UNIQUE (user_id, profile_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_adam_wake_word_profiles_user_profile
+ON adam_wake_word_profiles (user_id, profile_key);
+
+CREATE TRIGGER IF NOT EXISTS adam_wake_word_profiles_touch_updated_at
+AFTER UPDATE ON adam_wake_word_profiles
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+     UPDATE adam_wake_word_profiles
+        SET updated_at = CURRENT_TIMESTAMP
+      WHERE id = OLD.id;
+END;

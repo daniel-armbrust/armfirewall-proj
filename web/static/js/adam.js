@@ -1,5 +1,12 @@
 (function () {
     const state = document.getElementById("adam-state");
+    const wakeWordToggle = document.getElementById("adam-wake-word-toggle");
+    const wakeWordPanel = document.getElementById("adam-wake-word-panel");
+    const wakeWordActions = document.getElementById("adam-wake-word-actions");
+    const wakeWordState = document.getElementById("adam-wake-word-state");
+    const wakeWordProgress = document.getElementById("adam-wake-word-progress");
+    const wakeWordStart = document.getElementById("adam-wake-word-start");
+    const wakeWordCancel = document.getElementById("adam-wake-word-cancel");
     const datasetToggle = document.getElementById("adam-dataset-toggle");
     const datasetPanel = document.getElementById("adam-dataset-panel");
     const textClassificationToggle = document.getElementById("adam-text-classification-toggle");
@@ -30,6 +37,7 @@
     const classificationF1 = document.getElementById("adam-classification-f1");
     const classificationChartWrap = document.getElementById("adam-classification-chart-wrap");
     const classificationChart = document.getElementById("adam-classification-chart");
+    const classificationDatasetField = document.getElementById("adam-classification-dataset-field");
     const classificationDataset = document.getElementById("adam-classification-dataset");
     const classificationDeleteActions = document.getElementById("adam-classification-delete-actions");
     const classificationDelete = document.getElementById("adam-classification-delete");
@@ -64,32 +72,39 @@
     let deletionQueueing = false;
     let playgroundInferenceRunning = false;
 
-    if (!datasetToggle || !datasetPanel || !textClassificationToggle
+    if (!wakeWordToggle || !wakeWordPanel || !wakeWordActions || !wakeWordState
+            || !wakeWordProgress || !wakeWordStart || !wakeWordCancel
+            || !datasetToggle || !datasetPanel || !textClassificationToggle
             || !textClassificationPanel || !playgroundToggle || !playgroundPanel
             || !playgroundMode || !playgroundInput || !playgroundRun
             || !playgroundIntent || !playgroundConfidence || !playgroundMessage
             || !workRequestsToggle || !workRequestsPanel
             || !datasetCategory || !trainingInput || !testingInput || !trainingImport || !testingImport
             || !trainingName || !testingName || !trainingModel || !classificationDeleteActions
-            || !classificationDelete || !classificationDataset
+            || !classificationDelete || !classificationDatasetField || !classificationDataset
             || !deleteModal || !deleteModalCopy || !deleteCancel || !deleteConfirm) {
         return;
     }
 
     function setActiveView(view) {
+        const wakeWordSelected = view === "wake-word";
         const datasetSelected = view === "dataset";
         const textClassificationSelected = view === "text-classification";
         const playgroundSelected = view === "playground";
         const workRequestsSelected = view === "work-requests";
+        wakeWordPanel.hidden = !wakeWordSelected;
+        wakeWordActions.hidden = !wakeWordSelected;
         datasetPanel.hidden = !datasetSelected;
         textClassificationPanel.hidden = !textClassificationSelected;
         classificationDeleteActions.hidden = !textClassificationSelected || !activeTraining;
         playgroundPanel.hidden = !playgroundSelected;
         workRequestsPanel.hidden = !workRequestsSelected;
+        wakeWordToggle.classList.toggle("active", wakeWordSelected);
         datasetToggle.classList.toggle("active", datasetSelected);
         textClassificationToggle.classList.toggle("active", textClassificationSelected);
         playgroundToggle.classList.toggle("active", playgroundSelected);
         workRequestsToggle.classList.toggle("active", workRequestsSelected);
+        wakeWordToggle.setAttribute("aria-expanded", wakeWordSelected ? "true" : "false");
         datasetToggle.setAttribute("aria-expanded", datasetSelected ? "true" : "false");
         textClassificationToggle.setAttribute(
             "aria-expanded",
@@ -105,6 +120,20 @@
         } else if (workRequestsSelected) {
             loadWorkRequests({force: true});
         }
+    }
+
+    function renderWakeWordStatus(detail = {}) {
+        const completedSamples = Number(detail.completedSamples) || 0;
+        const requiredSamples = Number(detail.requiredSamples) || 5;
+        const status = detail.state || "required";
+        const enrolled = Boolean(detail.enrolled);
+        const inProgress = ["starting", "recording", "progress", "invalid"].includes(status);
+        const message = detail.message || "Wake word setup required";
+        wakeWordState.textContent = `status=${message}`;
+        wakeWordProgress.textContent = `${completedSamples}/${requiredSamples}`;
+        wakeWordStart.disabled = inProgress;
+        wakeWordStart.textContent = "Train Wake Word";
+        wakeWordCancel.hidden = !inProgress;
     }
 
     function setState(value) {
@@ -452,12 +481,13 @@
         classificationDeleteActions.hidden = !available || textClassificationPanel.hidden;
         classificationDelete.disabled = !available || deletionQueueing;
         classificationDataset.disabled = !available;
+        classificationDatasetField.hidden = !available;
         classificationModelState.textContent = available
             ? "model=active"
             : "model=unavailable";
 
         if (!available) {
-            classificationDataset.innerHTML = '<option value="">All datasets</option>';
+            classificationDataset.innerHTML = "";
             classificationDataset.value = "";
             classificationEmpty.querySelector("span:last-child").textContent =
                 "No trained model available.";
@@ -470,13 +500,10 @@
         const metrics = training.metrics || {};
         const datasets = training.datasets || [];
         const categoryOptions = training.dataset_categories || [];
-        const selectedCategory = training.selected_category || "";
-        classificationDataset.innerHTML = [
-            '<option value="">All datasets</option>',
-            ...categoryOptions.map((category) => (
-                `<option value="${HF.escapeHtml(category.value)}">${HF.escapeHtml(category.label)}</option>`
-            )),
-        ].join("");
+        const selectedCategory = training.selected_category || categoryOptions[0]?.value || "";
+        classificationDataset.innerHTML = categoryOptions.map((category) => (
+            `<option value="${HF.escapeHtml(category.value)}">${HF.escapeHtml(category.label)}</option>`
+        )).join("");
         classificationDataset.value = selectedCategory;
         classificationModel.textContent = training.model_file || "-";
         classificationAlgorithm.textContent = training.algorithm || "-";
@@ -507,6 +534,10 @@
         }
 
         setState("Model available");
+
+        if (!training.selected_category && selectedCategory) {
+            window.setTimeout(loadTextClassification, 0);
+        }
     }
 
     function openDeleteModal() {
@@ -668,6 +699,16 @@
         }
     }
 
+    wakeWordToggle.addEventListener("click", () => setActiveView("wake-word"));
+    wakeWordStart.addEventListener("click", () => {
+        document.dispatchEvent(new CustomEvent("adam:wake-word:enroll"));
+    });
+    wakeWordCancel.addEventListener("click", () => {
+        document.dispatchEvent(new CustomEvent("adam:wake-word:cancel"));
+    });
+    document.addEventListener("adam:wake-word-status", (event) => {
+        renderWakeWordStatus(event.detail);
+    });
     datasetToggle.addEventListener("click", () => setActiveView("dataset"));
     textClassificationToggle.addEventListener(
         "click",
@@ -724,7 +765,9 @@
         }
     });
 
-    setActiveView("dataset");
+    renderWakeWordStatus();
+    setActiveView("wake-word");
+    document.dispatchEvent(new CustomEvent("adam:wake-word:status:request"));
     renderDataset(null);
     syncPlaygroundControls();
     loadDataset();

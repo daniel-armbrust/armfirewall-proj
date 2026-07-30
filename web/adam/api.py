@@ -1,46 +1,19 @@
-"""ADAM HTTP route aggregator."""
+"""Compatibility exports for ADAM HTTP handlers.
+
+Route declarations live in :mod:`web.adam.routes`.
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-
-from web.adam import views
-from web.adam.api_datasets import (
-    api_dataset,
-    api_training,
-    api_upload_dataset,
-    router as datasets_router,
-)
-from web.adam.api_playground import (
-    api_playground_text_classification,
-    router as playground_router,
-)
+from web.adam.api_datasets import api_dataset, api_training, api_upload_dataset
+from web.adam.api_playground import api_playground_text_classification
 from web.adam.api_text_classification import (
     api_delete_text_classification,
     api_text_classification,
     api_text_classification_chart,
-    router as text_classification_router,
 )
-from web.adam.api_transcription import (
-    api_receive_transcription,
-    router as transcription_router,
-)
-from web.adam.websocket import router as websocket_router
-
-
-router = APIRouter()
-router.include_router(transcription_router)
-router.include_router(datasets_router)
-router.include_router(playground_router)
-router.include_router(text_classification_router)
-router.include_router(websocket_router)
-
-
-@router.get("/armfirewall/adam", response_class=HTMLResponse)
-def adam_page(request: Request) -> HTMLResponse:
-    """Render the ADAM page."""
-    return views.render_adam(request)
+from web.adam.api_transcription import api_receive_transcription
+from web.adam.routes import adam_page, router
 
 
 # Keep the existing import surface available to callers and tests while the

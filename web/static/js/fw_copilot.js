@@ -54,6 +54,13 @@
     let detectorEnrolled = false;
     let enrollmentInProgress = false;
     let enrollmentCompletedSamples = 0;
+    let enrollmentRecognizer = null;
+    let enrollmentRecognizerChannel = null;
+    let enrollmentResultSegments = [];
+    let enrollmentPartialTranscript = "";
+    let enrollmentFinalizationTimer = null;
+    let pendingEnrollmentStart = false;
+    let serverWakeProfile = null;
     let recognizer = null;
     let recognizerChannel = null;
     let commandTimeout = null;
@@ -179,6 +186,34 @@
         }
     }
 
+    async function loadServerWakeWordProfile() {
+        const response = await window.fetch(
+            `/api/adam/wake-word?profile_key=${encodeURIComponent(wakeProfileKey)}`,
+            { cache: "no-store", credentials: "same-origin", headers: { Accept: "application/json" } },
+        );
+        if (!response.ok) {
+            throw new Error("Unable to load the wake-word profile.");
+        }
+        const payload = await response.json();
+        return payload.profile || null;
+    }
+
+    async function saveServerWakeWordProfile(profile) {
+        const response = await window.fetch("/api/adam/wake-word", {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({
+                profile_key: wakeProfileKey,
+                templates: profile.templates,
+                threshold: profile.threshold,
+            }),
+        });
+        if (!response.ok) {
+            throw new Error("Unable to save the wake-word profile.");
+        }
+    }
+
     function supportError() {
         if (!window.isSecureContext
             || !navigator.mediaDevices
@@ -221,8 +256,22 @@
     }
 
     function setEnrollmentPrompt() {
-        setState("muted", "Click to teach Adam the wake word.");
+        setState("muted", "Wake word setup required.");
         copilot.setAttribute("aria-disabled", "false");
+        publishWakeWordStatus("required", "Wake word setup required.");
+    }
+
+    function publishWakeWordStatus(state, message, extra = {}) {
+        document.dispatchEvent(new CustomEvent("adam:wake-word-status", {
+            detail: {
+                state,
+                message,
+                enrolled: detectorEnrolled,
+                completedSamples: enrollmentCompletedSamples,
+                requiredSamples: enrollmentSamples,
+                ...extra,
+            },
+        }));
     }
 
     function setWakeAlertState({ autoTransition = true } = {}) {
@@ -362,7 +411,49 @@
             } else {
                 stopCommandRecognition();
             }
-        }, 450);
+        }, 1000);
+    }
+
+    function enrollmentTranscriptIsValid(transcript) {
+        const normalizedTranscript = normalizeText(transcript)
+            .replace(/[^a-z0-9\s]/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+        const normalizedWakeWord = normalizeText(wakeWord);
+        return normalizedTranscript === normalizedWakeWord;
+    }
+
+    async function beginEnrollmentSample(sampleNumber) {
+        const model = await loadOfflineModel();
+        if (!enrollmentInProgress || !audioProcessor || !detectorWorker) {
+            return;
+        }
+        enrollmentResultSegments = [];
+        enrollmentPartialTranscript = "";
+        enrollmentRecognizerChannel = new MessageChannel();
+        model.registerPort(enrollmentRecognizerChannel.port1);
+        enrollmentRecognizer = new model.KaldiRecognizer(commandSampleRate);
+        const activeRecognizer = enrollmentRecognizer;
+        enrollmentRecognizer.on("result", (result) => {
+            if (enrollmentRecognizer === activeRecognizer) {
+                const text = (result.result.text || "").trim();
+                if (text && enrollmentResultSegments.at(-1) !== text) {
+                    enrollmentResultSegments.push(text);
+                }
+            }
+        });
+        enrollmentRecognizer.on("partialresult", (result) => {
+            if (enrollmentRecognizer === activeRecognizer) {
+                enrollmentPartialTranscript = (result.result.partial || "").trim();
+            }
+        });
+        audioProcessor.port.postMessage({
+            action: "startRecognizer",
+            recognizerId: enrollmentRecognizer.id,
+            sampleRate: commandSampleRate,
+        }, [enrollmentRecognizerChannel.port2]);
+        detectorWorker.postMessage({ type: "recordEnrollmentSample" });
+        publishWakeWordStatus("recording", `Say “${spokenWakeWord}” now.`, {sampleNumber});
     }
 
     function scheduleEnrollmentSample(sampleNumber, delay = 700) {
@@ -371,23 +462,72 @@
         }
         setState(
             "awake",
-            `Say “${spokenWakeWord}” now (${sampleNumber}/${enrollmentSamples}).`,
+            `Get ready for wake word sample ${sampleNumber}/${enrollmentSamples}.`,
         );
         window.setTimeout(() => {
             if (enrollmentInProgress && detectorWorker) {
-                detectorWorker.postMessage({ type: "recordEnrollmentSample" });
+                beginEnrollmentSample(sampleNumber).catch(() => {
+                    enrollmentInProgress = false;
+                    setState("error", "Unable to verify the wake word.");
+                    publishWakeWordStatus("error", "Unable to verify the wake word.");
+                });
             }
         }, delay);
     }
 
-    function startEnrollment() {
-        if (!detectorReady || detectorEnrolled || enrollmentInProgress || !detectorWorker) {
+    function startEnrollment({replace = false} = {}) {
+        if (!detectorReady || (!replace && detectorEnrolled) || enrollmentInProgress || !detectorWorker) {
             return;
         }
         enrollmentInProgress = true;
         enrollmentCompletedSamples = 0;
         copilot.setAttribute("aria-disabled", "true");
         detectorWorker.postMessage({ type: "startEnrollment" });
+        publishWakeWordStatus("starting", "Preparing wake word setup.");
+    }
+
+    function finishEnrollmentRecognition() {
+        if (!enrollmentRecognizer || !audioProcessor || !detectorWorker) {
+            return;
+        }
+        audioProcessor.port.postMessage({ action: "stopRecognizer" });
+        window.clearTimeout(enrollmentFinalizationTimer);
+        enrollmentFinalizationTimer = window.setTimeout(() => {
+            const transcript = (
+                enrollmentResultSegments.join(" ").trim() || enrollmentPartialTranscript
+            ).trim();
+            enrollmentRecognizer.remove();
+            enrollmentRecognizer = null;
+            if (enrollmentRecognizerChannel) {
+                enrollmentRecognizerChannel.port1.close();
+                enrollmentRecognizerChannel = null;
+            }
+            if (enrollmentTranscriptIsValid(transcript)) {
+                detectorWorker.postMessage({ type: "acceptEnrollmentSample" });
+                return;
+            }
+            detectorWorker.postMessage({ type: "rejectEnrollmentSample" });
+            setState("retry", `Only “${spokenWakeWord}” is valid. Please try again.`);
+            publishWakeWordStatus("invalid", `Only “${spokenWakeWord}” is valid. Please try again.`);
+        }, 450);
+    }
+
+    function discardEnrollmentRecognition() {
+        window.clearTimeout(enrollmentFinalizationTimer);
+        enrollmentFinalizationTimer = null;
+        if (audioProcessor) {
+            audioProcessor.port.postMessage({ action: "stopRecognizer" });
+        }
+        if (enrollmentRecognizer) {
+            enrollmentRecognizer.remove();
+            enrollmentRecognizer = null;
+        }
+        if (enrollmentRecognizerChannel) {
+            enrollmentRecognizerChannel.port1.close();
+            enrollmentRecognizerChannel = null;
+        }
+        enrollmentResultSegments = [];
+        enrollmentPartialTranscript = "";
     }
 
     async function stopCommandRecognition({ resumeDetector = true } = {}) {
@@ -568,24 +708,50 @@
             detectorEnrolled = message.enrolled;
             if (detectorEnrolled) {
                 setListeningState();
+                publishWakeWordStatus("ready", "Wake word is ready.");
             } else {
                 setEnrollmentPrompt();
             }
+            if (pendingEnrollmentStart) {
+                pendingEnrollmentStart = false;
+                startEnrollment({replace: true});
+            }
         } else if (message.type === "enrollmentReady") {
             scheduleEnrollmentSample(1);
+        } else if (message.type === "enrollmentSampleCaptured") {
+            finishEnrollmentRecognition();
         } else if (message.type === "enrollmentSampleComplete") {
             enrollmentCompletedSamples = message.count;
+            publishWakeWordStatus(
+                "progress",
+                `Wake word sample ${message.count}/${enrollmentSamples} saved.`,
+            );
             if (message.count < enrollmentSamples) {
                 scheduleEnrollmentSample(message.count + 1, 900);
             }
+        } else if (message.type === "enrollmentSampleRejected") {
+            const nextSample = Math.min(enrollmentSamples, enrollmentCompletedSamples + 1);
+            scheduleEnrollmentSample(nextSample, 1200);
         } else if (message.type === "enrollmentTooQuiet") {
+            discardEnrollmentRecognition();
             setState("retry", `I couldn't hear you. Say “${spokenWakeWord}” again.`);
             const nextSample = Math.min(enrollmentSamples, enrollmentCompletedSamples + 1);
             scheduleEnrollmentSample(nextSample, 1200);
         } else if (message.type === "enrollmentComplete") {
             enrollmentInProgress = false;
             detectorEnrolled = true;
+            serverWakeProfile = message.profile || null;
             setListeningState();
+            publishWakeWordStatus("complete", "Wake word setup completed.");
+            if (serverWakeProfile) {
+                saveServerWakeWordProfile(serverWakeProfile).catch(() => {
+                    publishWakeWordStatus("error", "Wake word was trained, but could not be saved.");
+                });
+            }
+        } else if (message.type === "enrollmentCancelled") {
+            discardEnrollmentRecognition();
+            enrollmentInProgress = false;
+            setEnrollmentPrompt();
         } else if (message.type === "wakeWord") {
             debugLog("wake word detected", {
                 score: message.score,
@@ -623,11 +789,22 @@
             requiredDetectionStreak,
             thresholdMultiplier,
             preRollMs,
+            profile: serverWakeProfile,
         });
     }
 
     async function stopAudio() {
         await stopCommandRecognition({ resumeDetector: false });
+        window.clearTimeout(enrollmentFinalizationTimer);
+        enrollmentFinalizationTimer = null;
+        if (enrollmentRecognizer) {
+            enrollmentRecognizer.remove();
+            enrollmentRecognizer = null;
+        }
+        if (enrollmentRecognizerChannel) {
+            enrollmentRecognizerChannel.port1.close();
+            enrollmentRecognizerChannel = null;
+        }
         if (detectorWorker) {
             detectorWorker.terminate();
             detectorWorker = null;
@@ -651,7 +828,7 @@
         }
     }
 
-    async function enableListening() {
+    async function enableListening({enrollWakeWord = false} = {}) {
         if (!window.Vosk) {
             setState("error", "Microphone is not supported.");
             return;
@@ -698,6 +875,9 @@
             audioProcessor.connect(audioContext.destination);
             saveListeningPreference(true);
             loadOfflineModel().catch(() => {});
+            if (enrollWakeWord) {
+                pendingEnrollmentStart = true;
+            }
         } catch (error) {
             listeningEnabled = false;
             copilot.setAttribute("aria-pressed", "false");
@@ -733,8 +913,32 @@
 
     window.addEventListener("pointermove", trackPointer, { passive: true });
     document.addEventListener("adam:wake-word", sendTranscription);
+    document.addEventListener("adam:wake-word:status:request", () => {
+        publishWakeWordStatus(
+            detectorEnrolled ? "ready" : "required",
+            detectorEnrolled ? "Wake word is ready." : "Wake word setup required.",
+        );
+    });
+    document.addEventListener("adam:wake-word:enroll", () => {
+        if (listeningEnabled && detectorReady) {
+            startEnrollment({replace: true});
+            return;
+        }
+        pendingEnrollmentStart = true;
+        enableListening({enrollWakeWord: true});
+    });
+    document.addEventListener("adam:wake-word:cancel", () => {
+        if (detectorWorker && enrollmentInProgress) {
+            discardEnrollmentRecognition();
+            detectorWorker.postMessage({ type: "cancelEnrollment" });
+        }
+    });
     copilot.addEventListener("click", () => {
         if (!listeningEnabled) {
+            if (!detectorEnrolled) {
+                window.location.assign("/armfirewall/adam#wake-word");
+                return;
+            }
             enableListening();
         } else if (detectorReady && !detectorEnrolled) {
             startEnrollment();
@@ -757,14 +961,24 @@
 
     const savedListeningPreference = listeningPreference();
     connectAdamWebSocket();
-    if (savedListeningPreference === "true") {
-        enableListening();
-    } else if (savedListeningPreference === null) {
-        setState("muted", "Click to enable listening");
-        enableListening();
-    } else {
-        setState("muted", "Microphone is not active. Click to enable listening.");
-    }
+    loadServerWakeWordProfile().then((profile) => {
+        serverWakeProfile = profile;
+        detectorEnrolled = Boolean(profile && profile.templates
+            && profile.templates.length >= enrollmentSamples);
+        if (!detectorEnrolled) {
+            setEnrollmentPrompt();
+            return;
+        }
+        publishWakeWordStatus("ready", "Wake word is ready.");
+        if (savedListeningPreference === "true") {
+            enableListening();
+        } else {
+            setState("muted", "Microphone is not active. Click to enable listening.");
+        }
+    }).catch(() => {
+        detectorEnrolled = false;
+        setEnrollmentPrompt();
+    });
 
     window.addEventListener("pagehide", () => {
         pageIsClosing = true;

@@ -5,7 +5,7 @@ from __future__ import annotations
 from urllib.parse import unquote
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import HTTPException, Request
 
 from core.constants import (
     ADAM_DATASET_MAX_BYTES,
@@ -16,10 +16,6 @@ from web.adam import datasets
 from web.workrequests import api as workrequests_api
 
 
-router = APIRouter()
-
-
-@router.get("/api/adam/dataset")
 def api_dataset(dataset_category: str = "firewall") -> dict[str, object]:
     """Return the latest uploaded ADAM dataset."""
     try:
@@ -30,7 +26,6 @@ def api_dataset(dataset_category: str = "firewall") -> dict[str, object]:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.post("/api/adam/dataset")
 async def api_upload_dataset(
     request: Request,
     dataset_type: str = "training",
@@ -69,7 +64,6 @@ async def api_upload_dataset(
     }
 
 
-@router.post("/api/adam/training")
 def api_training(dataset_category: str = "firewall") -> dict[str, object]:
     """Queue asynchronous ADAM model training for the active dataset pair."""
     request_uid = str(uuid4())
@@ -120,4 +114,4 @@ def api_training(dataset_category: str = "firewall") -> dict[str, object]:
     }
 
 
-__all__ = ["api_dataset", "api_training", "api_upload_dataset", "router"]
+__all__ = ["api_dataset", "api_training", "api_upload_dataset"]

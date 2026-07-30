@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 from core.constants import (
@@ -15,10 +15,6 @@ from web.adam import text_classification
 from web.workrequests import api as workrequests_api
 
 
-router = APIRouter()
-
-
-@router.get("/api/adam/text-classification")
 def api_text_classification(dataset_category: str | None = None) -> dict[str, object]:
     """Return active shared-model details, optionally for one dataset category."""
     try:
@@ -31,7 +27,6 @@ def api_text_classification(dataset_category: str | None = None) -> dict[str, ob
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.delete("/api/adam/text-classification")
 def api_delete_text_classification(training_uid: str) -> dict[str, object]:
     """Queue deletion of the active model and its training artifacts."""
     try:
@@ -78,7 +73,6 @@ def api_delete_text_classification(training_uid: str) -> dict[str, object]:
     }
 
 
-@router.get("/api/adam/text-classification/chart", response_class=FileResponse)
 def api_text_classification_chart(
     training_uid: str,
     dataset_category: str | None = None,
@@ -105,5 +99,4 @@ __all__ = [
     "api_delete_text_classification",
     "api_text_classification",
     "api_text_classification_chart",
-    "router",
 ]

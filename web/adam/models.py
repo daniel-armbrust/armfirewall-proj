@@ -18,3 +18,11 @@ class AdamPlaygroundInferencePayload(BaseModel):
     """Text submitted to the ADAM Playground classifier."""
 
     text: str = Field(min_length=1, max_length=ADAM_TRANSCRIPTION_MAX_CHARS)
+
+
+class AdamWakeWordProfilePayload(BaseModel):
+    """Browser-generated acoustic templates for one ADAM wake-word profile."""
+
+    profile_key: str = Field(min_length=1, max_length=64)
+    templates: list[list[list[float]]]
+    threshold: float

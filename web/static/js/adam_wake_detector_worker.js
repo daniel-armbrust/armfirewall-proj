@@ -16,6 +16,7 @@ let templates = [];
 let threshold = 0;
 let audioBuffer = [];
 let enrollmentBuffer = [];
+let pendingEnrollmentFeatures = null;
 let collectingEnrollment = false;
 let detectionPaused = true;
 let samplesSinceDetection = 0;
@@ -202,13 +203,26 @@ async function finishEnrollmentSample() {
         postMessage({ type: "enrollmentTooQuiet" });
         return;
     }
-    templates.push(features);
+    pendingEnrollmentFeatures = features;
+    postMessage({ type: "enrollmentSampleCaptured" });
+}
+
+async function acceptEnrollmentSample() {
+    if (!pendingEnrollmentFeatures) {
+        return;
+    }
+    templates.push(pendingEnrollmentFeatures);
+    pendingEnrollmentFeatures = null;
     postMessage({ type: "enrollmentSampleComplete", count: templates.length });
     if (templates.length >= enrollmentSampleCount) {
         threshold = calibrateThreshold();
         await saveProfile();
         detectionPaused = false;
-        postMessage({ type: "enrollmentComplete", threshold });
+        postMessage({
+            type: "enrollmentComplete",
+            threshold,
+            profile: { profileKey, templates, threshold },
+        });
     }
 }
 
@@ -282,11 +296,14 @@ self.onmessage = async (event) => {
             requiredDetectionStreak = message.requiredDetectionStreak || requiredDetectionStreak;
             thresholdMultiplier = message.thresholdMultiplier || thresholdMultiplier;
             preRollMs = message.preRollMs || preRollMs;
-            const profile = await loadProfile();
-            if (profile) {
+            const profile = message.profile || await loadProfile();
+            if (profile && Array.isArray(profile.templates)) {
                 templates = profile.templates || [];
                 threshold = profile.threshold || calibrateThreshold();
                 detectionPaused = false;
+                if (message.profile) {
+                    await saveProfile();
+                }
             }
             postMessage({ type: "ready", enrolled: templates.length >= enrollmentSampleCount });
         } else if (message.type === "audio") {
@@ -297,10 +314,22 @@ self.onmessage = async (event) => {
             audioBuffer = [];
             detectionPaused = true;
             collectingEnrollment = false;
+            pendingEnrollmentFeatures = null;
             postMessage({ type: "enrollmentReady" });
         } else if (message.type === "recordEnrollmentSample") {
             enrollmentBuffer = [];
             collectingEnrollment = true;
+        } else if (message.type === "acceptEnrollmentSample") {
+            await acceptEnrollmentSample();
+        } else if (message.type === "rejectEnrollmentSample") {
+            pendingEnrollmentFeatures = null;
+            postMessage({ type: "enrollmentSampleRejected" });
+        } else if (message.type === "cancelEnrollment") {
+            collectingEnrollment = false;
+            enrollmentBuffer = [];
+            pendingEnrollmentFeatures = null;
+            templates = [];
+            postMessage({ type: "enrollmentCancelled" });
         } else if (message.type === "resumeDetection") {
             audioBuffer = [];
             detectionPaused = false;

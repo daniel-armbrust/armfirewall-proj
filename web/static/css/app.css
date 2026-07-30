@@ -2129,12 +2129,12 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 }
 
 .adam-training-data-panel .edit-form {
-    padding: 10px 14px;
+    padding: 4px 14px 6px;
 }
 
 .adam-dataset-fields {
     display: grid;
-    gap: 8px;
+    gap: 2px;
     max-width: 840px;
 }
 
@@ -2144,7 +2144,7 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .adam-dataset-requirements {
     min-height: 0;
-    padding: 8px 0 0;
+    padding: 3px 0 0;
 }
 
 .adam-dataset-row {
@@ -2156,6 +2156,21 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .adam-dataset-row .text-button {
     min-width: 230px;
+}
+
+.adam-training-data-panel .adam-dataset-row .field {
+    gap: 1px;
+}
+
+.adam-training-data-panel .panel-head {
+    min-height: 32px;
+    padding: 7px 14px;
+}
+
+.adam-training-data-panel .adam-dataset-fields input,
+.adam-training-data-panel .adam-dataset-fields select,
+.adam-training-data-panel .adam-dataset-row .text-button {
+    min-height: 30px;
 }
 
 .adam-training-actions {
@@ -2265,6 +2280,37 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     min-height: 0;
     margin-top: 10px;
     padding: 12px;
+}
+
+.adam-wake-word-form {
+    padding: 8px 14px;
+    gap: 8px;
+}
+
+.adam-wake-word-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.adam-wake-word-progress strong {
+    color: var(--accent);
+    font-size: 18px;
+}
+
+#adam-wake-word-panel .panel-head {
+    min-height: 32px;
+    padding: 7px 14px;
+}
+
+.adam-wake-word-actions {
+    margin-top: 18px;
+    flex-direction: row;
+    align-items: center;
 }
 
 #adam-delete-modal .modal-dialog {

@@ -2,15 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
-
 from web.adam import models
 
 
-router = APIRouter()
-
-
-@router.post("/api/adam/transcription")
 def api_receive_transcription(
     payload: models.AdamTranscriptionPayload,
 ) -> dict[str, str]:
@@ -19,4 +13,4 @@ def api_receive_transcription(
     return {"status": "received"}
 
 
-__all__ = ["api_receive_transcription", "router"]
+__all__ = ["api_receive_transcription"]

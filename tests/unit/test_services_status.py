@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from core import supervisord
-from web.routes.services import routes as services_routes
+from web.services import routes as services_routes
 from web.services import api as services_status
 from web.workrequests import api as workrequests_api
 

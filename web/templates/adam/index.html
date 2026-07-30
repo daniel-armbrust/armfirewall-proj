@@ -29,8 +29,12 @@
 </section>
 
 <nav class="local-tabs" aria-label="ADAM tools">
-    <button class="local-tab active" type="button" id="adam-dataset-toggle"
-            aria-controls="adam-dataset-panel" aria-expanded="true">
+    <button class="local-tab active" type="button" id="adam-wake-word-toggle"
+            aria-controls="adam-wake-word-panel" aria-expanded="true">
+        WAKE WORD
+    </button>
+    <button class="local-tab" type="button" id="adam-dataset-toggle"
+            aria-controls="adam-dataset-panel" aria-expanded="false">
         DATASETS
     </button>
     <button class="local-tab" type="button" id="adam-text-classification-toggle">
@@ -49,7 +53,31 @@
     </button>
 </nav>
 
-<section id="adam-dataset-panel">
+<section class="panel" id="adam-wake-word-panel">
+    <div class="panel-head">
+        <h2>Wake Word</h2>
+        <span id="adam-wake-word-state">status=Wake word setup required</span>
+    </div>
+    <div class="edit-form adam-wake-word-form">
+        <div class="adam-wake-word-progress" aria-live="polite">
+            <span>Samples</span>
+            <strong id="adam-wake-word-progress">0/5</strong>
+        </div>
+        <p class="field-help">
+            Adam must be the only spoken wake word in every sample. Any other word is rejected.
+        </p>
+    </div>
+</section>
+<div class="form-actions routing-global-actions adam-wake-word-actions" id="adam-wake-word-actions">
+    <button class="text-button primary" type="button" id="adam-wake-word-start">
+        Train Wake Word
+    </button>
+    <button class="text-button danger" type="button" id="adam-wake-word-cancel" hidden>
+        Cancel
+    </button>
+</div>
+
+<section id="adam-dataset-panel" hidden>
 <section class="panel adam-training-data-panel">
     <div class="panel-head">
         <h2>Training data</h2>
@@ -110,11 +138,10 @@
         <span id="adam-classification-model-state">model=unavailable</span>
     </div>
     <div class="edit-form">
-        <label class="field adam-classification-dataset-field">
+        <label class="field adam-classification-dataset-field"
+               id="adam-classification-dataset-field" hidden>
             <span>Trained dataset</span>
-            <select id="adam-classification-dataset" disabled>
-                <option value="">All datasets</option>
-            </select>
+            <select id="adam-classification-dataset" disabled></select>
         </label>
         <div class="terminal-empty" id="adam-classification-empty">
             <span class="prompt">$</span>
@@ -288,5 +315,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260730-playground-inference" defer></script>
+<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260803-wake-word-compact" defer></script>
 {% endblock %}

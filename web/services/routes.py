@@ -15,7 +15,7 @@ from web.services.linkfailover import views as services_linkfailover_views
 from web.services.squid import views as services_squid_views
 from web.services import api as services_api
 from web.services import views as services_views
-from web.routes.workrequests import routes as workrequests_routes
+from web.workrequests import routes as workrequests_routes
 
 
 router = APIRouter()

@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 
 from web.adam.models import AdamPlaygroundInferencePayload
 from web.adam.playground import PlaygroundInferenceError, infer_text_classification
 
 
-router = APIRouter()
-
-
-@router.post("/api/adam/playground/text-classification")
 def api_playground_text_classification(
     payload: AdamPlaygroundInferencePayload,
 ) -> dict[str, object]:
@@ -22,4 +18,4 @@ def api_playground_text_classification(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-__all__ = ["api_playground_text_classification", "router"]
+__all__ = ["api_playground_text_classification"]

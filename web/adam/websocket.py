@@ -8,7 +8,7 @@ import uuid
 from collections import deque
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect
 
 from web import auth
 from web.adam.inference import AdamInferenceError, infer_intent
@@ -16,8 +16,6 @@ from web.adam.models import AdamTranscriptionPayload
 from web.constants import SESSION_COOKIE
 from web.services.api import service_enabled
 
-
-router = APIRouter()
 
 _CLOSE_UNAUTHORIZED = 4401
 _CLOSE_FORBIDDEN = 4403
@@ -121,7 +119,6 @@ async def receive_command(websocket: WebSocket, processed_request_ids: deque[str
     )
 
 
-@router.websocket("/ws/adam")
 async def adam_websocket(websocket: WebSocket) -> None:
     """Keep an authenticated ADAM command channel open while ADAM is enabled."""
     if not origin_is_allowed(websocket):
