@@ -1,0 +1,1 @@
+"""ADAM wake-word package."""

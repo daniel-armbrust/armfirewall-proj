@@ -74,6 +74,7 @@ def _load_active_model() -> Any:
 
         _cached_model = classifier
         _cached_signature = signature
+        
         return classifier
 
 
@@ -96,8 +97,10 @@ def infer_intent(text: str) -> IntentPrediction:
         raise AdamInferenceError("ADAM intent inference failed.") from exc
 
     prediction = IntentPrediction(intent=intent, confidence=confidence)
+
     logger.log(
         f"ADAM inference result: intent={prediction.intent!r} confidence={prediction.confidence:.4f}",
         source=LOG_SOURCE,
     )
+
     return prediction

@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 from core.constants import ADAM_TRANSCRIPTION_MAX_CHARS
-from web.adam.inference import AdamInferenceError, IntentPrediction, infer_intent
+from web.adam.text_classification.inference import (
+    AdamInferenceError,
+    IntentPrediction,
+    infer_intent,
+)
 
 
 TEXT_CLASSIFICATION_MODE = "text-classification"

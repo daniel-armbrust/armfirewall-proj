@@ -9,6 +9,11 @@ from core.constants import RRD_IMG_DIR
 from web import auth
 from web.constants import STATIC_DIR
 from web.adam import routes as adam_routes
+from web.adam.datasets import routes as adam_datasets_routes
+from web.adam.text_classification import routes as text_classification_training_routes
+from web.adam.playground import routes as adam_playground_routes
+from web.adam.transcription import routes as adam_transcription_routes
+from web.adam.wake_word import routes as adam_wake_word_routes
 from web.dashboard import routes as dashboard_routes
 from web.firewall import routes as firewall_routes
 from web.interfaces import routes as interface_routes
@@ -44,4 +49,9 @@ app.include_router(service_routes.router)
 app.include_router(tools_routes.router)
 app.include_router(workrequest_routes.router)
 app.include_router(adam_routes.router)
+app.include_router(adam_datasets_routes.router)
+app.include_router(text_classification_training_routes.router)
+app.include_router(adam_playground_routes.router)
+app.include_router(adam_transcription_routes.router)
+app.include_router(adam_wake_word_routes.router)
 app.include_router(menu_routes.router)

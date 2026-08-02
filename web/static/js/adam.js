@@ -65,6 +65,8 @@
     const workRequestRefreshMs = 3000;
     let activeDataset = null;
     let uploadInProgress = false;
+    let selectedTrainingFile = null;
+    let selectedTestingFile = null;
     let trainingInProgress = false;
     let workRequestsLoading = false;
     let textClassificationLoading = false;
@@ -222,17 +224,16 @@
     }
 
     function syncControls() {
-        const training = activeDataset && activeDataset.training;
-        const testing = activeDataset && activeDataset.testing;
-        const editable = !activeDataset || activeDataset.status === "uploaded";
         const busy = uploadInProgress || trainingInProgress;
-
+        const filesSelected = Boolean(
+            datasetCategory.value && selectedTrainingFile && selectedTestingFile,
+        );
         trainingInput.disabled = busy;
+        testingInput.disabled = busy;
         datasetCategory.disabled = busy;
-        testingInput.disabled = busy || !training || !editable;
         trainingImport.disabled = busy;
-        testingImport.disabled = busy || !training || !editable;
-        trainingModel.disabled = busy || !training || !testing || !editable;
+        testingImport.disabled = busy;
+        trainingModel.disabled = busy || !filesSelected;
     }
 
     function renderDataset(dataset) {
@@ -298,32 +299,6 @@
         return false;
     }
 
-    async function loadDataset() {
-        try {
-            const category = encodeURIComponent(datasetCategory.value);
-            const response = await fetch(`/api/adam/dataset?dataset_category=${category}`, {
-                cache: "no-store",
-                credentials: "same-origin",
-                headers: {"Accept": "application/json"},
-            });
-
-            if (handleAuthentication(response)) {
-                return;
-            }
-
-            const payload = await parseResponse(response);
-
-            if (!response.ok) {
-                throw new Error(payload.detail || `HTTP ${response.status}`);
-            }
-
-            renderDataset(payload.dataset || null);
-        } catch (error) {
-            setState("Error");
-            setStatus(error.message, true);
-        }
-    }
-
     function validateFile(file) {
         if (!file.name.toLowerCase().endsWith(".csv")) {
             setStatus("Select a file with a .csv extension.", true);
@@ -338,98 +313,31 @@
         return true;
     }
 
-    async function uploadDataset(file, datasetType) {
-        if (!validateFile(file)) {
-            return;
-        }
-
-        uploadInProgress = true;
+    function selectDataset(file, type) {
+        if (!validateFile(file)) return;
+        if (type === "training") { selectedTrainingFile = file; trainingName.value = file.name; }
+        else { selectedTestingFile = file; testingName.value = file.name; }
+        setState(selectedTrainingFile && selectedTestingFile ? "Ready to train selected datasets" : "Select the remaining dataset");
+        setStatus(`${type === "training" ? "Training" : "Testing"} dataset selected. It will upload when Train Model is clicked.`);
         syncControls();
-        setState(`Uploading ${datasetType} dataset`);
-        setStatus("");
-
-        const button = datasetType === "training" ? trainingImport : testingImport;
-        const defaultLabel = datasetType === "training"
-            ? "Load Training Dataset"
-            : "Load Test Dataset";
-        button.textContent = "Uploading...";
-
-        try {
-            const response = await fetch(
-                `/api/adam/dataset?dataset_type=${encodeURIComponent(datasetType)}&dataset_category=${encodeURIComponent(datasetCategory.value)}`,
-                {
-                    method: "POST",
-                    credentials: "same-origin",
-                    headers: {
-                        "Accept": "application/json",
-                        "Content-Type": "text/csv",
-                        "X-File-Name": encodeURIComponent(file.name),
-                    },
-                    body: file,
-                },
-            );
-
-            if (handleAuthentication(response)) {
-                return;
-            }
-
-            const payload = await parseResponse(response);
-
-            if (!response.ok) {
-                throw new Error(payload.detail || `HTTP ${response.status}`);
-            }
-
-            renderDataset(payload.dataset);
-            setStatus(payload.message || "Dataset loaded successfully.");
-        } catch (error) {
-            setState("Error");
-            setStatus(error.message, true);
-        } finally {
-            uploadInProgress = false;
-            button.textContent = defaultLabel;
-            trainingInput.value = "";
-            testingInput.value = "";
-            syncControls();
-        }
     }
 
     async function queueTraining() {
-        trainingInProgress = true;
-        syncControls();
-        trainingModel.textContent = "Queueing...";
-        setState("Queueing training");
-        setStatus("");
-
+        if (!selectedTrainingFile || !selectedTestingFile) { setStatus("Select both training and testing CSV files first.", true); return; }
+        trainingInProgress = true; syncControls(); trainingModel.textContent = "Uploading and queueing..."; setState("Validating selected datasets"); setStatus("");
         try {
-            const category = encodeURIComponent(datasetCategory.value);
-            const response = await fetch(`/api/adam/training?dataset_category=${category}`, {
-                method: "POST",
-                credentials: "same-origin",
-                headers: {"Accept": "application/json"},
-            });
-
-            if (handleAuthentication(response)) {
-                return;
-            }
-
+            const formData = new FormData();
+            formData.append("dataset_category", datasetCategory.value);
+            formData.append("training_dataset", selectedTrainingFile, selectedTrainingFile.name);
+            formData.append("testing_dataset", selectedTestingFile, selectedTestingFile.name);
+            const response = await fetch("/api/adam/text-classification/training", {method: "POST", credentials: "same-origin", headers: {"Accept": "application/json"}, body: formData});
+            if (handleAuthentication(response)) return;
             const payload = await parseResponse(response);
-
-            if (!response.ok) {
-                throw new Error(payload.detail || `HTTP ${response.status}`);
-            }
-
-            renderDataset(payload.dataset);
-            setStatus(payload.message || "Training work request queued successfully.");
-            setActiveView("work-requests");
-        } catch (error) {
-            setState("Error");
-            setStatus(error.message, true);
-            await loadDataset();
-        } finally {
-            trainingInProgress = false;
-            trainingModel.textContent = "Train Model";
-            syncControls();
-        }
+            if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+            selectedTrainingFile = null; selectedTestingFile = null; trainingInput.value = ""; testingInput.value = "";
+            renderDataset(payload.dataset); setStatus(payload.message || "Training work request queued successfully."); setActiveView("work-requests");
+        } catch (error) { setState("Error"); setStatus(error.message, true); }
+        finally { trainingInProgress = false; trainingModel.textContent = "Train Model"; syncControls(); }
     }
 
     function renderWorkRequests(payload) {
@@ -687,7 +595,6 @@
             }
 
             renderWorkRequests(payload);
-            await loadDataset();
         } catch (error) {
             workRequestsBody.innerHTML = `
                 <tr>
@@ -717,9 +624,9 @@
     playgroundToggle.addEventListener("click", () => setActiveView("playground"));
     workRequestsToggle.addEventListener("click", () => setActiveView("work-requests"));
     datasetCategory.addEventListener("change", () => {
+        selectedTrainingFile = null; selectedTestingFile = null; trainingInput.value = ""; testingInput.value = "";
         renderDataset(null);
         setStatus("");
-        loadDataset();
     });
     trainingImport.addEventListener("click", () => trainingInput.click());
     testingImport.addEventListener("click", () => testingInput.click());
@@ -746,7 +653,7 @@
         const file = trainingInput.files && trainingInput.files[0];
 
         if (file) {
-            uploadDataset(file, "training");
+            selectDataset(file, "training");
         }
     });
 
@@ -754,7 +661,7 @@
         const file = testingInput.files && testingInput.files[0];
 
         if (file) {
-            uploadDataset(file, "testing");
+            selectDataset(file, "testing");
         }
     });
 
@@ -770,5 +677,4 @@
     document.dispatchEvent(new CustomEvent("adam:wake-word:status:request"));
     renderDataset(null);
     syncPlaygroundControls();
-    loadDataset();
 })();

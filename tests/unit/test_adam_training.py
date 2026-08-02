@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from web.adam import datasets
+from web.adam.datasets import repository, service as datasets
 from web.workrequests import api as workrequests_api
 
 
@@ -37,6 +37,7 @@ class AdamDatasetWorkflowTests(unittest.TestCase):
 
         self.patches = [
             mock.patch.object(datasets, "ADAM_DB_PATH", self.database_path),
+            mock.patch.object(repository, "ADAM_DB_PATH", self.database_path),
             mock.patch.object(datasets, "ADAM_DATASET_DIR", self.dataset_dir),
         ]
 
@@ -50,8 +51,8 @@ class AdamDatasetWorkflowTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def load_dataset_pair(self) -> dict[str, object]:
-        datasets.store_dataset(TRAINING_CSV, "training.csv", "training")
-        return datasets.store_dataset(TESTING_CSV, "testing.csv", "testing")
+        datasets.store_dataset(TRAINING_CSV, "training.csv", "training", "firewall")
+        return datasets.store_dataset(TESTING_CSV, "testing.csv", "testing", "firewall")
 
     def test_training_and_testing_uploads_share_one_dataset_pair(self) -> None:
         pair = self.load_dataset_pair()
@@ -91,6 +92,7 @@ class AdamDatasetWorkflowTests(unittest.TestCase):
             TRAINING_CSV,
             "replacement.csv",
             "training",
+            "firewall",
         )
 
         self.assertEqual(current["training"]["file_name"], "replacement.csv")
@@ -109,7 +111,7 @@ class AdamDatasetWorkflowTests(unittest.TestCase):
         self.assertEqual(statuses, [("archived", 0, 2), ("uploaded", 1, 1)])
 
     def test_testing_dataset_rejects_unknown_labels(self) -> None:
-        datasets.store_dataset(TRAINING_CSV, "training.csv", "training")
+        datasets.store_dataset(TRAINING_CSV, "training.csv", "training", "firewall")
 
         with self.assertRaisesRegex(
             datasets.DatasetUploadError,
@@ -119,6 +121,7 @@ class AdamDatasetWorkflowTests(unittest.TestCase):
                 b"text,label\nshow routes,unknown_label\nsecond,allow_rule\n",
                 "testing.csv",
                 "testing",
+                "firewall",
             )
 
 

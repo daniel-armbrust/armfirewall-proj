@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from web.adam import models
+from .models import AdamTranscriptionPayload
 
 
 def api_receive_transcription(
-    payload: models.AdamTranscriptionPayload,
+    payload: AdamTranscriptionPayload,
 ) -> dict[str, str]:
     """Receive an ADAM voice transcription without processing it."""
     print(payload)

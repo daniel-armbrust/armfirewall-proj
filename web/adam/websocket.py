@@ -11,8 +11,8 @@ from urllib.parse import urlparse
 from fastapi import WebSocket, WebSocketDisconnect
 
 from web import auth
-from web.adam.inference import AdamInferenceError, infer_intent
-from web.adam.models import AdamTranscriptionPayload
+from web.adam.text_classification.inference import AdamInferenceError, infer_intent
+from web.adam.transcription.models import AdamTranscriptionPayload
 from web.constants import SESSION_COOKIE
 from web.services.api import service_enabled
 

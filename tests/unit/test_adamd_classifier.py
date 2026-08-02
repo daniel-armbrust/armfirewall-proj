@@ -15,7 +15,9 @@ from core.constants import (
 from daemons.adamd import adamd, text_classifier
 from daemons.workreqd import workreqd
 from daemons.workreqd.models import QueuedWorkRequest
-from web.adam import datasets, text_classification
+from web.adam.text_classification import repository as text_classification_repository
+from web.adam.text_classification import service as text_classification
+from web.adam.datasets import repository, service as datasets
 
 
 TRAINING_CSV = b"""text,label
@@ -49,6 +51,7 @@ class AdamTextClassifierTests(unittest.TestCase):
 
         self.patches = [
             mock.patch.object(datasets, "ADAM_DB_PATH", self.database_path),
+            mock.patch.object(repository, "ADAM_DB_PATH", self.database_path),
             mock.patch.object(datasets, "ADAM_DATASET_DIR", self.dataset_dir),
             mock.patch.object(text_classifier, "ADAM_DB_PATH", self.database_path),
             mock.patch.object(text_classifier, "ADAM_DATASET_DIR", self.dataset_dir),
@@ -65,9 +68,9 @@ class AdamTextClassifierTests(unittest.TestCase):
                 self.model_path,
             ),
             mock.patch.object(text_classifier, "ROOT_DIR", self.root),
-            mock.patch.object(text_classification, "ADAM_DB_PATH", self.database_path),
-            mock.patch.object(text_classification, "ADAM_CHARTS_DIR", self.charts_dir),
-            mock.patch.object(text_classification, "ROOT_DIR", self.root),
+            mock.patch.object(text_classification_repository, "ADAM_DB_PATH", self.database_path),
+            mock.patch.object(text_classification.storage, "ADAM_CHARTS_DIR", self.charts_dir),
+            mock.patch.object(text_classification.storage, "ROOT_DIR", self.root),
         ]
 
         for patcher in self.patches:
@@ -80,10 +83,10 @@ class AdamTextClassifierTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def test_adamd_trains_tests_and_saves_one_classifier(self) -> None:
-        datasets.store_dataset(TRAINING_CSV, "training.csv", "training")
-        datasets.store_dataset(TESTING_CSV, "testing.csv", "testing")
+        datasets.store_dataset(TRAINING_CSV, "training.csv", "training", "firewall")
+        datasets.store_dataset(TESTING_CSV, "testing.csv", "testing", "firewall")
         request_uid = "11111111-1111-4111-8111-111111111111"
-        queued = datasets.prepare_training(request_uid)
+        queued = datasets.prepare_training(request_uid, "firewall")
         argv = [
             "--work-request-id",
             "1",
@@ -148,10 +151,10 @@ class AdamTextClassifierTests(unittest.TestCase):
         )
 
     def test_adamd_deletes_active_model_chart_and_associated_datasets(self) -> None:
-        datasets.store_dataset(TRAINING_CSV, "training.csv", "training")
-        datasets.store_dataset(TESTING_CSV, "testing.csv", "testing")
+        datasets.store_dataset(TRAINING_CSV, "training.csv", "training", "firewall")
+        datasets.store_dataset(TESTING_CSV, "testing.csv", "testing", "firewall")
         training_request_uid = "11111111-1111-4111-8111-111111111111"
-        queued = datasets.prepare_training(training_request_uid)
+        queued = datasets.prepare_training(training_request_uid, "firewall")
         training_argv = [
             "--work-request-id",
             "1",

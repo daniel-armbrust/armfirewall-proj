@@ -2134,12 +2134,14 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .adam-dataset-fields {
     display: grid;
-    gap: 2px;
+    gap: 18px;
     max-width: 840px;
+    padding: 12px 0;
 }
 
 .adam-dataset-category-field {
     max-width: 586px;
+    padding-bottom: 4px;
 }
 
 .adam-dataset-requirements {
@@ -2152,6 +2154,7 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     grid-template-columns: minmax(280px, 1fr) auto;
     gap: 24px;
     align-items: end;
+    padding: 4px 0;
 }
 
 .adam-dataset-row .text-button {

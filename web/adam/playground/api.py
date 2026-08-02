@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 
-from web.adam.models import AdamPlaygroundInferencePayload
-from web.adam.playground import PlaygroundInferenceError, infer_text_classification
+from .models import AdamPlaygroundInferencePayload
+from .service import PlaygroundInferenceError, infer_text_classification
 
 
 def api_playground_text_classification(

@@ -6,8 +6,9 @@ import unittest
 
 from pydantic import ValidationError
 
-from web.adam.api import api_receive_transcription, router
-from web.adam.models import AdamTranscriptionPayload
+from web.adam.transcription.api import api_receive_transcription
+from web.adam.transcription.models import AdamTranscriptionPayload
+from web.adam.transcription.routes import router
 
 
 class AdamTranscriptionApiTests(unittest.TestCase):
