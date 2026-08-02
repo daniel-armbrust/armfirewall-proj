@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import tempfile
 from pathlib import Path
@@ -12,6 +11,8 @@ import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
+
+from core.hashing import sha256_file
 
 
 def build_classifier(*, max_iterations: int, random_state: int) -> Pipeline:
@@ -35,17 +36,6 @@ def build_classifier(*, max_iterations: int, random_state: int) -> Pipeline:
             ),
         ]
     )
-
-
-def file_sha256(path: Path) -> str:
-    """Return the SHA-256 digest for one file."""
-    digest = hashlib.sha256()
-
-    with path.open("rb") as model_file:
-        for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
-            digest.update(chunk)
-
-    return digest.hexdigest()
 
 
 def publish_model(
@@ -73,7 +63,7 @@ def publish_model(
         with temporary_path.open("rb") as model_file:
             os.fsync(model_file.fileno())
 
-        digest = file_sha256(temporary_path)
+        digest = sha256_file(temporary_path)
 
         if model_path.exists():
             rollback_path = models_dir / f".text_classifier-{uuid4()}.rollback"

@@ -66,7 +66,9 @@ def main(argv: list[str] | None = None) -> int:
             ),
             source=ADAM_LOG_SOURCE,
         )
+
         result = delete_text_classifier(training_uid)
+
         logger.info(
             (
                 f"Completed ADAM text classifier deletion for work request "
@@ -76,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
             ),
             source=ADAM_LOG_SOURCE,
         )
+
         return 0
 
     logger.info(
@@ -109,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
         source=ADAM_LOG_SOURCE,
     )
+    
     return 0
 
 

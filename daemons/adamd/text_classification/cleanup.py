@@ -31,6 +31,7 @@ def delete_classifier(
         normalize_uuid=normalize_uuid,
         stored_artifact_path=stored_artifact_path,
     )
+
     staging_path = _create_staging_directory(staging_dir)
     staged_files: list[tuple[Path, Path]] = []
 
@@ -47,6 +48,7 @@ def delete_classifier(
         raise
 
     _remove_staged_files(staged_files, staging_path)
+
     return {
         "training_runs": len(context["run_ids"]),
         "datasets": len(context["dataset_ids"]),
@@ -66,6 +68,7 @@ def _collect_delete_context(
 ) -> dict[str, Any]:
     """Collect database records and validated artifact paths to remove."""
     normalized_uid = normalize_uuid(training_uid, "training_uid")
+
     training_run = db.fetch_one(
         """
         SELECT id, model_joblib_filepath, evaluation_chart_filepath
@@ -75,6 +78,7 @@ def _collect_delete_context(
         (normalized_uid,),
         db_path=db_path,
     )
+
     if training_run is None:
         raise ValueError("The active ADAM text classifier was not found.")
 
@@ -89,19 +93,24 @@ def _collect_delete_context(
         (training_run["id"],),
         db_path=db_path,
     )
+
     dataset_ids = [int(dataset["id"]) for dataset in datasets]
     affected_runs = _affected_runs(dataset_ids, db_path=db_path)
     run_ids = {int(run["id"]) for run in affected_runs}
     run_ids.add(int(training_run["id"]))
 
     artifact_paths: set[Path] = set()
+
     if training_run["model_joblib_filepath"]:
         artifact_paths.add(stored_artifact_path(training_run["model_joblib_filepath"], models_dir, "model"))
+
     if training_run["evaluation_chart_filepath"]:
         artifact_paths.add(stored_artifact_path(training_run["evaluation_chart_filepath"], charts_dir, "chart"))
+
     for run in affected_runs:
         if run["evaluation_chart_filepath"]:
             artifact_paths.add(stored_artifact_path(run["evaluation_chart_filepath"], charts_dir, "chart"))
+
     for dataset in datasets:
         normalize_uuid(dataset["dataset_uid"], "dataset_id")
         artifact_paths.add(stored_artifact_path(dataset["stored_filepath"], dataset_dir, "dataset"))
@@ -118,6 +127,7 @@ def _affected_runs(dataset_ids: list[int], *, db_path: Path) -> list[dict[str, A
     if not dataset_ids:
         return []
     placeholders = ", ".join("?" for _ in dataset_ids)
+
     return db.fetch_all(
         f"""
         SELECT DISTINCT r.id, r.evaluation_chart_filepath
@@ -133,29 +143,36 @@ def _affected_runs(dataset_ids: list[int], *, db_path: Path) -> list[dict[str, A
 def _create_staging_directory(staging_dir: Path) -> Path:
     """Create the temporary directory used for safe deletion."""
     staging_dir.mkdir(parents=True, exist_ok=True, mode=0o750)
+    
     return Path(tempfile.mkdtemp(prefix=".delete-", dir=staging_dir))
 
 
 def _stage_artifacts(artifact_paths: set[Path], staging_path: Path) -> list[tuple[Path, Path]]:
     """Move artifacts to staging before changing database records."""
     staged_files: list[tuple[Path, Path]] = []
+
     for index, artifact_path in enumerate(sorted(artifact_paths)):
         if not artifact_path.exists():
             continue
+
         if not artifact_path.is_file():
             raise ValueError(f"The ADAM {artifact_path.name} artifact is not a regular file.")
+
         staged_path = staging_path / f"{index}-{artifact_path.name}"
         os.replace(artifact_path, staged_path)
         staged_files.append((artifact_path, staged_path))
+
     return staged_files
 
 
 def _delete_database_records(run_ids: set[int], dataset_ids: list[int], *, db_path: Path) -> None:
     """Delete training relationships, runs, and datasets in one transaction."""
     placeholders = ", ".join("?" for _ in run_ids)
+
     with db.transaction(db_path) as connection:
         db.execute_on(connection, f"DELETE FROM adam_training_run_datasets WHERE training_run_id IN ({placeholders})", tuple(sorted(run_ids)))
         db.execute_on(connection, f"DELETE FROM adam_training_runs WHERE id IN ({placeholders})", tuple(sorted(run_ids)))
+
         if dataset_ids:
             dataset_placeholders = ", ".join("?" for _ in dataset_ids)
             db.execute_on(connection, f"DELETE FROM adam_datasets WHERE id IN ({dataset_placeholders})", tuple(dataset_ids))
@@ -172,4 +189,5 @@ def _remove_staged_files(staged_files: list[tuple[Path, Path]], staging_path: Pa
     """Permanently remove successfully staged artifacts."""
     for _, staged_path in staged_files:
         staged_path.unlink(missing_ok=True)
+
     staging_path.rmdir()

@@ -45,28 +45,77 @@ from .state import mark_failed, mark_running
 def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]:
     """Train, evaluate, publish, and persist one text classifier."""
     training_run = _training_run(training_uid, request_uid)
-    datasets = _training_datasets(int(training_run["id"]))
-    training_texts: list[str] = []
-    training_labels: list[str] = []
-    testing_texts: list[str] = []
-    testing_labels: list[str] = []
-    training_by_category: dict[str, tuple[list[str], list[str]]] = {}
-    testing_by_category: dict[str, tuple[list[str], list[str]]] = {}
+    
+    training_data, testing_data, category = _load_training_data(
+        _training_datasets(int(training_run["id"]))
+    )
 
-    for dataset in datasets:
-        texts, labels = _load_dataset(dataset)
+    _validate_training_data(training_data, testing_data)
 
-        if dataset["purpose"] == "training":
-            training_texts.extend(texts)
-            training_labels.extend(labels)
-            training_by_category[str(dataset["category"])] = (texts, labels)
-        elif dataset["purpose"] == "testing":
-            testing_texts.extend(texts)
-            testing_labels.extend(labels)
-            testing_by_category[str(dataset["category"])] = (texts, labels)
+    training_texts, training_labels = training_data
+    testing_texts, testing_labels = testing_data
+    classifier = _build_classifier()
+    classifier.fit(training_texts, training_labels)
+    predictions = classifier.predict(testing_texts)
 
-    if not training_texts or not testing_texts:
+    model_sha256, rollback_path = _publish_model(classifier)
+
+    metadata = _training_metadata(
+        training_run,
+        classifier,
+        training_data,
+        testing_data,
+        predictions,
+        model_sha256,
+    )
+
+    return _publish_and_persist_training(
+        int(training_run["id"]),
+        str(training_run["training_uid"]),
+        category,
+        metadata,
+        testing_labels,
+        predictions,
+        rollback_path,
+    )
+
+
+def _load_training_data(
+    datasets: list[dict[str, Any]],
+) -> tuple[
+    tuple[list[str], list[str]],
+    tuple[list[str], list[str]],
+    str,
+]:
+    """Load the selected category's training and testing CSV data."""
+    datasets_by_purpose = {
+        str(dataset["purpose"]): dataset
+        for dataset in datasets
+    }
+
+    training_dataset = datasets_by_purpose.get("training")
+    testing_dataset = datasets_by_purpose.get("testing")
+
+    if training_dataset is None or testing_dataset is None:
         raise ValueError("Training and testing datasets are required.")
+
+    if training_dataset["category"] != testing_dataset["category"]:
+        raise ValueError("Training and testing datasets must use the same category.")
+
+    return (
+        _load_dataset(training_dataset),
+        _load_dataset(testing_dataset),
+        str(training_dataset["category"]),
+    )
+
+
+def _validate_training_data(
+    training_data: tuple[list[str], list[str]],
+    testing_data: tuple[list[str], list[str]],
+) -> None:
+    """Validate that one dataset pair can train a text classifier."""
+    _, training_labels = training_data
+    _, testing_labels = testing_data
 
     if len(set(training_labels)) < 2:
         raise ValueError("Training requires at least two labels.")
@@ -74,15 +123,23 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
     unknown_labels = sorted(set(testing_labels) - set(training_labels))
 
     if unknown_labels:
-        rendered = ", ".join(unknown_labels)
         raise ValueError(
-            f"Testing contains labels not found in training: {rendered}."
+            "Testing contains labels not found in training: "
+            f"{', '.join(unknown_labels)}."
         )
 
-    classifier = _build_classifier()
-    classifier.fit(training_texts, training_labels)
-    predictions = classifier.predict(testing_texts)
 
+def _training_metadata(
+    training_run: dict[str, Any],
+    classifier: Pipeline,
+    training_data: tuple[list[str], list[str]],
+    testing_data: tuple[list[str], list[str]],
+    predictions: Any,
+    model_sha256: str,
+) -> dict[str, Any]:
+    """Build persisted metrics for one trained text classifier."""
+    training_texts, training_labels = training_data
+    testing_texts, testing_labels = testing_data
     precision, recall, f1_score, _ = precision_recall_fscore_support(
         testing_labels,
         predictions,
@@ -90,17 +147,14 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
         zero_division=0,
     )
 
-    model_sha256, rollback_path = _publish_model(classifier)
-    labels = [str(value) for value in classifier.classes_]
-
-    metadata = {
+    return {
         "model_id": str(uuid4()),
         "model_file": ADAM_TEXT_CLASSIFIER_MODEL_PATH.name,
         "model_sha256": model_sha256,
         "training_uid": training_run["training_uid"],
         "training_records": len(training_texts),
         "testing_records": len(testing_texts),
-        "labels": labels,
+        "labels": [str(value) for value in classifier.classes_],
         "training_accuracy": float(classifier.score(training_texts, training_labels)),
         "testing_accuracy": float(classifier.score(testing_texts, testing_labels)),
         "precision_macro": float(precision),
@@ -112,83 +166,45 @@ def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]
         },
     }
 
-    evaluation_chart_path: Path | None = None
-    category_chart_paths: list[Path] = []
+
+def _publish_and_persist_training(
+    training_run_id: int,
+    training_uid: str,
+    category: str,
+    metadata: dict[str, Any],
+    testing_labels: list[str],
+    predictions: Any,
+    rollback_path: Path | None,
+) -> dict[str, Any]:
+    """Publish the single evaluation chart and persist the training result."""
+    chart_path: Path | None = None
 
     try:
-        evaluation_chart_path = _publish_evaluation_chart(
-            str(training_run["training_uid"]),
+        chart_path = _publish_evaluation_chart(
+            training_uid,
             metadata,
             testing_labels,
             predictions,
         )
-
-        metadata["evaluation_chart_filepath"] = str(
-            evaluation_chart_path.relative_to(ROOT_DIR)
-        )
-
-        metadata["category_results"] = []
-        for category in sorted(testing_by_category):
-            category_training_texts, category_training_labels = training_by_category[category]
-            category_testing_texts, category_testing_labels = testing_by_category[category]
-            category_predictions = classifier.predict(category_testing_texts)
-            category_labels = sorted(
-                set(category_training_labels)
-                | set(category_testing_labels)
-                | {str(value) for value in category_predictions}
-            )
-            category_precision, category_recall, category_f1, _ = (
-                precision_recall_fscore_support(
-                    category_testing_labels,
-                    category_predictions,
-                    average="macro",
-                    zero_division=0,
-                )
-            )
-            category_metadata = {
-                "labels": category_labels,
-                "training_accuracy": float(
-                    classifier.score(category_training_texts, category_training_labels)
-                ),
-                "testing_accuracy": float(
-                    classifier.score(category_testing_texts, category_testing_labels)
-                ),
-                "precision_macro": float(category_precision),
-                "recall_macro": float(category_recall),
-                "f1_macro": float(category_f1),
+        chart_filepath = str(chart_path.relative_to(ROOT_DIR))
+        metadata["evaluation_chart_filepath"] = chart_filepath
+        metadata["category_results"] = [
+            {
+                "category": category,
+                "evaluation_chart_filepath": chart_filepath,
             }
-            category_chart_path = _publish_evaluation_chart(
-                str(training_run["training_uid"]),
-                category_metadata,
-                category_testing_labels,
-                category_predictions,
-                chart_suffix=f"category-{category}",
-            )
-            category_chart_paths.append(category_chart_path)
-            metadata["category_results"].append(
-                {
-                    "category": category,
-                    "evaluation_chart_filepath": str(
-                        category_chart_path.relative_to(ROOT_DIR)
-                    ),
-                }
-            )
-
-        _persist_success(int(training_run["id"]), metadata)
+        ]
+        _persist_success(training_run_id, metadata)
     except Exception:
         _restore_model(rollback_path)
-
-        if evaluation_chart_path is not None:
-            evaluation_chart_path.unlink(missing_ok=True)
-        for category_chart_path in category_chart_paths:
-            category_chart_path.unlink(missing_ok=True)
+        if chart_path is not None:
+            chart_path.unlink(missing_ok=True)
         raise
     else:
         if rollback_path is not None:
             rollback_path.unlink(missing_ok=True)
 
     return metadata
-
 
 def delete_text_classifier(training_uid: str) -> dict[str, int]:
     """Delete the active model, charts, datasets, and dependent training runs."""

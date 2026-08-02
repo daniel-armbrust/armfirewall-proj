@@ -1,32 +1,61 @@
 ArmFirewall ADAM Training Daemon
 ================================
 
-adamd is a one-shot executor for asynchronous ADAM model training. It is started
-by workreqd for one queued work request and exits when that request finishes. It
-is not a persistent daemon and must not be registered in Supervisor.
+adamd is a one-shot worker for ADAM text-classification lifecycle requests. It
+is dispatched by workreqd for one queued request and exits when that request
+finishes. It is not a persistent daemon and must not be registered in
+Supervisor.
 
-Execution Flow
---------------
+Responsibilities
+----------------
 
-1. The web application stores each immutable CSV under
-   ROOT_DIR/daemons/adamd/datasets/<UUID>.csv.
-2. The web application creates one training run associated with every complete
-   active dataset category and queues its training_uid.
-3. workreqd dispatches the request to adamd.
-4. adamd validates the request and loads every associated CSV.
-5. A TfidfVectorizer and LogisticRegression pipeline trains the classifier.
-6. adamd atomically saves the joblib pipeline under
-   ROOT_DIR/daemons/adamd/models/ and exits.
+The web application owns CSV upload validation and dataset persistence. For one
+selected dataset category, it stores one training CSV and one testing CSV, then
+creates an adam_training_runs record and queues its training_uid.
 
-Required payload:
+workreqd owns request dispatch. It starts this worker with:
+
+    python -m daemons.adamd.adamd
+
+adamd validates the work-request arguments and delegates the text-classification
+operation to text_classification/service.py.
+
+Training Flow
+-------------
+
+1. The web application stores the selected training and testing CSV files under
+   ROOT_DIR/daemons/adamd/datasets/.
+2. The web application creates one queued training run associated with exactly
+   that dataset pair.
+3. workreqd dispatches the request with the training_uid payload.
+4. adamd marks the run as running.
+5. text_classification/service.py loads and validates the two CSV files.
+6. A deterministic TfidfVectorizer and LogisticRegression pipeline is trained
+   and evaluated against the testing CSV.
+7. The model and one evaluation chart are atomically published.
+8. The training metadata and metrics are persisted and the run becomes active.
+
+The training run is marked as failed if any training step raises an exception.
+
+Deletion Flow
+-------------
+
+A delete work request targets the active training_uid. The worker safely stages
+model, chart, and dataset artifacts, removes the related database records in a
+transaction, and removes the staged files only after the transaction succeeds.
+
+Payload
+-------
+
+Both training and deletion requests require a valid UUID:
 
     {"training_uid": "5b6789b4-36a2-4e33-96fe-cc98cc9cf236"}
 
-For manual diagnostics, use:
+For manual diagnostics:
 
     python -m daemons.adamd.adamd \
         --work-request-id 1 \
-        --request-uid example-request \
+        --request-uid 11111111-1111-4111-8111-111111111111 \
         --category-name ADAM.MODEL_TRAINING \
         --category ADAM \
         --family MACHINE_LEARNING \
@@ -35,20 +64,41 @@ For manual diagnostics, use:
         --target-rule-id "" \
         --payload-json '{"training_uid":"5b6789b4-36a2-4e33-96fe-cc98cc9cf236"}'
 
+Use --action-name delete to remove the active classifier identified by the
+payload.
+
+Package Structure
+-----------------
+
+adamd.py
+    Work-request parser and lifecycle dispatcher.
+
+text_classification/service.py
+    Training orchestration, validation, publication, persistence, and deletion
+    entry points.
+
+text_classification/training.py
+    scikit-learn pipeline construction and atomic model publication.
+
+text_classification/evaluation.py
+    Evaluation chart generation and atomic chart publication.
+
+text_classification/datasets.py
+    Training-run lookup and safe CSV/artifact path handling.
+
+text_classification/persistence.py
+    Successful training metadata and metric persistence.
+
+text_classification/state.py
+    Queued, running, and failed training-run transitions.
+
+text_classification/cleanup.py
+    Safe staging and deletion of training artifacts and database records.
+
 Artifacts
 ---------
 
-daemons/adamd/models/adam-intent-<UUID>.joblib
-    Fitted scikit-learn Pipeline ready for prediction.
-
-daemons/adamd/models/adam-intent-<UUID>.json
-    Training provenance, classes, record count and training accuracy.
-
-daemons/adamd/models/active.json
-    Atomic pointer containing metadata for the active inference model.
-
-Responsibility Boundary
------------------------
-
-The web process validates uploads and queues work. workreqd owns dispatch and
-status tracking. adamd owns one training execution and then terminates.
+The configured ADAM model directory contains the active joblib classifier. The
+configured chart directory contains its evaluation chart. Dataset CSV files,
+model artifacts, and charts are constrained to their configured directories
+before they are read, published, or deleted.
