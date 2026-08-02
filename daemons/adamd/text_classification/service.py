@@ -25,21 +25,21 @@ from core.constants import (
     ROOT_DIR,
 )
 
-from .classifier_evaluation import publish_evaluation_chart
-from .artifact_cleanup import delete_classifier
-from .classifier_training import (
+from .evaluation import publish_evaluation_chart
+from .cleanup import delete_classifier
+from .training import (
     build_classifier,
     publish_model,
     restore_model,
 )
-from .dataset_loader import (
+from .datasets import (
     load_dataset,
     stored_artifact_path,
     training_datasets,
     training_run,
 )
-from .training_persistence import persist_success
-from .training_state import mark_failed, mark_running
+from .persistence import persist_success
+from .state import mark_failed, mark_running
 
 
 def train_text_classifier(training_uid: str, request_uid: str) -> dict[str, Any]:

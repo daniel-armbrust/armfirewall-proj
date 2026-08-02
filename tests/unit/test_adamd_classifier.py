@@ -12,7 +12,8 @@ from core.constants import (
     ADAM_TRAINING_CPU_QUOTA_PERCENT,
     ADAM_TRAINING_MEMORY_MAX_BYTES,
 )
-from daemons.adamd import adamd, text_classifier
+from daemons.adamd import adamd
+from daemons.adamd.text_classification import service as text_classifier
 from daemons.workreqd import workreqd
 from daemons.workreqd.models import QueuedWorkRequest
 from web.adam.text_classification import repository as text_classification_repository
@@ -68,6 +69,7 @@ class AdamTextClassifierTests(unittest.TestCase):
                 self.model_path,
             ),
             mock.patch.object(text_classifier, "ROOT_DIR", self.root),
+            mock.patch.object(text_classification, "ADAM_DB_PATH", self.database_path),
             mock.patch.object(text_classification_repository, "ADAM_DB_PATH", self.database_path),
             mock.patch.object(text_classification.storage, "ADAM_CHARTS_DIR", self.charts_dir),
             mock.patch.object(text_classification.storage, "ROOT_DIR", self.root),
@@ -86,7 +88,7 @@ class AdamTextClassifierTests(unittest.TestCase):
         datasets.store_dataset(TRAINING_CSV, "training.csv", "training", "firewall")
         datasets.store_dataset(TESTING_CSV, "testing.csv", "testing", "firewall")
         request_uid = "11111111-1111-4111-8111-111111111111"
-        queued = datasets.prepare_training(request_uid, "firewall")
+        queued = text_classification.prepare_training(request_uid, "firewall")
         argv = [
             "--work-request-id",
             "1",
@@ -154,7 +156,7 @@ class AdamTextClassifierTests(unittest.TestCase):
         datasets.store_dataset(TRAINING_CSV, "training.csv", "training", "firewall")
         datasets.store_dataset(TESTING_CSV, "testing.csv", "testing", "firewall")
         training_request_uid = "11111111-1111-4111-8111-111111111111"
-        queued = datasets.prepare_training(training_request_uid, "firewall")
+        queued = text_classification.prepare_training(training_request_uid, "firewall")
         training_argv = [
             "--work-request-id",
             "1",

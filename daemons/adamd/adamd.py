@@ -16,7 +16,7 @@ from core.constants import (
 )
 from core.payload import decode_json_payload
 
-from .text_classifier import (
+from .text_classification.service import (
     delete_text_classifier,
     mark_training_failed,
     mark_training_running,

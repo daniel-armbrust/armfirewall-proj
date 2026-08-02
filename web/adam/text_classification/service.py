@@ -10,15 +10,129 @@ from uuid import uuid4
 from core import db
 from core.constants import (
     ADAM_DATASET_CATEGORIES,
+    ADAM_DB_PATH,
     ADAM_WORK_REQUEST_ACTION,
     ADAM_WORK_REQUEST_CATEGORY,
 )
 from web.adam.datasets import service as datasets_service
+from web.adam.datasets.errors import (
+    DatasetStateError,
+    DatasetStorageError,
+    DatasetUploadError,
+)
 from web.workrequests import api as workrequests_api
 
 from .errors import TextClassificationStorageError
 from . import repository, storage
 
+
+def prepare_training(
+    request_uid: str,
+    dataset_category: str,
+) -> dict[str, object]:
+    """Create a text-classification run for the selected active dataset pair."""
+    category = _training_category(dataset_category)
+
+    try:
+        with db.transaction(ADAM_DB_PATH) as connection:
+            rows = [
+                dict(row)
+                for row in db.fetch_all_on(
+                    connection,
+                    """
+                    SELECT id, dataset_uid, category, purpose, records, labels
+                    FROM adam_datasets
+                    WHERE category = ? AND is_active = 1 AND status = 'uploaded'
+                    ORDER BY purpose
+                    """,
+                    (category,),
+                )
+            ]
+
+            datasets_by_purpose = {
+                str(row["purpose"]): row
+                for row in rows
+            }
+
+            training_dataset = datasets_by_purpose.get("training")
+            testing_dataset = datasets_by_purpose.get("testing")
+
+            if training_dataset is None:
+                raise DatasetStateError("No uploaded training dataset is available.")
+
+            if testing_dataset is None:
+                raise DatasetStateError(
+                    "Load both training and testing datasets first."
+                )
+
+            training_uid = str(uuid4())
+            labels = sorted(json.loads(str(training_dataset["labels"])))
+
+            cursor = db.execute_on(
+                connection,
+                """
+                INSERT INTO adam_training_runs (
+                    training_uid, work_request_uid, status,
+                    training_records, testing_records, labels, labels_count
+                )
+                VALUES (?, ?, 'queue', ?, ?, ?, ?)
+                """,
+                (
+                    training_uid,
+                    request_uid,
+                    int(training_dataset["records"]),
+                    int(testing_dataset["records"]),
+                    json.dumps(labels, ensure_ascii=False),
+                    len(labels),
+                ),
+            )
+
+            training_run_id = int(cursor.lastrowid)
+
+            for dataset in (training_dataset, testing_dataset):
+                db.execute_on(
+                    connection,
+                    """
+                    INSERT INTO adam_training_run_datasets (training_run_id, dataset_id)
+                    VALUES (?, ?)
+                    """,
+                    (training_run_id, int(dataset["id"])),
+                )
+    except DatasetStateError:
+        raise
+    except (OSError, db.DatabaseError, RuntimeError) as exc:
+        raise DatasetStorageError(
+            "The training request could not be prepared."
+        ) from exc
+
+    dataset = datasets_service.latest_dataset(category)
+
+    if dataset is None:
+        raise DatasetStorageError("The training request could not be prepared.")
+
+    dataset["training_uid"] = training_uid
+    dataset["datasets"] = [
+        {
+            "dataset_id": row["dataset_uid"],
+            "category": row["category"],
+            "purpose": row["purpose"],
+        }
+        for row in (training_dataset, testing_dataset)
+    ]
+
+    return dataset
+
+
+def _training_category(value: str) -> str:
+    """Validate the category used to create a text-classification run."""
+    category = value.strip().lower()
+
+    if category not in ADAM_DATASET_CATEGORIES:
+        raise DatasetUploadError(
+            "Dataset category must be Adam Misc, Firewall, Greetings, or NER."
+        )
+
+    return category
 
 
 def queue_training(
@@ -38,7 +152,7 @@ def queue_training(
     )
 
     request_uid = str(uuid4())
-    queued = datasets_service.prepare_training(request_uid, dataset_category)
+    queued = prepare_training(request_uid, dataset_category)
 
     work_request_id = workrequests_api.queue_work_request(
         action=ADAM_WORK_REQUEST_ACTION,
