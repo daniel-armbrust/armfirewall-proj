@@ -35,6 +35,7 @@ def prepare_training(
 
     try:
         with db.transaction(ADAM_DB_PATH) as connection:
+            # Fetch the active uploaded training and testing datasets for this category.
             rows = [
                 dict(row)
                 for row in db.fetch_all_on(
@@ -68,6 +69,7 @@ def prepare_training(
             training_uid = str(uuid4())
             labels = sorted(json.loads(str(training_dataset["labels"])))
 
+            # Create the queued training run with the selected dataset metadata.
             cursor = db.execute_on(
                 connection,
                 """
@@ -89,6 +91,7 @@ def prepare_training(
 
             training_run_id = int(cursor.lastrowid)
 
+            # Link both selected datasets to this training run for traceability.
             for dataset in (training_dataset, testing_dataset):
                 db.execute_on(
                     connection,

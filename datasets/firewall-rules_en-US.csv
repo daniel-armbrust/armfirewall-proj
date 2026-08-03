@@ -1,244 +1,244 @@
 text,label
-Is port 22/TCP open on the firewall?,check_port_access
-Please check whether port 443 using the TCP protocol is blocked.,check_port_access
-Please check whether port 80 using the TCP protocol is blocked.,check_port_access
-Confirm whether the custom service on port 389/TCP can receive connections.,check_port_access
-Can source 198.51.100.27 access port 80/TCP through the firewall?,check_port_access
-Check whether traffic to 172.18.10.0/24 on port 995/UDP is allowed.,check_port_access
-I want to know if there is any rule allowing the custom service on 1883/TCP.,check_port_access
-Check the status of port 443/TCP on interface eth1.,check_port_access
-Does the firewall allow connections destined for port 5900/TCP?,check_port_access
-Validate whether the custom service is accessible from source 10.10.0.0/16 using 8883/UDP.,check_port_access
-Can you check if port 53/UDP on destination 10.40.5.25 is closed?,check_port_access
-Is there any policy blocking access to port 68/TCP?,check_port_access
-"Report the access status of the custom service, port 161/TCP.",check_port_access
-Is port 25/TCP open on the firewall?,check_port_access
-Please check whether port 993 using the TCP protocol is blocked.,check_port_access
-Confirm whether the custom service on port 1812/TCP can receive connections.,check_port_access
-Can source 8.8.8.8 access port 587/TCP through the firewall?,check_port_access
-Check whether traffic to 172.18.10.0/24 on port 5672/UDP is allowed.,check_port_access
-I want to know if there is any rule allowing the custom service on 8443/TCP.,check_port_access
-Check the status of port 993/TCP on interface bond0.,check_port_access
-Does the firewall allow connections destined for port 67/TCP?,check_port_access
-Validate whether the custom service is accessible from source 203.0.113.18 using 143/UDP.,check_port_access
-Can you check if port 995/TCP on destination 10.40.5.25 is closed?,check_port_access
-Is there any policy blocking access to port 853/TCP?,check_port_access
-"Report the access status of the custom service, port 1521/TCP.",check_port_access
-Is port 3389/TCP open on the firewall?,check_port_access
-Please check whether port 5432 using the TCP protocol is blocked.,check_port_access
-Confirm whether the custom service on port 8080/TCP can receive connections.,check_port_access
-Can source 10.0.8.15 access port 3306/TCP through the firewall?,check_port_access
-Check whether traffic to 172.18.10.0/24 on port 53/UDP is allowed.,check_port_access
-I want to know if there is any rule allowing the custom service on 123/TCP.,check_port_access
-Check the status of port 5432/TCP on interface vlan20.,check_port_access
-Does the firewall allow connections destined for port 636/TCP?,check_port_access
-Validate whether the custom service is accessible from source 198.51.100.64/27 using 1433/UDP.,check_port_access
-Can you check if port 6379/TCP on destination 10.40.5.25 is closed?,check_port_access
-Is there any policy blocking access to port 5060/TCP?,check_port_access
-"Report the access status of the custom service, port 6443/TCP.",check_port_access
-Is port 123/UDP open on the firewall?,check_port_access
-Please check whether port 25 using the TCP protocol is blocked.,check_port_access
-Confirm whether the custom service on port 110/TCP can receive connections.,check_port_access
-Can source 192.168.10.25 access port 161/UDP through the firewall?,check_port_access
-Check whether traffic to 172.18.10.0/24 on port 587/UDP is allowed.,check_port_access
-I want to know if there is any rule allowing the custom service on 1194/TCP.,check_port_access
-Check the status of port 514/UDP on interface WAN.,check_port_access
-Does the firewall allow connections destined for port 4500/TCP?,check_port_access
-Validate whether the custom service is accessible from source 172.20.5.10 using 6379/UDP.,check_port_access
-Can you check if port 389/TCP on destination 10.40.5.25 is closed?,check_port_access
-Is there any policy blocking access to port 22/TCP?,check_port_access
-"Report the access status of the custom service, port 80/TCP.",check_port_access
-Is port 636/TCP open on the firewall?,check_port_access
-Please check whether port 514 using the TCP protocol is blocked.,check_port_access
-Confirm whether the custom service on port 995/TCP can receive connections.,check_port_access
-Can source 172.16.40.0/24 access port 5060/UDP through the firewall?,check_port_access
-Check whether traffic to 172.18.10.0/24 on port 3389/UDP is allowed.,check_port_access
-I want to know if there is any rule allowing the custom service on 5900/TCP.,check_port_access
-Check the status of port 1883/TCP on interface LAN.,check_port_access
-Does the firewall allow connections destined for port 27017/TCP?,check_port_access
-Validate whether the custom service is accessible from source 172.16.2.5 using 68/UDP.,check_port_access
-Can you check if port 445/TCP on destination 10.40.5.25 is closed?,check_port_access
-Is there any policy blocking access to port 500/TCP?,check_port_access
-Create a firewall rule to open port 80 on the firewall.,create_allow_port_rule
-Create a firewall rule to open port 22/TCP.,create_allow_port_rule
-Authorize inbound connections for the custom service on port 80/TCP.,create_allow_port_rule
-Open port 389/TCP for destination 192.168.30.15.,create_allow_port_rule
-Allow source 198.51.100.27 to access port 80/TCP.,create_allow_port_rule
-Add a rule allowing port 995/UDP via interface bond0.,create_allow_port_rule
-Open the custom service on the firewall using 1883/TCP.,create_allow_port_rule
-Configure a permission for traffic destined to port 443/TCP.,create_allow_port_rule
-Add an inbound rule allowing 5900/TCP on 172.20.8.0/24.,create_allow_port_rule
-Enable access from source 10.10.0.0/16 to port 8883/UDP.,create_allow_port_rule
-Create a firewall rule to open port 53/UDP.,create_allow_port_rule
-Authorize inbound connections for the custom service on port 68/TCP.,create_allow_port_rule
-Open port 161/TCP for destination 192.168.200.0/24.,create_allow_port_rule
-Allow source 10.0.8.15 to access port 25/TCP.,create_allow_port_rule
-Add a rule allowing port 993/TCP via interface eth1.,create_allow_port_rule
-Open the custom service on the firewall using 1812/TCP.,create_allow_port_rule
-Configure a permission for traffic destined to port 587/TCP.,create_allow_port_rule
-Add an inbound rule allowing 5672/UDP on 172.18.10.0/24.,create_allow_port_rule
-Enable access from source 198.51.100.64/27 to port 8443/TCP.,create_allow_port_rule
-Create a firewall rule to open port 993/TCP.,create_allow_port_rule
-Authorize inbound connections for the custom service on port 67/TCP.,create_allow_port_rule
-Open port 143/UDP for destination 8.8.8.8.,create_allow_port_rule
-Allow source 172.16.40.0/24 to access port 995/TCP.,create_allow_port_rule
-Add a rule allowing port 853/TCP via interface eth0.,create_allow_port_rule
-Open the custom service on the firewall using 1521/TCP.,create_allow_port_rule
-Configure a permission for traffic destined to port 3389/TCP.,create_allow_port_rule
-Add an inbound rule allowing 5432/TCP on 1.1.1.1.,create_allow_port_rule
-Enable access from source 172.16.2.5 to port 8080/TCP.,create_allow_port_rule
-Create a firewall rule to open port 3306/TCP.,create_allow_port_rule
-Authorize inbound connections for the custom service on port 53/UDP.,create_allow_port_rule
-Open port 123/TCP for destination 192.168.100.45.,create_allow_port_rule
-Allow source 8.8.8.8 to access port 5432/TCP.,create_allow_port_rule
-Add a rule allowing port 636/TCP via interface DMZ.,create_allow_port_rule
-Open the custom service on the firewall using 1433/UDP.,create_allow_port_rule
-Configure a permission for traffic destined to port 6379/TCP.,create_allow_port_rule
-Add an inbound rule allowing 5060/TCP on 10.0.0.20.,create_allow_port_rule
-Enable access from source 203.0.113.18 to port 6443/TCP.,create_allow_port_rule
-Create a firewall rule to open port 123/UDP.,create_allow_port_rule
-Authorize inbound connections for the custom service on port 25/TCP.,create_allow_port_rule
-Open port 110/TCP for destination 192.168.30.15.,create_allow_port_rule
-Allow source 192.168.10.25 to access port 161/UDP.,create_allow_port_rule
-Add a rule allowing port 587/UDP via interface LAN.,create_allow_port_rule
-Open the custom service on the firewall using 1194/TCP.,create_allow_port_rule
-Configure a permission for traffic destined to port 514/UDP.,create_allow_port_rule
-Add an inbound rule allowing 4500/TCP on 172.20.8.0/24.,create_allow_port_rule
-Create a rule to block port 22/TCP on the firewall.,create_block_port_rule
-Deny connections to the custom service on port 80/TCP.,create_block_port_rule
-Close port 389/TCP on destination 192.168.30.15.,create_block_port_rule
-Prevent source 198.51.100.27 from accessing port 80/TCP.,create_block_port_rule
-Add a block for 995/UDP on interface bond0.,create_block_port_rule
-Prohibit custom traffic using port 1883/TCP.,create_block_port_rule
-Add a drop rule for packets destined to port 443/TCP.,create_block_port_rule
-Block new connections to 172.20.8.0/24 on port 5900/TCP.,create_block_port_rule
-Create a denial from source 10.10.0.0/16 for 8883/UDP.,create_block_port_rule
-Create a rule to block port 53/UDP on the firewall.,create_block_port_rule
-Deny connections to the custom service on port 68/TCP.,create_block_port_rule
-Close port 161/TCP on destination 192.168.200.0/24.,create_block_port_rule
-Prevent source 10.0.8.15 from accessing port 25/TCP.,create_block_port_rule
-Add a block for 993/TCP on interface eth1.,create_block_port_rule
-Prohibit custom traffic using port 1812/TCP.,create_block_port_rule
-Add a drop rule for packets destined to port 587/TCP.,create_block_port_rule
-Block new connections to 172.18.10.0/24 on port 5672/UDP.,create_block_port_rule
-Create a denial from source 198.51.100.64/27 for 8443/TCP.,create_block_port_rule
-Create a rule to block port 993/TCP on the firewall.,create_block_port_rule
-Deny connections to the custom service on port 67/TCP.,create_block_port_rule
-Close port 143/UDP on destination 8.8.8.8.,create_block_port_rule
-Prevent source 172.16.40.0/24 from accessing port 995/TCP.,create_block_port_rule
-Add a block for 853/TCP on interface eth0.,create_block_port_rule
-Prohibit custom traffic using port 1521/TCP.,create_block_port_rule
-Add a drop rule for packets destined to port 3389/TCP.,create_block_port_rule
-Block new connections to 1.1.1.1 on port 5432/TCP.,create_block_port_rule
-Create a denial from source 172.16.2.5 for 8080/TCP.,create_block_port_rule
-Create a rule to block port 3306/TCP on the firewall.,create_block_port_rule
-Deny connections to the custom service on port 53/UDP.,create_block_port_rule
-Close port 123/TCP on destination 192.168.100.45.,create_block_port_rule
-Prevent source 8.8.8.8 from accessing port 5432/TCP.,create_block_port_rule
-Add a block for 636/TCP on interface DMZ.,create_block_port_rule
-Prohibit custom traffic using port 1433/UDP.,create_block_port_rule
-Add a drop rule for packets destined to port 6379/TCP.,create_block_port_rule
-Block new connections to 10.0.0.20 on port 5060/TCP.,create_block_port_rule
-Create a denial from source 203.0.113.18 for 6443/TCP.,create_block_port_rule
-Create a rule to block port 123/UDP on the firewall.,create_block_port_rule
-Deny connections to the custom service on port 25/TCP.,create_block_port_rule
-Close port 110/TCP on destination 192.168.30.15.,create_block_port_rule
-Prevent source 192.168.10.25 from accessing port 161/UDP.,create_block_port_rule
-Add a block for 587/UDP on interface LAN.,create_block_port_rule
-Prohibit custom traffic using port 1194/TCP.,create_block_port_rule
-Add a drop rule for packets destined to port 514/UDP.,create_block_port_rule
-Block new connections to 172.20.8.0/24 on port 4500/TCP.,create_block_port_rule
-Create a denial from source 172.20.5.10 for 6379/UDP.,create_block_port_rule
-Create a firewall rule that allows traffic from source 8.8.8.8 to the entire internal network.,create_allow_traffic_rule
-Create a rule allowing traffic from source 8.8.8.8 to 192.168.1.10.,create_allow_traffic_rule
-Allow communication from 192.0.2.44 to 1.1.1.1 on port 80/TCP.,create_allow_traffic_rule
-Authorize source 198.51.100.64/27 to access the entire internal network.,create_allow_traffic_rule
-Allow traffic flow from 198.51.100.27 to 172.16.0.50 via interface DMZ.,create_allow_traffic_rule
-Add an accept rule between 203.0.113.0/28 and 172.18.10.0/24.,create_allow_traffic_rule
-Enable connections originating from 203.0.113.18 to 192.168.100.45 using 1883/TCP.,create_allow_traffic_rule
-Let through the packets sent by 172.16.40.0/24 to 10.20.0.0/16.,create_allow_traffic_rule
-"Add a traffic permission from 10.20.30.40 to 172.20.8.0/24, port 5900/TCP.",create_allow_traffic_rule
-Grant access from network 10.10.0.0/16 to destination 8.8.8.8.,create_allow_traffic_rule
-Create a rule allowing traffic from source 192.168.10.25 to 10.40.5.25.,create_allow_traffic_rule
-Allow communication from 192.168.50.0/24 to 10.0.0.20 on port 68/TCP.,create_allow_traffic_rule
-Authorize source 172.16.2.5 to access the entire internal network.,create_allow_traffic_rule
-Allow traffic flow from 10.0.8.15 to 192.168.1.10 via interface LAN.,create_allow_traffic_rule
-Add an accept rule between 1.1.1.1 and 1.1.1.1.,create_allow_traffic_rule
-Enable connections originating from 172.20.5.10 to 192.168.30.15 using 1812/TCP.,create_allow_traffic_rule
-Let through the packets sent by 8.8.8.8 to 172.16.0.50.,create_allow_traffic_rule
-"Add a traffic permission from 192.0.2.44 to 172.18.10.0/24, port 5672/UDP.",create_allow_traffic_rule
-Grant access from network 198.51.100.64/27 to destination 192.168.100.45.,create_allow_traffic_rule
-Create a rule allowing traffic from source 198.51.100.27 to 10.20.0.0/16.,create_allow_traffic_rule
-Allow communication from 203.0.113.0/28 to 172.20.8.0/24 on port 67/TCP.,create_allow_traffic_rule
-Authorize source 203.0.113.18 to access the entire internal network.,create_allow_traffic_rule
-Allow traffic flow from 172.16.40.0/24 to 10.40.5.25 via interface WAN.,create_allow_traffic_rule
-Add an accept rule between 10.20.30.40 and 10.0.0.20.,create_allow_traffic_rule
-Enable connections originating from 10.10.0.0/16 to 192.168.200.0/24 using 1521/TCP.,create_allow_traffic_rule
-Let through the packets sent by 192.168.10.25 to 192.168.1.10.,create_allow_traffic_rule
-"Add a traffic permission from 192.168.50.0/24 to 1.1.1.1, port 5432/TCP.",create_allow_traffic_rule
-Grant access from network 172.16.2.5 to destination 192.168.30.15.,create_allow_traffic_rule
-Create a rule allowing traffic from source 10.0.8.15 to 172.16.0.50.,create_allow_traffic_rule
-Allow communication from 1.1.1.1 to 172.18.10.0/24 on port 53/UDP.,create_allow_traffic_rule
-Authorize source 172.20.5.10 to access the entire internal network.,create_allow_traffic_rule
-Allow traffic flow from 8.8.8.8 to 10.20.0.0/16 via interface vlan20.,create_allow_traffic_rule
-Add an accept rule between 192.0.2.44 and 172.20.8.0/24.,create_allow_traffic_rule
-Enable connections originating from 198.51.100.64/27 to 8.8.8.8 using 1433/UDP.,create_allow_traffic_rule
-Let through the packets sent by 198.51.100.27 to 10.40.5.25.,create_allow_traffic_rule
-"Add a traffic permission from 203.0.113.0/28 to 10.0.0.20, port 5060/TCP.",create_allow_traffic_rule
-Grant access from network 203.0.113.18 to destination 192.168.200.0/24.,create_allow_traffic_rule
-Create a rule allowing traffic from source 172.16.40.0/24 to 192.168.1.10.,create_allow_traffic_rule
-Allow communication from 10.20.30.40 to 1.1.1.1 on port 25/TCP.,create_allow_traffic_rule
-Authorize source 10.10.0.0/16 to access the entire internal network.,create_allow_traffic_rule
-Allow traffic flow from 192.168.10.25 to 172.16.0.50 via interface bond0.,create_allow_traffic_rule
-Add an accept rule between 192.168.50.0/24 and 172.18.10.0/24.,create_allow_traffic_rule
-Enable connections originating from 172.16.2.5 to 192.168.100.45 using 1194/TCP.,create_allow_traffic_rule
-Let through the packets sent by 10.0.8.15 to 10.20.0.0/16.,create_allow_traffic_rule
-"Add a traffic permission from 1.1.1.1 to 172.20.8.0/24, port 4500/TCP.",create_allow_traffic_rule
-"Create a firewall rule that blocks source 200.100.3.4 to destination 8.8.8.8, destination port 775/TCP.",create_block_traffic_rule
-Create a rule blocking source 8.8.8.8 to destination 192.168.1.10 on port 22/TCP.,create_block_traffic_rule
-Deny all traffic from 192.0.2.44 to 1.1.1.1.,create_block_traffic_rule
-Block any packet originating from source 198.51.100.64/27.,create_block_traffic_rule
-Drop connections from 198.51.100.27 destined to 172.16.0.50 on 80/TCP.,create_block_traffic_rule
-Prevent communication between 203.0.113.0/28 and 172.18.10.0/24 via interface bond0.,create_block_traffic_rule
-Add a denial rule from address 203.0.113.18 to 192.168.100.45.,create_block_traffic_rule
-"Prohibit access from 172.16.40.0/24 to destination 10.20.0.0/16, destination port 443/TCP.",create_block_traffic_rule
-Stop the traffic flow originating from 10.20.30.40 destined to 172.20.8.0/24.,create_block_traffic_rule
-Add a block for packets from 10.10.0.0/16 to 8.8.8.8 using 8883/UDP.,create_block_traffic_rule
-Create a rule blocking source 192.168.10.25 to destination 10.40.5.25 on port 53/UDP.,create_block_traffic_rule
-Deny all traffic from 192.168.50.0/24 to 10.0.0.20.,create_block_traffic_rule
-Block any packet originating from source 172.16.2.5.,create_block_traffic_rule
-Drop connections from 10.0.8.15 destined to 192.168.1.10 on 25/TCP.,create_block_traffic_rule
-Prevent communication between 1.1.1.1 and 1.1.1.1 via interface eth1.,create_block_traffic_rule
-Add a denial rule from address 172.20.5.10 to 192.168.30.15.,create_block_traffic_rule
-"Prohibit access from 8.8.8.8 to destination 172.16.0.50, destination port 587/TCP.",create_block_traffic_rule
-Stop the traffic flow originating from 192.0.2.44 destined to 172.18.10.0/24.,create_block_traffic_rule
-Add a block for packets from 198.51.100.64/27 to 192.168.100.45 using 8443/TCP.,create_block_traffic_rule
-Create a rule blocking source 198.51.100.27 to destination 10.20.0.0/16 on port 993/TCP.,create_block_traffic_rule
-Deny all traffic from 203.0.113.0/28 to 172.20.8.0/24.,create_block_traffic_rule
-Block any packet originating from source 203.0.113.18.,create_block_traffic_rule
-Drop connections from 172.16.40.0/24 destined to 10.40.5.25 on 995/TCP.,create_block_traffic_rule
-Prevent communication between 10.20.30.40 and 10.0.0.20 via interface eth0.,create_block_traffic_rule
-Add a denial rule from address 10.10.0.0/16 to 192.168.200.0/24.,create_block_traffic_rule
-"Prohibit access from 192.168.10.25 to destination 192.168.1.10, destination port 3389/TCP.",create_block_traffic_rule
-Stop the traffic flow originating from 192.168.50.0/24 destined to 1.1.1.1.,create_block_traffic_rule
-Add a block for packets from 172.16.2.5 to 192.168.30.15 using 8080/TCP.,create_block_traffic_rule
-Create a rule blocking source 10.0.8.15 to destination 172.16.0.50 on port 3306/TCP.,create_block_traffic_rule
-Deny all traffic from 1.1.1.1 to 172.18.10.0/24.,create_block_traffic_rule
-Block any packet originating from source 172.20.5.10.,create_block_traffic_rule
-Drop connections from 8.8.8.8 destined to 10.20.0.0/16 on 5432/TCP.,create_block_traffic_rule
-Prevent communication between 192.0.2.44 and 172.20.8.0/24 via interface DMZ.,create_block_traffic_rule
-Add a denial rule from address 198.51.100.64/27 to 8.8.8.8.,create_block_traffic_rule
-"Prohibit access from 198.51.100.27 to destination 10.40.5.25, destination port 6379/TCP.",create_block_traffic_rule
-Stop the traffic flow originating from 203.0.113.0/28 destined to 10.0.0.20.,create_block_traffic_rule
-Add a block for packets from 203.0.113.18 to 192.168.200.0/24 using 6443/TCP.,create_block_traffic_rule
-Create a rule blocking source 172.16.40.0/24 to destination 192.168.1.10 on port 123/UDP.,create_block_traffic_rule
-Deny all traffic from 10.20.30.40 to 1.1.1.1.,create_block_traffic_rule
-Block any packet originating from source 10.10.0.0/16.,create_block_traffic_rule
-Drop connections from 192.168.10.25 destined to 172.16.0.50 on 161/UDP.,create_block_traffic_rule
-Prevent communication between 192.168.50.0/24 and 172.18.10.0/24 via interface LAN.,create_block_traffic_rule
-Add a denial rule from address 172.16.2.5 to 192.168.100.45.,create_block_traffic_rule
-"Prohibit access from 10.0.8.15 to destination 10.20.0.0/16, destination port 514/UDP.",create_block_traffic_rule
-Stop the traffic flow originating from 1.1.1.1 destined to 172.20.8.0/24.,create_block_traffic_rule
+Is port 22/TCP open on the firewall?,check_firewall_rule
+Please check whether port 443 using the TCP protocol is blocked.,check_firewall_rule
+Please check whether port 80 using the TCP protocol is blocked.,check_firewall_rule
+Confirm whether the custom service on port 389/TCP can receive connections.,check_firewall_rule
+Can source 198.51.100.27 access port 80/TCP through the firewall?,check_firewall_rule
+Check whether traffic to 172.18.10.0/24 on port 995/UDP is allowed.,check_firewall_rule
+I want to know if there is any rule allowing the custom service on 1883/TCP.,check_firewall_rule
+Check the status of port 443/TCP on interface eth1.,check_firewall_rule
+Does the firewall allow connections destined for port 5900/TCP?,check_firewall_rule
+Validate whether the custom service is accessible from source 10.10.0.0/16 using 8883/UDP.,check_firewall_rule
+Can you check if port 53/UDP on destination 10.40.5.25 is closed?,check_firewall_rule
+Is there any policy blocking access to port 68/TCP?,check_firewall_rule
+"Report the access status of the custom service, port 161/TCP.",check_firewall_rule
+Is port 25/TCP open on the firewall?,check_firewall_rule
+Please check whether port 993 using the TCP protocol is blocked.,check_firewall_rule
+Confirm whether the custom service on port 1812/TCP can receive connections.,check_firewall_rule
+Can source 8.8.8.8 access port 587/TCP through the firewall?,check_firewall_rule
+Check whether traffic to 172.18.10.0/24 on port 5672/UDP is allowed.,check_firewall_rule
+I want to know if there is any rule allowing the custom service on 8443/TCP.,check_firewall_rule
+Check the status of port 993/TCP on interface bond0.,check_firewall_rule
+Does the firewall allow connections destined for port 67/TCP?,check_firewall_rule
+Validate whether the custom service is accessible from source 203.0.113.18 using 143/UDP.,check_firewall_rule
+Can you check if port 995/TCP on destination 10.40.5.25 is closed?,check_firewall_rule
+Is there any policy blocking access to port 853/TCP?,check_firewall_rule
+"Report the access status of the custom service, port 1521/TCP.",check_firewall_rule
+Is port 3389/TCP open on the firewall?,check_firewall_rule
+Please check whether port 5432 using the TCP protocol is blocked.,check_firewall_rule
+Confirm whether the custom service on port 8080/TCP can receive connections.,check_firewall_rule
+Can source 10.0.8.15 access port 3306/TCP through the firewall?,check_firewall_rule
+Check whether traffic to 172.18.10.0/24 on port 53/UDP is allowed.,check_firewall_rule
+I want to know if there is any rule allowing the custom service on 123/TCP.,check_firewall_rule
+Check the status of port 5432/TCP on interface vlan20.,check_firewall_rule
+Does the firewall allow connections destined for port 636/TCP?,check_firewall_rule
+Validate whether the custom service is accessible from source 198.51.100.64/27 using 1433/UDP.,check_firewall_rule
+Can you check if port 6379/TCP on destination 10.40.5.25 is closed?,check_firewall_rule
+Is there any policy blocking access to port 5060/TCP?,check_firewall_rule
+"Report the access status of the custom service, port 6443/TCP.",check_firewall_rule
+Is port 123/UDP open on the firewall?,check_firewall_rule
+Please check whether port 25 using the TCP protocol is blocked.,check_firewall_rule
+Confirm whether the custom service on port 110/TCP can receive connections.,check_firewall_rule
+Can source 192.168.10.25 access port 161/UDP through the firewall?,check_firewall_rule
+Check whether traffic to 172.18.10.0/24 on port 587/UDP is allowed.,check_firewall_rule
+I want to know if there is any rule allowing the custom service on 1194/TCP.,check_firewall_rule
+Check the status of port 514/UDP on interface WAN.,check_firewall_rule
+Does the firewall allow connections destined for port 4500/TCP?,check_firewall_rule
+Validate whether the custom service is accessible from source 172.20.5.10 using 6379/UDP.,check_firewall_rule
+Can you check if port 389/TCP on destination 10.40.5.25 is closed?,check_firewall_rule
+Is there any policy blocking access to port 22/TCP?,check_firewall_rule
+"Report the access status of the custom service, port 80/TCP.",check_firewall_rule
+Is port 636/TCP open on the firewall?,check_firewall_rule
+Please check whether port 514 using the TCP protocol is blocked.,check_firewall_rule
+Confirm whether the custom service on port 995/TCP can receive connections.,check_firewall_rule
+Can source 172.16.40.0/24 access port 5060/UDP through the firewall?,check_firewall_rule
+Check whether traffic to 172.18.10.0/24 on port 3389/UDP is allowed.,check_firewall_rule
+I want to know if there is any rule allowing the custom service on 5900/TCP.,check_firewall_rule
+Check the status of port 1883/TCP on interface LAN.,check_firewall_rule
+Does the firewall allow connections destined for port 27017/TCP?,check_firewall_rule
+Validate whether the custom service is accessible from source 172.16.2.5 using 68/UDP.,check_firewall_rule
+Can you check if port 445/TCP on destination 10.40.5.25 is closed?,check_firewall_rule
+Is there any policy blocking access to port 500/TCP?,check_firewall_rule
+Create a firewall rule to open port 80 on the firewall.,create_firewall_allow_rule
+Create a firewall rule to open port 22/TCP.,create_firewall_allow_rule
+Authorize inbound connections for the custom service on port 80/TCP.,create_firewall_allow_rule
+Open port 389/TCP for destination 192.168.30.15.,create_firewall_allow_rule
+Allow source 198.51.100.27 to access port 80/TCP.,create_firewall_allow_rule
+Add a rule allowing port 995/UDP via interface bond0.,create_firewall_allow_rule
+Open the custom service on the firewall using 1883/TCP.,create_firewall_allow_rule
+Configure a permission for traffic destined to port 443/TCP.,create_firewall_allow_rule
+Add an inbound rule allowing 5900/TCP on 172.20.8.0/24.,create_firewall_allow_rule
+Enable access from source 10.10.0.0/16 to port 8883/UDP.,create_firewall_allow_rule
+Create a firewall rule to open port 53/UDP.,create_firewall_allow_rule
+Authorize inbound connections for the custom service on port 68/TCP.,create_firewall_allow_rule
+Open port 161/TCP for destination 192.168.200.0/24.,create_firewall_allow_rule
+Allow source 10.0.8.15 to access port 25/TCP.,create_firewall_allow_rule
+Add a rule allowing port 993/TCP via interface eth1.,create_firewall_allow_rule
+Open the custom service on the firewall using 1812/TCP.,create_firewall_allow_rule
+Configure a permission for traffic destined to port 587/TCP.,create_firewall_allow_rule
+Add an inbound rule allowing 5672/UDP on 172.18.10.0/24.,create_firewall_allow_rule
+Enable access from source 198.51.100.64/27 to port 8443/TCP.,create_firewall_allow_rule
+Create a firewall rule to open port 993/TCP.,create_firewall_allow_rule
+Authorize inbound connections for the custom service on port 67/TCP.,create_firewall_allow_rule
+Open port 143/UDP for destination 8.8.8.8.,create_firewall_allow_rule
+Allow source 172.16.40.0/24 to access port 995/TCP.,create_firewall_allow_rule
+Add a rule allowing port 853/TCP via interface eth0.,create_firewall_allow_rule
+Open the custom service on the firewall using 1521/TCP.,create_firewall_allow_rule
+Configure a permission for traffic destined to port 3389/TCP.,create_firewall_allow_rule
+Add an inbound rule allowing 5432/TCP on 1.1.1.1.,create_firewall_allow_rule
+Enable access from source 172.16.2.5 to port 8080/TCP.,create_firewall_allow_rule
+Create a firewall rule to open port 3306/TCP.,create_firewall_allow_rule
+Authorize inbound connections for the custom service on port 53/UDP.,create_firewall_allow_rule
+Open port 123/TCP for destination 192.168.100.45.,create_firewall_allow_rule
+Allow source 8.8.8.8 to access port 5432/TCP.,create_firewall_allow_rule
+Add a rule allowing port 636/TCP via interface DMZ.,create_firewall_allow_rule
+Open the custom service on the firewall using 1433/UDP.,create_firewall_allow_rule
+Configure a permission for traffic destined to port 6379/TCP.,create_firewall_allow_rule
+Add an inbound rule allowing 5060/TCP on 10.0.0.20.,create_firewall_allow_rule
+Enable access from source 203.0.113.18 to port 6443/TCP.,create_firewall_allow_rule
+Create a firewall rule to open port 123/UDP.,create_firewall_allow_rule
+Authorize inbound connections for the custom service on port 25/TCP.,create_firewall_allow_rule
+Open port 110/TCP for destination 192.168.30.15.,create_firewall_allow_rule
+Allow source 192.168.10.25 to access port 161/UDP.,create_firewall_allow_rule
+Add a rule allowing port 587/UDP via interface LAN.,create_firewall_allow_rule
+Open the custom service on the firewall using 1194/TCP.,create_firewall_allow_rule
+Configure a permission for traffic destined to port 514/UDP.,create_firewall_allow_rule
+Add an inbound rule allowing 4500/TCP on 172.20.8.0/24.,create_firewall_allow_rule
+Create a rule to block port 22/TCP on the firewall.,create_firewall_block_rule
+Deny connections to the custom service on port 80/TCP.,create_firewall_block_rule
+Close port 389/TCP on destination 192.168.30.15.,create_firewall_block_rule
+Prevent source 198.51.100.27 from accessing port 80/TCP.,create_firewall_block_rule
+Add a block for 995/UDP on interface bond0.,create_firewall_block_rule
+Prohibit custom traffic using port 1883/TCP.,create_firewall_block_rule
+Add a drop rule for packets destined to port 443/TCP.,create_firewall_block_rule
+Block new connections to 172.20.8.0/24 on port 5900/TCP.,create_firewall_block_rule
+Create a denial from source 10.10.0.0/16 for 8883/UDP.,create_firewall_block_rule
+Create a rule to block port 53/UDP on the firewall.,create_firewall_block_rule
+Deny connections to the custom service on port 68/TCP.,create_firewall_block_rule
+Close port 161/TCP on destination 192.168.200.0/24.,create_firewall_block_rule
+Prevent source 10.0.8.15 from accessing port 25/TCP.,create_firewall_block_rule
+Add a block for 993/TCP on interface eth1.,create_firewall_block_rule
+Prohibit custom traffic using port 1812/TCP.,create_firewall_block_rule
+Add a drop rule for packets destined to port 587/TCP.,create_firewall_block_rule
+Block new connections to 172.18.10.0/24 on port 5672/UDP.,create_firewall_block_rule
+Create a denial from source 198.51.100.64/27 for 8443/TCP.,create_firewall_block_rule
+Create a rule to block port 993/TCP on the firewall.,create_firewall_block_rule
+Deny connections to the custom service on port 67/TCP.,create_firewall_block_rule
+Close port 143/UDP on destination 8.8.8.8.,create_firewall_block_rule
+Prevent source 172.16.40.0/24 from accessing port 995/TCP.,create_firewall_block_rule
+Add a block for 853/TCP on interface eth0.,create_firewall_block_rule
+Prohibit custom traffic using port 1521/TCP.,create_firewall_block_rule
+Add a drop rule for packets destined to port 3389/TCP.,create_firewall_block_rule
+Block new connections to 1.1.1.1 on port 5432/TCP.,create_firewall_block_rule
+Create a denial from source 172.16.2.5 for 8080/TCP.,create_firewall_block_rule
+Create a rule to block port 3306/TCP on the firewall.,create_firewall_block_rule
+Deny connections to the custom service on port 53/UDP.,create_firewall_block_rule
+Close port 123/TCP on destination 192.168.100.45.,create_firewall_block_rule
+Prevent source 8.8.8.8 from accessing port 5432/TCP.,create_firewall_block_rule
+Add a block for 636/TCP on interface DMZ.,create_firewall_block_rule
+Prohibit custom traffic using port 1433/UDP.,create_firewall_block_rule
+Add a drop rule for packets destined to port 6379/TCP.,create_firewall_block_rule
+Block new connections to 10.0.0.20 on port 5060/TCP.,create_firewall_block_rule
+Create a denial from source 203.0.113.18 for 6443/TCP.,create_firewall_block_rule
+Create a rule to block port 123/UDP on the firewall.,create_firewall_block_rule
+Deny connections to the custom service on port 25/TCP.,create_firewall_block_rule
+Close port 110/TCP on destination 192.168.30.15.,create_firewall_block_rule
+Prevent source 192.168.10.25 from accessing port 161/UDP.,create_firewall_block_rule
+Add a block for 587/UDP on interface LAN.,create_firewall_block_rule
+Prohibit custom traffic using port 1194/TCP.,create_firewall_block_rule
+Add a drop rule for packets destined to port 514/UDP.,create_firewall_block_rule
+Block new connections to 172.20.8.0/24 on port 4500/TCP.,create_firewall_block_rule
+Create a denial from source 172.20.5.10 for 6379/UDP.,create_firewall_block_rule
+Create a firewall rule that allows traffic from source 8.8.8.8 to the entire internal network.,create_firewall_allow_rule
+Create a rule allowing traffic from source 8.8.8.8 to 192.168.1.10.,create_firewall_allow_rule
+Allow communication from 192.0.2.44 to 1.1.1.1 on port 80/TCP.,create_firewall_allow_rule
+Authorize source 198.51.100.64/27 to access the entire internal network.,create_firewall_allow_rule
+Allow traffic flow from 198.51.100.27 to 172.16.0.50 via interface DMZ.,create_firewall_allow_rule
+Add an accept rule between 203.0.113.0/28 and 172.18.10.0/24.,create_firewall_allow_rule
+Enable connections originating from 203.0.113.18 to 192.168.100.45 using 1883/TCP.,create_firewall_allow_rule
+Let through the packets sent by 172.16.40.0/24 to 10.20.0.0/16.,create_firewall_allow_rule
+"Add a traffic permission from 10.20.30.40 to 172.20.8.0/24, port 5900/TCP.",create_firewall_allow_rule
+Grant access from network 10.10.0.0/16 to destination 8.8.8.8.,create_firewall_allow_rule
+Create a rule allowing traffic from source 192.168.10.25 to 10.40.5.25.,create_firewall_allow_rule
+Allow communication from 192.168.50.0/24 to 10.0.0.20 on port 68/TCP.,create_firewall_allow_rule
+Authorize source 172.16.2.5 to access the entire internal network.,create_firewall_allow_rule
+Allow traffic flow from 10.0.8.15 to 192.168.1.10 via interface LAN.,create_firewall_allow_rule
+Add an accept rule between 1.1.1.1 and 1.1.1.1.,create_firewall_allow_rule
+Enable connections originating from 172.20.5.10 to 192.168.30.15 using 1812/TCP.,create_firewall_allow_rule
+Let through the packets sent by 8.8.8.8 to 172.16.0.50.,create_firewall_allow_rule
+"Add a traffic permission from 192.0.2.44 to 172.18.10.0/24, port 5672/UDP.",create_firewall_allow_rule
+Grant access from network 198.51.100.64/27 to destination 192.168.100.45.,create_firewall_allow_rule
+Create a rule allowing traffic from source 198.51.100.27 to 10.20.0.0/16.,create_firewall_allow_rule
+Allow communication from 203.0.113.0/28 to 172.20.8.0/24 on port 67/TCP.,create_firewall_allow_rule
+Authorize source 203.0.113.18 to access the entire internal network.,create_firewall_allow_rule
+Allow traffic flow from 172.16.40.0/24 to 10.40.5.25 via interface WAN.,create_firewall_allow_rule
+Add an accept rule between 10.20.30.40 and 10.0.0.20.,create_firewall_allow_rule
+Enable connections originating from 10.10.0.0/16 to 192.168.200.0/24 using 1521/TCP.,create_firewall_allow_rule
+Let through the packets sent by 192.168.10.25 to 192.168.1.10.,create_firewall_allow_rule
+"Add a traffic permission from 192.168.50.0/24 to 1.1.1.1, port 5432/TCP.",create_firewall_allow_rule
+Grant access from network 172.16.2.5 to destination 192.168.30.15.,create_firewall_allow_rule
+Create a rule allowing traffic from source 10.0.8.15 to 172.16.0.50.,create_firewall_allow_rule
+Allow communication from 1.1.1.1 to 172.18.10.0/24 on port 53/UDP.,create_firewall_allow_rule
+Authorize source 172.20.5.10 to access the entire internal network.,create_firewall_allow_rule
+Allow traffic flow from 8.8.8.8 to 10.20.0.0/16 via interface vlan20.,create_firewall_allow_rule
+Add an accept rule between 192.0.2.44 and 172.20.8.0/24.,create_firewall_allow_rule
+Enable connections originating from 198.51.100.64/27 to 8.8.8.8 using 1433/UDP.,create_firewall_allow_rule
+Let through the packets sent by 198.51.100.27 to 10.40.5.25.,create_firewall_allow_rule
+"Add a traffic permission from 203.0.113.0/28 to 10.0.0.20, port 5060/TCP.",create_firewall_allow_rule
+Grant access from network 203.0.113.18 to destination 192.168.200.0/24.,create_firewall_allow_rule
+Create a rule allowing traffic from source 172.16.40.0/24 to 192.168.1.10.,create_firewall_allow_rule
+Allow communication from 10.20.30.40 to 1.1.1.1 on port 25/TCP.,create_firewall_allow_rule
+Authorize source 10.10.0.0/16 to access the entire internal network.,create_firewall_allow_rule
+Allow traffic flow from 192.168.10.25 to 172.16.0.50 via interface bond0.,create_firewall_allow_rule
+Add an accept rule between 192.168.50.0/24 and 172.18.10.0/24.,create_firewall_allow_rule
+Enable connections originating from 172.16.2.5 to 192.168.100.45 using 1194/TCP.,create_firewall_allow_rule
+Let through the packets sent by 10.0.8.15 to 10.20.0.0/16.,create_firewall_allow_rule
+"Add a traffic permission from 1.1.1.1 to 172.20.8.0/24, port 4500/TCP.",create_firewall_allow_rule
+"Create a firewall rule that blocks source 200.100.3.4 to destination 8.8.8.8, destination port 775/TCP.",create_firewall_block_rule
+Create a rule blocking source 8.8.8.8 to destination 192.168.1.10 on port 22/TCP.,create_firewall_block_rule
+Deny all traffic from 192.0.2.44 to 1.1.1.1.,create_firewall_block_rule
+Block any packet originating from source 198.51.100.64/27.,create_firewall_block_rule
+Drop connections from 198.51.100.27 destined to 172.16.0.50 on 80/TCP.,create_firewall_block_rule
+Prevent communication between 203.0.113.0/28 and 172.18.10.0/24 via interface bond0.,create_firewall_block_rule
+Add a denial rule from address 203.0.113.18 to 192.168.100.45.,create_firewall_block_rule
+"Prohibit access from 172.16.40.0/24 to destination 10.20.0.0/16, destination port 443/TCP.",create_firewall_block_rule
+Stop the traffic flow originating from 10.20.30.40 destined to 172.20.8.0/24.,create_firewall_block_rule
+Add a block for packets from 10.10.0.0/16 to 8.8.8.8 using 8883/UDP.,create_firewall_block_rule
+Create a rule blocking source 192.168.10.25 to destination 10.40.5.25 on port 53/UDP.,create_firewall_block_rule
+Deny all traffic from 192.168.50.0/24 to 10.0.0.20.,create_firewall_block_rule
+Block any packet originating from source 172.16.2.5.,create_firewall_block_rule
+Drop connections from 10.0.8.15 destined to 192.168.1.10 on 25/TCP.,create_firewall_block_rule
+Prevent communication between 1.1.1.1 and 1.1.1.1 via interface eth1.,create_firewall_block_rule
+Add a denial rule from address 172.20.5.10 to 192.168.30.15.,create_firewall_block_rule
+"Prohibit access from 8.8.8.8 to destination 172.16.0.50, destination port 587/TCP.",create_firewall_block_rule
+Stop the traffic flow originating from 192.0.2.44 destined to 172.18.10.0/24.,create_firewall_block_rule
+Add a block for packets from 198.51.100.64/27 to 192.168.100.45 using 8443/TCP.,create_firewall_block_rule
+Create a rule blocking source 198.51.100.27 to destination 10.20.0.0/16 on port 993/TCP.,create_firewall_block_rule
+Deny all traffic from 203.0.113.0/28 to 172.20.8.0/24.,create_firewall_block_rule
+Block any packet originating from source 203.0.113.18.,create_firewall_block_rule
+Drop connections from 172.16.40.0/24 destined to 10.40.5.25 on 995/TCP.,create_firewall_block_rule
+Prevent communication between 10.20.30.40 and 10.0.0.20 via interface eth0.,create_firewall_block_rule
+Add a denial rule from address 10.10.0.0/16 to 192.168.200.0/24.,create_firewall_block_rule
+"Prohibit access from 192.168.10.25 to destination 192.168.1.10, destination port 3389/TCP.",create_firewall_block_rule
+Stop the traffic flow originating from 192.168.50.0/24 destined to 1.1.1.1.,create_firewall_block_rule
+Add a block for packets from 172.16.2.5 to 192.168.30.15 using 8080/TCP.,create_firewall_block_rule
+Create a rule blocking source 10.0.8.15 to destination 172.16.0.50 on port 3306/TCP.,create_firewall_block_rule
+Deny all traffic from 1.1.1.1 to 172.18.10.0/24.,create_firewall_block_rule
+Block any packet originating from source 172.20.5.10.,create_firewall_block_rule
+Drop connections from 8.8.8.8 destined to 10.20.0.0/16 on 5432/TCP.,create_firewall_block_rule
+Prevent communication between 192.0.2.44 and 172.20.8.0/24 via interface DMZ.,create_firewall_block_rule
+Add a denial rule from address 198.51.100.64/27 to 8.8.8.8.,create_firewall_block_rule
+"Prohibit access from 198.51.100.27 to destination 10.40.5.25, destination port 6379/TCP.",create_firewall_block_rule
+Stop the traffic flow originating from 203.0.113.0/28 destined to 10.0.0.20.,create_firewall_block_rule
+Add a block for packets from 203.0.113.18 to 192.168.200.0/24 using 6443/TCP.,create_firewall_block_rule
+Create a rule blocking source 172.16.40.0/24 to destination 192.168.1.10 on port 123/UDP.,create_firewall_block_rule
+Deny all traffic from 10.20.30.40 to 1.1.1.1.,create_firewall_block_rule
+Block any packet originating from source 10.10.0.0/16.,create_firewall_block_rule
+Drop connections from 192.168.10.25 destined to 172.16.0.50 on 161/UDP.,create_firewall_block_rule
+Prevent communication between 192.168.50.0/24 and 172.18.10.0/24 via interface LAN.,create_firewall_block_rule
+Add a denial rule from address 172.16.2.5 to 192.168.100.45.,create_firewall_block_rule
+"Prohibit access from 10.0.8.15 to destination 10.20.0.0/16, destination port 514/UDP.",create_firewall_block_rule
+Stop the traffic flow originating from 1.1.1.1 destined to 172.20.8.0/24.,create_firewall_block_rule
 Change the rule that allows port 22/TCP to permit access only from source 1.1.1.1,update_firewall_rule
 Change the rule that allows port 22/TCP to permit access only from source 8.8.8.8.,update_firewall_rule
 Modify the rule from source 192.0.2.44 to change the destination to 1.1.1.1.,update_firewall_rule
@@ -299,30 +299,30 @@ Delete the RDP service permission granted to source 192.168.10.25.,delete_firewa
 Remove the block from 192.168.50.0/24 to 1.1.1.1 on port 5432/TCP.,delete_firewall_rule
 Delete the port 8080/TCP rule applied on interface LAN.,delete_firewall_rule
 Remove from the firewall the rule associated with address 10.0.8.15.,delete_firewall_rule
-Block ping coming from the internet.,create_block_traffic_rule
-Create a rule to drop ICMP echo-request packets received on interface WAN.,create_block_traffic_rule
-Prevent source 203.0.113.45 from sending ping to the internal network.,create_block_traffic_rule
-Deny ICMP traffic from source 198.51.100.80 to destination 192.168.1.20.,create_block_traffic_rule
-Block ICMP echo requests directed to server 10.0.0.15.,create_block_traffic_rule
-Prohibit IPv4 pings originating from network 172.16.50.0/24.,create_block_traffic_rule
-Drop ICMP type 8 messages entering via interface eth0.,create_block_traffic_rule
-Add a rule blocking ICMP echo-request from source 8.8.4.4.,create_block_traffic_rule
-Stop pings sent by external network 192.0.2.0/24 to the LAN.,create_block_traffic_rule
-Reject ICMP packets received on interface vlan20.,create_block_traffic_rule
-Prevent host 203.0.113.70 from testing connectivity via ping with the DMZ.,create_block_traffic_rule
-Block ICMPv6 echo-request requests coming from network 2001:db8:10::/64.,create_block_traffic_rule
-Drop ICMP traffic originating in the DMZ destined to the administrative network.,create_block_traffic_rule
-Block any ping destined to server 192.168.100.30.,create_block_traffic_rule
-Deny ICMP echo-reply responses received from source 198.51.100.33.,create_block_traffic_rule
-Allow ping from the internal network to the internet.,create_allow_traffic_rule
-Allow ICMP echo-request from source 10.10.5.0/24 to destination 192.168.20.10.,create_allow_traffic_rule
-Authorize ICMP echo-reply responses for availability checks.,create_allow_traffic_rule
-Create a rule accepting ICMPv6 neighbor discovery messages on the LAN.,create_allow_traffic_rule
-Allow pings sent by monitoring server 172.16.1.25.,create_allow_traffic_rule
-Allow ICMP type 8 messages on the management interface de.,create_allow_traffic_rule
-Authorize ICMP traffic between source 192.168.40.0/24 and network 10.50.0.0/16.,create_allow_traffic_rule
-Accept ping requests via the WAN only when they come from source 1.0.0.1.,create_allow_traffic_rule
-Enable ICMPv6 echo-request for address 2001:db8:20::15.,create_allow_traffic_rule
+Block ping coming from the internet.,create_firewall_block_rule
+Create a rule to drop ICMP echo-request packets received on interface WAN.,create_firewall_block_rule
+Prevent source 203.0.113.45 from sending ping to the internal network.,create_firewall_block_rule
+Deny ICMP traffic from source 198.51.100.80 to destination 192.168.1.20.,create_firewall_block_rule
+Block ICMP echo requests directed to server 10.0.0.15.,create_firewall_block_rule
+Prohibit IPv4 pings originating from network 172.16.50.0/24.,create_firewall_block_rule
+Drop ICMP type 8 messages entering via interface eth0.,create_firewall_block_rule
+Add a rule blocking ICMP echo-request from source 8.8.4.4.,create_firewall_block_rule
+Stop pings sent by external network 192.0.2.0/24 to the LAN.,create_firewall_block_rule
+Reject ICMP packets received on interface vlan20.,create_firewall_block_rule
+Prevent host 203.0.113.70 from testing connectivity via ping with the DMZ.,create_firewall_block_rule
+Block ICMPv6 echo-request requests coming from network 2001:db8:10::/64.,create_firewall_block_rule
+Drop ICMP traffic originating in the DMZ destined to the administrative network.,create_firewall_block_rule
+Block any ping destined to server 192.168.100.30.,create_firewall_block_rule
+Deny ICMP echo-reply responses received from source 198.51.100.33.,create_firewall_block_rule
+Allow ping from the internal network to the internet.,create_firewall_allow_rule
+Allow ICMP echo-request from source 10.10.5.0/24 to destination 192.168.20.10.,create_firewall_allow_rule
+Authorize ICMP echo-reply responses for availability checks.,create_firewall_allow_rule
+Create a rule accepting ICMPv6 neighbor discovery messages on the LAN.,create_firewall_allow_rule
+Allow pings sent by monitoring server 172.16.1.25.,create_firewall_allow_rule
+Allow ICMP type 8 messages on the management interface de.,create_firewall_allow_rule
+Authorize ICMP traffic between source 192.168.40.0/24 and network 10.50.0.0/16.,create_firewall_allow_rule
+Accept ping requests via the WAN only when they come from source 1.0.0.1.,create_firewall_allow_rule
+Enable ICMPv6 echo-request for address 2001:db8:20::15.,create_firewall_allow_rule
 Change the ping rule to allow ICMP only from source 203.0.113.90.,update_firewall_rule
 Modify the ICMP block to apply only on interface WAN.,update_firewall_rule
 Update the echo-request rule to also allow the corresponding echo-reply responses.,update_firewall_rule
@@ -334,31 +334,31 @@ Is port 23/UDP blocked on the firewall?,check_firewall_rule
 Modify the current rule for IP 192.168.1.1 to point to port 1521/TCP.,update_firewall_rule
 Change the rule that allows port 22/TCP to permit access only from source 172.16.0.10,update_firewall_rule
 "Update the port 3306/TCP policy, restricting it to IP 10.20.30.40.",update_firewall_rule
-Create a firewall rule that allows traffic from source 172.16.0.10 to the entire internal network.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 172.16.0.10 to the entire internal network.,create_firewall_allow_rule
 Is port 443/ICMP open on the firewall?,check_firewall_rule
-"Create a firewall rule that blocks source 10.0.0.5 to destination 45.4.5.6, destination port 3306/UDP.",create_block_traffic_rule
-Create a firewall rule that allows traffic from source 172.16.2.5 to the internet.,create_allow_traffic_rule
+"Create a firewall rule that blocks source 10.0.0.5 to destination 45.4.5.6, destination port 3306/UDP.",create_firewall_block_rule
+Create a firewall rule that allows traffic from source 172.16.2.5 to the internet.,create_firewall_allow_rule
 Change the rule that allows port 22/UDP to permit access only from source 192.168.1.1,update_firewall_rule
 Delete the SSH access rule that allows traffic from 10.0.0.5 to the staging subnet.,delete_firewall_rule
 Change the rule that allows port 443/TCP to permit access only from source 8.8.8.8,update_firewall_rule
 Please check whether port 3306 using the ICMP protocol is blocked.,check_firewall_rule
-"Create a firewall rule that blocks source 192.168.1.1 to destination 45.4.5.6, destination port 22/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 192.168.1.1 to destination 45.4.5.6, destination port 22/UDP.",create_firewall_block_rule
 Is port 8443/TCP blocked on the firewall?,check_firewall_rule
-"Create a firewall rule that blocks source 172.16.0.10 to destination 10.1.1.50, destination port 8080/TCP.",create_block_traffic_rule
-Create a firewall rule to open port 1521 on the firewall.,create_allow_traffic_rule
+"Create a firewall rule that blocks source 172.16.0.10 to destination 10.1.1.50, destination port 8080/TCP.",create_firewall_block_rule
+Create a firewall rule to open port 1521 on the firewall.,create_firewall_allow_rule
 Modify the current rule for IP 10.1.1.50 to point to port 23/UDP.,update_firewall_rule
-"Create a firewall rule that blocks source 8.8.8.8 to destination 45.4.5.6, destination port 80/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 8.8.8.8 to destination 45.4.5.6, destination port 80/UDP.",create_firewall_block_rule
 Change the rule that allows port 993/TCP to permit access only from source 192.168.100.45,update_firewall_rule
-Create a rule that blocks access from 8.8.4.4 to the staging subnet.,create_block_traffic_rule
+Create a rule that blocks access from 8.8.4.4 to the staging subnet.,create_firewall_block_rule
 Delete the firewall rule that allows IP address 200.100.3.4,delete_firewall_rule
-Create a firewall rule that allows traffic from source 8.8.4.4 to the DMZ.,create_allow_traffic_rule
-Block any communication from source 45.4.5.6 to the staging subnet.,create_block_traffic_rule
-Create a firewall rule to open port 993 on the firewall.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 8.8.4.4 to the DMZ.,create_firewall_allow_rule
+Block any communication from source 45.4.5.6 to the staging subnet.,create_firewall_block_rule
+Create a firewall rule to open port 993 on the firewall.,create_firewall_allow_rule
 "Update the port 53/UDP policy, restricting it to IP 8.8.4.4.",update_firewall_rule
-"Create a firewall rule that blocks source 172.16.0.10 to destination 192.168.100.45, destination port 443/TCP.",create_block_traffic_rule
-Create a rule that blocks access from 192.168.1.1 to the production segment.,create_block_traffic_rule
+"Create a firewall rule that blocks source 172.16.0.10 to destination 192.168.100.45, destination port 443/TCP.",create_firewall_block_rule
+Create a rule that blocks access from 192.168.1.1 to the production segment.,create_firewall_block_rule
 Delete the MySQL access rule that allows traffic from 200.100.3.4 to the entire internal network.,delete_firewall_rule
-Create a rule that blocks access from 172.16.0.10 to the web server.,create_block_traffic_rule
+Create a rule that blocks access from 172.16.0.10 to the web server.,create_firewall_block_rule
 Modify the current rule for IP 200.100.3.4 to point to port 23/UDP.,update_firewall_rule
 Remove the existing block for IP address 10.1.1.50.,delete_firewall_rule
 Delete the HTTPS access rule that allows traffic from 172.16.0.10 to the entire internal network.,delete_firewall_rule
@@ -368,15 +368,15 @@ Validate whether access to port 21 (UDP) is blocked.,check_firewall_rule
 Change the rule that allows port 1433/UDP to permit access only from source 1.1.1.1,update_firewall_rule
 Delete the rule that allows HTTPS access from source 8.8.8.8 to the staging subnet.,delete_firewall_rule
 "Update the port 22/TCP policy, restricting it to IP 10.1.1.50.",update_firewall_rule
-"Create a firewall rule that blocks source 192.168.1.1 to destination 172.16.2.5, destination port 8080/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 192.168.1.1 to destination 172.16.2.5, destination port 8080/UDP.",create_firewall_block_rule
 Delete the HTTP access rule that allows traffic from 172.16.0.10 to the DMZ.,delete_firewall_rule
 "Update the port 23/UDP policy, restricting it to IP 8.8.4.4.",update_firewall_rule
 Change the rule that allows port 3306/UDP to permit access only from source 192.168.100.45,update_firewall_rule
-Open port 445/ICMP on the main firewall.,create_allow_traffic_rule
+Open port 445/ICMP on the main firewall.,create_firewall_allow_rule
 Change the rule that allows port 1433/TCP to permit access only from source 200.100.3.4,update_firewall_rule
 Change the rule that allows port 25/TCP to permit access only from source 192.168.100.45,update_firewall_rule
 Please check whether port 27017 using the UDP protocol is open.,check_firewall_rule
-Allow traffic originating from 1.1.1.1 destined to the entire internal network.,create_allow_traffic_rule
+Allow traffic originating from 1.1.1.1 destined to the entire internal network.,create_firewall_allow_rule
 Delete the HTTP access rule that allows traffic from 172.16.0.10 to the database.,delete_firewall_rule
 Modify the current rule for IP 192.168.100.45 to point to port 8080/TCP.,update_firewall_rule
 Is port 23/TCP open on the firewall?,check_firewall_rule
@@ -386,19 +386,19 @@ Delete the rule that allows FTP access from source 172.16.0.10 to the entire int
 "Update the port 8080/UDP policy, restricting it to IP 1.1.1.1.",update_firewall_rule
 Delete the FTP access rule that allows traffic from 192.168.0.254 to the database.,delete_firewall_rule
 "Update the port 23/UDP policy, restricting it to IP 172.16.0.10.",update_firewall_rule
-"Create a firewall rule that blocks source 10.0.0.5 to destination 172.16.2.5, destination port 80/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 10.0.0.5 to destination 172.16.2.5, destination port 80/UDP.",create_firewall_block_rule
 "Update the port 27017/TCP policy, restricting it to IP 45.4.5.6.",update_firewall_rule
 Please check whether port 995 using the UDP protocol is blocked.,check_firewall_rule
-"Create a firewall rule that blocks source 8.8.8.8 to destination 192.168.0.254, destination port 443/TCP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 8.8.8.8 to destination 192.168.0.254, destination port 443/TCP.",create_firewall_block_rule
 Delete the rule that allows HTTP access from source 192.168.1.1 to the staging subnet.,delete_firewall_rule
 Delete the rule that allows HTTP access from source 192.168.100.45 to the web server.,delete_firewall_rule
 Delete the HTTPS access rule that allows traffic from 192.168.1.1 to the staging subnet.,delete_firewall_rule
 Delete the MySQL access rule that allows traffic from 192.168.100.45 to the DMZ.,delete_firewall_rule
 Modify the current rule for IP 192.168.0.254 to point to port 22/TCP.,update_firewall_rule
-"Create a firewall rule that blocks source 200.100.3.4 to destination 172.16.2.5, destination port 443/TCP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 200.100.3.4 to destination 172.16.2.5, destination port 443/TCP.",create_firewall_block_rule
 "Update the port 27017/TCP policy, restricting it to IP 192.168.1.1.",update_firewall_rule
-"Create a firewall rule that blocks source 172.16.0.10 to destination 192.168.100.45, destination port 8080/TCP.",create_block_traffic_rule
-Block any communication from source 200.100.3.4 to the database.,create_block_traffic_rule
+"Create a firewall rule that blocks source 172.16.0.10 to destination 192.168.100.45, destination port 8080/TCP.",create_firewall_block_rule
+Block any communication from source 200.100.3.4 to the database.,create_firewall_block_rule
 Modify the current rule for IP 192.168.1.1 to point to port 123/UDP.,update_firewall_rule
 Delete the rule that allows HTTP access from source 192.168.0.254 to the DMZ.,delete_firewall_rule
 "Update the port 6379/UDP policy, restricting it to IP 8.8.4.4.",update_firewall_rule
@@ -412,22 +412,22 @@ Change the rule that allows port 21/UDP to permit access only from source 45.4.5
 Validate whether access to port 110 (TCP) is blocked.,check_firewall_rule
 Modify the current rule for IP 172.16.2.5 to point to port 27017/TCP.,update_firewall_rule
 Delete the MySQL access rule that allows traffic from 192.168.1.1 to the database.,delete_firewall_rule
-"Create a firewall rule that blocks source 200.100.3.4 to destination 192.168.0.254, destination port 80/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 200.100.3.4 to destination 192.168.0.254, destination port 80/UDP.",create_firewall_block_rule
 Modify the current rule for IP 172.16.2.5 to point to port 110/TCP.,update_firewall_rule
-"Create a firewall rule that blocks source 172.16.0.10 to destination 8.8.4.4, destination port 443/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 172.16.0.10 to destination 8.8.4.4, destination port 443/UDP.",create_firewall_block_rule
 Change the rule that allows port 53/TCP to permit access only from source 192.168.1.1,update_firewall_rule
-Create a firewall rule that allows traffic from source 8.8.4.4 to the web server.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 8.8.4.4 to the web server.,create_firewall_allow_rule
 Modify the current rule for IP 1.1.1.1 to point to port 8443/UDP.,update_firewall_rule
-Block any communication from source 45.4.5.6 to the production segment.,create_block_traffic_rule
-Open port 6379/TCP on the main firewall.,create_allow_traffic_rule
+Block any communication from source 45.4.5.6 to the production segment.,create_firewall_block_rule
+Open port 6379/TCP on the main firewall.,create_firewall_allow_rule
 "Update the port 8443/UDP policy, restricting it to IP 10.1.1.50.",update_firewall_rule
-Block any communication from source 8.8.4.4 to the DMZ.,create_block_traffic_rule
+Block any communication from source 8.8.4.4 to the DMZ.,create_firewall_block_rule
 Validate whether access to port 25 (ICMP) is active.,check_firewall_rule
 "Update the port 8443/TCP policy, restricting it to IP 45.4.5.6.",update_firewall_rule
 Change the rule that allows port 6379/UDP to permit access only from source 192.168.100.45,update_firewall_rule
 Delete the rule that allows SSH access from source 10.20.30.40 to the DMZ.,delete_firewall_rule
-Create a rule that blocks access from 200.100.3.4 to the web server.,create_block_traffic_rule
-"Create a firewall rule that blocks source 200.100.3.4 to destination 10.20.30.40, destination port 22/UDP.",create_block_traffic_rule
+Create a rule that blocks access from 200.100.3.4 to the web server.,create_firewall_block_rule
+"Create a firewall rule that blocks source 200.100.3.4 to destination 10.20.30.40, destination port 22/UDP.",create_firewall_block_rule
 "Update the port 110/TCP policy, restricting it to IP 45.4.5.6.",update_firewall_rule
 "Update the port 23/UDP policy, restricting it to IP 10.1.1.50.",update_firewall_rule
 Modify the current rule for IP 1.1.1.1 to point to port 25/TCP.,update_firewall_rule
@@ -435,18 +435,18 @@ Modify the current rule for IP 1.1.1.1 to point to port 6379/TCP.,update_firewal
 Delete the rule that allows HTTP access from source 192.168.100.45 to the database.,delete_firewall_rule
 Delete the SSH access rule that allows traffic from 172.16.0.10 to the web server.,delete_firewall_rule
 Modify the current rule for IP 172.16.2.5 to point to port 22/TCP.,update_firewall_rule
-"Create a firewall rule that blocks source 172.16.0.10 to destination 192.168.0.254, destination port 443/TCP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 172.16.0.10 to destination 192.168.0.254, destination port 443/TCP.",create_firewall_block_rule
 Delete the firewall rule that allows IP address 192.168.100.45,delete_firewall_rule
-Create a firewall rule that allows traffic from source 192.168.100.45 to the internet.,create_allow_traffic_rule
-"Create a firewall rule that blocks source 10.0.0.5 to destination 172.16.2.5, destination port 22/UDP.",create_block_traffic_rule
+Create a firewall rule that allows traffic from source 192.168.100.45 to the internet.,create_firewall_allow_rule
+"Create a firewall rule that blocks source 10.0.0.5 to destination 172.16.2.5, destination port 22/UDP.",create_firewall_block_rule
 Is port 21/ICMP active on the firewall?,check_firewall_rule
 Delete the FTP access rule that allows traffic from 1.1.1.1 to the database.,delete_firewall_rule
 "Update the port 25/TCP policy, restricting it to IP 200.100.3.4.",update_firewall_rule
-"Create a firewall rule that blocks source 200.100.3.4 to destination 45.4.5.6, destination port 80/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 200.100.3.4 to destination 45.4.5.6, destination port 80/UDP.",create_firewall_block_rule
 Modify the current rule for IP 10.1.1.50 to point to port 21/UDP.,update_firewall_rule
 Delete the rule that allows FTP access from source 10.1.1.50 to the DMZ.,delete_firewall_rule
 Is port 53/TCP blocked on the firewall?,check_firewall_rule
-Block any communication from source 8.8.8.8 to the staging subnet.,create_block_traffic_rule
+Block any communication from source 8.8.8.8 to the staging subnet.,create_firewall_block_rule
 Please check whether port 445 using the TCP protocol is active.,check_firewall_rule
 Delete the SSH access rule that allows traffic from 200.100.3.4 to the database.,delete_firewall_rule
 Modify the current rule for IP 192.168.0.254 to point to port 27017/TCP.,update_firewall_rule
@@ -454,16 +454,16 @@ Modify the current rule for IP 45.4.5.6 to point to port 53/TCP.,update_firewall
 Is port 110/UDP active on the firewall?,check_firewall_rule
 "Update the port 80/UDP policy, restricting it to IP 192.168.0.254.",update_firewall_rule
 Is port 80/UDP open on the firewall?,check_firewall_rule
-Create a firewall rule to open port 25 on the firewall.,create_allow_traffic_rule
+Create a firewall rule to open port 25 on the firewall.,create_firewall_allow_rule
 "Update the port 27017/UDP policy, restricting it to IP 172.16.0.10.",update_firewall_rule
-Create a firewall rule to open port 3306 on the firewall.,create_allow_traffic_rule
+Create a firewall rule to open port 3306 on the firewall.,create_firewall_allow_rule
 Modify the current rule for IP 45.4.5.6 to point to port 80/TCP.,update_firewall_rule
 Modify the current rule for IP 192.168.1.1 to point to port 5432/UDP.,update_firewall_rule
 Delete the rule that allows HTTPS access from source 192.168.0.254 to the staging subnet.,delete_firewall_rule
 Delete the HTTPS access rule that allows traffic from 200.100.3.4 to the DMZ.,delete_firewall_rule
 Delete the rule that allows HTTP access from source 10.0.0.5 to the database.,delete_firewall_rule
 Delete the HTTPS access rule that allows traffic from 192.168.1.1 to the web server.,delete_firewall_rule
-Block any communication from source 10.0.0.5 to the database.,create_block_traffic_rule
+Block any communication from source 10.0.0.5 to the database.,create_firewall_block_rule
 Remove the existing block for IP address 200.100.3.4.,delete_firewall_rule
 Delete the rule that allows HTTP access from source 192.168.1.1 to the entire internal network.,delete_firewall_rule
 Change the rule that allows port 21/UDP to permit access only from source 10.20.30.40,update_firewall_rule
@@ -473,10 +473,10 @@ Delete the rule that allows HTTPS access from source 192.168.100.45 to the DMZ.,
 Validate whether access to port 5432 (ICMP) is open.,check_firewall_rule
 Delete the FTP access rule that allows traffic from 192.168.1.1 to the database.,delete_firewall_rule
 Modify the current rule for IP 8.8.8.8 to point to port 8443/UDP.,update_firewall_rule
-Create a firewall rule that allows traffic from source 10.0.0.5 to the entire internal network.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 10.0.0.5 to the entire internal network.,create_firewall_allow_rule
 Modify the current rule for IP 10.20.30.40 to point to port 80/UDP.,update_firewall_rule
 Validate whether access to port 443 (UDP) is open.,check_firewall_rule
-Block any communication from source 8.8.8.8 to the production segment.,create_block_traffic_rule
+Block any communication from source 8.8.8.8 to the production segment.,create_firewall_block_rule
 Change the rule that allows port 21/UDP to permit access only from source 1.1.1.1,update_firewall_rule
 Delete the rule that allows FTP access from source 8.8.4.4 to the database.,delete_firewall_rule
 Change the rule that allows port 25/UDP to permit access only from source 200.100.3.4,update_firewall_rule
@@ -484,7 +484,7 @@ Change the rule that allows port 25/UDP to permit access only from source 200.10
 "Update the port 1433/TCP policy, restricting it to IP 172.16.0.10.",update_firewall_rule
 Modify the current rule for IP 1.1.1.1 to point to port 1521/UDP.,update_firewall_rule
 "Update the port 22/UDP policy, restricting it to IP 192.168.0.254.",update_firewall_rule
-Block any communication from source 8.8.8.8 to the entire internal network.,create_block_traffic_rule
+Block any communication from source 8.8.8.8 to the entire internal network.,create_firewall_block_rule
 Delete the rule that allows HTTP access from source 8.8.8.8 to the web server.,delete_firewall_rule
 Validate whether access to port 25 (TCP) is open.,check_firewall_rule
 "Update the port 445/TCP policy, restricting it to IP 10.20.30.40.",update_firewall_rule
@@ -495,22 +495,22 @@ Delete the rule that allows HTTP access from source 172.16.2.5 to the staging su
 Is port 23/ICMP active on the firewall?,check_firewall_rule
 "Update the port 161/UDP policy, restricting it to IP 45.4.5.6.",update_firewall_rule
 "Update the port 161/TCP policy, restricting it to IP 192.168.100.45.",update_firewall_rule
-Create a firewall rule that allows traffic from source 192.168.0.254 to the internet.,create_allow_traffic_rule
-Allow traffic originating from 45.4.5.6 destined to the production segment.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 192.168.0.254 to the internet.,create_firewall_allow_rule
+Allow traffic originating from 45.4.5.6 destined to the production segment.,create_firewall_allow_rule
 Validate whether access to port 8443 (UDP) is open.,check_firewall_rule
 Delete the MySQL access rule that allows traffic from 172.16.0.10 to the entire internal network.,delete_firewall_rule
 Modify the current rule for IP 200.100.3.4 to point to port 25/TCP.,update_firewall_rule
-"Create a firewall rule that blocks source 172.16.0.10 to destination 10.1.1.50, destination port 22/TCP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 172.16.0.10 to destination 10.1.1.50, destination port 22/TCP.",create_firewall_block_rule
 Please check whether port 1433 using the ICMP protocol is blocked.,check_firewall_rule
 Delete the HTTP access rule that allows traffic from 8.8.8.8 to the database.,delete_firewall_rule
 "Update the port 8080/UDP policy, restricting it to IP 10.1.1.50.",update_firewall_rule
 Modify the current rule for IP 10.0.0.5 to point to port 8443/TCP.,update_firewall_rule
 Please check whether port 25 using the TCP protocol is blocked.,check_firewall_rule
 Modify the current rule for IP 10.1.1.50 to point to port 27017/UDP.,update_firewall_rule
-Allow traffic originating from 10.1.1.50 destined to the database.,create_allow_traffic_rule
+Allow traffic originating from 10.1.1.50 destined to the database.,create_firewall_allow_rule
 Validate whether access to port 445 (TCP) is blocked.,check_firewall_rule
 Please check whether port 993 using the ICMP protocol is blocked.,check_firewall_rule
-Allow traffic originating from 10.0.0.5 destined to the staging subnet.,create_allow_traffic_rule
+Allow traffic originating from 10.0.0.5 destined to the staging subnet.,create_firewall_allow_rule
 Change the rule that allows port 8080/UDP to permit access only from source 1.1.1.1,update_firewall_rule
 Validate whether access to port 23 (ICMP) is open.,check_firewall_rule
 Change the rule that allows port 110/TCP to permit access only from source 10.1.1.50,update_firewall_rule
@@ -520,53 +520,53 @@ Validate whether access to port 6379 (ICMP) is blocked.,check_firewall_rule
 Delete the SSH access rule that allows traffic from 192.168.1.1 to the DMZ.,delete_firewall_rule
 Modify the current rule for IP 8.8.8.8 to point to port 443/UDP.,update_firewall_rule
 Change the rule that allows port 995/TCP to permit access only from source 192.168.100.45,update_firewall_rule
-Block any communication from source 10.1.1.50 to the database.,create_block_traffic_rule
-"Create a firewall rule that blocks source 10.0.0.5 to destination 10.20.30.40, destination port 80/TCP.",create_block_traffic_rule
+Block any communication from source 10.1.1.50 to the database.,create_firewall_block_rule
+"Create a firewall rule that blocks source 10.0.0.5 to destination 10.20.30.40, destination port 80/TCP.",create_firewall_block_rule
 Delete the rule that allows FTP access from source 172.16.2.5 to the DMZ.,delete_firewall_rule
 Modify the current rule for IP 172.16.0.10 to point to port 27017/TCP.,update_firewall_rule
-Allow traffic originating from 8.8.8.8 destined to the database.,create_allow_traffic_rule
+Allow traffic originating from 8.8.8.8 destined to the database.,create_firewall_allow_rule
 Delete the rule that allows MySQL access from source 172.16.2.5 to the DMZ.,delete_firewall_rule
 Is port 80/ICMP blocked on the firewall?,check_firewall_rule
 "Update the port 5432/UDP policy, restricting it to IP 10.1.1.50.",update_firewall_rule
 Delete the SSH access rule that allows traffic from 172.16.2.5 to the web server.,delete_firewall_rule
 Delete the HTTPS access rule that allows traffic from 8.8.8.8 to the web server.,delete_firewall_rule
 "Update the port 53/TCP policy, restricting it to IP 10.0.0.5.",update_firewall_rule
-Create a rule that blocks access from 10.20.30.40 to the web server.,create_block_traffic_rule
+Create a rule that blocks access from 10.20.30.40 to the web server.,create_firewall_block_rule
 Delete the HTTP access rule that allows traffic from 192.168.0.254 to the web server.,delete_firewall_rule
 Change the rule that allows port 80/TCP to permit access only from source 172.16.0.10,update_firewall_rule
 Change the rule that allows port 3306/UDP to permit access only from source 10.0.0.5,update_firewall_rule
 Modify the current rule for IP 172.16.2.5 to point to port 5432/TCP.,update_firewall_rule
-"Create a firewall rule that blocks source 200.100.3.4 to destination 192.168.100.45, destination port 8080/UDP.",create_block_traffic_rule
-"Create a firewall rule that blocks source 8.8.8.8 to destination 172.16.2.5, destination port 8080/TCP.",create_block_traffic_rule
-Allow traffic originating from 1.1.1.1 destined to the staging subnet.,create_allow_traffic_rule
+"Create a firewall rule that blocks source 200.100.3.4 to destination 192.168.100.45, destination port 8080/UDP.",create_firewall_block_rule
+"Create a firewall rule that blocks source 8.8.8.8 to destination 172.16.2.5, destination port 8080/TCP.",create_firewall_block_rule
+Allow traffic originating from 1.1.1.1 destined to the staging subnet.,create_firewall_allow_rule
 "Update the port 1433/TCP policy, restricting it to IP 10.20.30.40.",update_firewall_rule
-Create a rule that blocks access from 1.1.1.1 to the entire internal network.,create_block_traffic_rule
+Create a rule that blocks access from 1.1.1.1 to the entire internal network.,create_firewall_block_rule
 Modify the current rule for IP 192.168.1.1 to point to port 993/TCP.,update_firewall_rule
-Create a firewall rule that allows traffic from source 192.168.0.254 to the database cluster.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 192.168.0.254 to the database cluster.,create_firewall_allow_rule
 Delete the rule that allows FTP access from source 8.8.4.4 to the DMZ.,delete_firewall_rule
 Please check whether port 53 using the ICMP protocol is open.,check_firewall_rule
-"Create a firewall rule that blocks source 1.1.1.1 to destination 10.20.30.40, destination port 80/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 1.1.1.1 to destination 10.20.30.40, destination port 80/UDP.",create_firewall_block_rule
 Is port 22/TCP blocked on the firewall?,check_firewall_rule
-Block any communication from source 200.100.3.4 to the internet.,create_block_traffic_rule
-Create a firewall rule that allows traffic from source 192.168.100.45 to the web server.,create_allow_traffic_rule
+Block any communication from source 200.100.3.4 to the internet.,create_firewall_block_rule
+Create a firewall rule that allows traffic from source 192.168.100.45 to the web server.,create_firewall_allow_rule
 Modify the current rule for IP 8.8.4.4 to point to port 8080/UDP.,update_firewall_rule
-"Create a firewall rule that blocks source 1.1.1.1 to destination 8.8.4.4, destination port 80/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 1.1.1.1 to destination 8.8.4.4, destination port 80/UDP.",create_firewall_block_rule
 Modify the current rule for IP 1.1.1.1 to point to port 8443/TCP.,update_firewall_rule
 "Update the port 3306/TCP policy, restricting it to IP 192.168.100.45.",update_firewall_rule
 Modify the current rule for IP 192.168.100.45 to point to port 1521/UDP.,update_firewall_rule
 "Update the port 443/TCP policy, restricting it to IP 8.8.4.4.",update_firewall_rule
 Please check whether port 1521 using the ICMP protocol is blocked.,check_firewall_rule
 Delete the HTTPS access rule that allows traffic from 192.168.100.45 to the database.,delete_firewall_rule
-"Create a firewall rule that blocks source 192.168.1.1 to destination 10.20.30.40, destination port 80/UDP.",create_block_traffic_rule
-Open port 445/UDP on the main firewall.,create_allow_traffic_rule
+"Create a firewall rule that blocks source 192.168.1.1 to destination 10.20.30.40, destination port 80/UDP.",create_firewall_block_rule
+Open port 445/UDP on the main firewall.,create_firewall_allow_rule
 Delete the rule that allows SSH access from source 172.16.0.10 to the web server.,delete_firewall_rule
-Create a firewall rule that allows traffic from source 10.20.30.40 to the web server.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 10.20.30.40 to the web server.,create_firewall_allow_rule
 Modify the current rule for IP 10.1.1.50 to point to port 3306/UDP.,update_firewall_rule
 Please check whether port 25 using the TCP protocol is open.,check_firewall_rule
 Delete the SSH access rule that allows traffic from 192.168.1.1 to the database.,delete_firewall_rule
 Delete the HTTPS access rule that allows traffic from 8.8.4.4 to the staging subnet.,delete_firewall_rule
 Modify the current rule for IP 192.168.100.45 to point to port 443/TCP.,update_firewall_rule
-Create a firewall rule that allows traffic from source 172.16.2.5 to the database.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 172.16.2.5 to the database.,create_firewall_allow_rule
 Change the rule that allows port 110/TCP to permit access only from source 10.20.30.40,update_firewall_rule
 Modify the current rule for IP 200.100.3.4 to point to port 6379/TCP.,update_firewall_rule
 "Update the port 110/UDP policy, restricting it to IP 200.100.3.4.",update_firewall_rule
@@ -574,7 +574,7 @@ Change the rule that allows port 445/UDP to permit access only from source 45.4.
 Validate whether access to port 161 (UDP) is blocked.,check_firewall_rule
 Remove the existing block for IP address 1.1.1.1.,delete_firewall_rule
 Change the rule that allows port 53/TCP to permit access only from source 172.16.2.5,update_firewall_rule
-Create a firewall rule that allows traffic from source 8.8.8.8 to the entire internal network.,create_allow_traffic_rule
+Create a firewall rule that allows traffic from source 8.8.8.8 to the entire internal network.,create_firewall_allow_rule
 Please check whether port 80 using the UDP protocol is active.,check_firewall_rule
 "Update the port 995/UDP policy, restricting it to IP 192.168.1.1.",update_firewall_rule
 Validate whether access to port 3306 (TCP) is active.,check_firewall_rule
@@ -582,16 +582,16 @@ Please check whether port 25 using the ICMP protocol is active.,check_firewall_r
 "Update the port 80/UDP policy, restricting it to IP 200.100.3.4.",update_firewall_rule
 Delete the MySQL access rule that allows traffic from 10.20.30.40 to the entire internal network.,delete_firewall_rule
 "Update the port 3306/UDP policy, restricting it to IP 192.168.0.254.",update_firewall_rule
-Create a rule that blocks access from 172.16.0.10 to the database.,create_block_traffic_rule
+Create a rule that blocks access from 172.16.0.10 to the database.,create_firewall_block_rule
 Delete the rule that allows HTTP access from source 10.1.1.50 to the database.,delete_firewall_rule
 "Update the port 995/TCP policy, restricting it to IP 1.1.1.1.",update_firewall_rule
 Modify the current rule for IP 8.8.4.4 to point to port 21/UDP.,update_firewall_rule
 Is port 25/ICMP open on the firewall?,check_firewall_rule
 Change the rule that allows port 80/UDP to permit access only from source 1.1.1.1,update_firewall_rule
 Please check whether port 8080 using the UDP protocol is open.,check_firewall_rule
-Create a rule that blocks access from 10.0.0.5 to the database.,create_block_traffic_rule
-"Create a firewall rule that blocks source 1.1.1.1 to destination 10.1.1.50, destination port 8080/TCP.",create_block_traffic_rule
-Create a rule that blocks access from 200.100.3.4 to the production segment.,create_block_traffic_rule
+Create a rule that blocks access from 10.0.0.5 to the database.,create_firewall_block_rule
+"Create a firewall rule that blocks source 1.1.1.1 to destination 10.1.1.50, destination port 8080/TCP.",create_firewall_block_rule
+Create a rule that blocks access from 200.100.3.4 to the production segment.,create_firewall_block_rule
 Modify the current rule for IP 8.8.8.8 to point to port 993/TCP.,update_firewall_rule
 Modify the current rule for IP 45.4.5.6 to point to port 443/UDP.,update_firewall_rule
 "Update the port 1521/UDP policy, restricting it to IP 10.20.30.40.",update_firewall_rule
@@ -608,24 +608,24 @@ Validate whether access to port 3306 (ICMP) is open.,check_firewall_rule
 Modify the current rule for IP 192.168.0.254 to point to port 110/TCP.,update_firewall_rule
 Delete the rule that allows HTTP access from source 10.1.1.50 to the staging subnet.,delete_firewall_rule
 Validate whether access to port 110 (ICMP) is blocked.,check_firewall_rule
-"Create a firewall rule that blocks source 172.16.0.10 to destination 10.20.30.40, destination port 22/TCP.",create_block_traffic_rule
-Block any communication from source 10.1.1.50 to the entire internal network.,create_block_traffic_rule
+"Create a firewall rule that blocks source 172.16.0.10 to destination 10.20.30.40, destination port 22/TCP.",create_firewall_block_rule
+Block any communication from source 10.1.1.50 to the entire internal network.,create_firewall_block_rule
 Change the rule that allows port 8443/TCP to permit access only from source 45.4.5.6,update_firewall_rule
 Modify the current rule for IP 45.4.5.6 to point to port 3306/TCP.,update_firewall_rule
-"Create a firewall rule that blocks source 1.1.1.1 to destination 192.168.0.254, destination port 443/UDP.",create_block_traffic_rule
+"Create a firewall rule that blocks source 1.1.1.1 to destination 192.168.0.254, destination port 443/UDP.",create_firewall_block_rule
 Change the rule that allows port 27017/UDP to permit access only from source 172.16.0.10,update_firewall_rule
 Modify the current rule for IP 8.8.4.4 to point to port 1521/UDP.,update_firewall_rule
 Change the rule that allows port 995/UDP to permit access only from source 192.168.1.1,update_firewall_rule
 Please check whether port 445 using the UDP protocol is open.,check_firewall_rule
-Block any communication from source 192.168.0.254 to the staging subnet.,create_block_traffic_rule
+Block any communication from source 192.168.0.254 to the staging subnet.,create_firewall_block_rule
 Delete the rule that allows HTTPS access from source 200.100.3.4 to the DMZ.,delete_firewall_rule
 Modify the current rule for IP 200.100.3.4 to point to port 27017/TCP.,update_firewall_rule
 Validate whether access to port 23 (TCP) is active.,check_firewall_rule
 Delete the rule that allows FTP access from source 172.16.0.10 to the staging subnet.,delete_firewall_rule
 "Update the port 22/UDP policy, restricting it to IP 192.168.1.1.",update_firewall_rule
 Please check whether port 110 using the ICMP protocol is blocked.,check_firewall_rule
-Create a firewall rule to open port 22 on the firewall.,create_allow_traffic_rule
+Create a firewall rule to open port 22 on the firewall.,create_firewall_allow_rule
 Validate whether access to port 23 (UDP) is blocked.,check_firewall_rule
 Delete the rule that allows HTTP access from source 8.8.4.4 to the web server.,delete_firewall_rule
-Open port 21/ICMP on the main firewall.,create_allow_traffic_rule
+Open port 21/ICMP on the main firewall.,create_firewall_allow_rule
 Delete the FTP access rule that allows traffic from 200.100.3.4 to the DMZ.,delete_firewall_rule

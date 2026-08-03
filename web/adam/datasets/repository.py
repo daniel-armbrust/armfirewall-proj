@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from core import db
-from core.constants import ADAM_DATASET_CATEGORIES, ADAM_DB_PATH
+from core.constants import ADAM_DATASET_CATEGORIES
 
 
 def _active_dataset(

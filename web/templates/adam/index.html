@@ -207,12 +207,37 @@
                 </div>
             </div>
             <div class="adam-classification-chart" id="adam-classification-chart-wrap" hidden>
-                <img id="adam-classification-chart"
-                     alt="Text classifier evaluation metrics and confusion matrix">
+                <button class="adam-classification-chart-trigger" type="button"
+                        id="adam-classification-chart-open"
+                        aria-label="Open evaluation chart in full screen">
+                    <img id="adam-classification-chart"
+                         alt="Text classifier evaluation metrics and confusion matrix">
+                </button>
             </div>
         </div>
     </div>
 </section>
+
+<div class="graph-modal" id="adam-classification-chart-modal" hidden>
+    <button class="graph-modal-backdrop" type="button"
+            data-adam-chart-modal-close aria-label="Close evaluation chart preview"></button>
+    <section class="graph-modal-dialog" role="dialog" aria-modal="true"
+             aria-labelledby="adam-classification-chart-modal-title">
+        <div class="graph-modal-head">
+            <div>
+                <p class="eyebrow">adam/text-classification</p>
+                <h2 id="adam-classification-chart-modal-title">Evaluation chart</h2>
+            </div>
+            <button class="icon-button" type="button"
+                    data-adam-chart-modal-close aria-label="Close">X</button>
+        </div>
+        <div class="graph-modal-body">
+            <img id="adam-classification-chart-modal-image"
+                 alt="Expanded text classifier evaluation chart">
+        </div>
+    </section>
+</div>
+
 <div class="form-actions routing-global-actions adam-classification-delete-actions"
      id="adam-classification-delete-actions" hidden>
     <button class="text-button danger" type="button"
@@ -293,6 +318,21 @@
     </div>
 </section>
 
+<div class="modal-backdrop" id="adam-training-error-modal" hidden>
+    <section class="modal-dialog" role="alertdialog" aria-modal="true"
+             aria-labelledby="adam-training-error-modal-title">
+        <div class="modal-head">
+            <h2 id="adam-training-error-modal-title">Training Error</h2>
+        </div>
+        <p class="modal-copy" id="adam-training-error-message"></p>
+        <div class="form-actions modal-actions">
+            <button class="text-button" type="button" id="adam-training-error-close">
+                Close
+            </button>
+        </div>
+    </section>
+</div>
+
 <div class="modal-backdrop" id="adam-delete-modal" hidden>
     <section class="modal-dialog" role="dialog" aria-modal="true"
              aria-labelledby="adam-delete-modal-title">
@@ -316,5 +356,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260803-wake-word-compact" defer></script>
+<script src="{{ url_for('static', path='/js/adam.js') }}?v=20260816-training-error-modal" defer></script>
 {% endblock %}

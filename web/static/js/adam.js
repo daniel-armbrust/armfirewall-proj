@@ -37,10 +37,16 @@
     const classificationF1 = document.getElementById("adam-classification-f1");
     const classificationChartWrap = document.getElementById("adam-classification-chart-wrap");
     const classificationChart = document.getElementById("adam-classification-chart");
+    const classificationChartOpen = document.getElementById("adam-classification-chart-open");
+    const classificationChartModal = document.getElementById("adam-classification-chart-modal");
+    const classificationChartModalImage = document.getElementById("adam-classification-chart-modal-image");
     const classificationDatasetField = document.getElementById("adam-classification-dataset-field");
     const classificationDataset = document.getElementById("adam-classification-dataset");
     const classificationDeleteActions = document.getElementById("adam-classification-delete-actions");
     const classificationDelete = document.getElementById("adam-classification-delete");
+    const trainingErrorModal = document.getElementById("adam-training-error-modal");
+    const trainingErrorMessage = document.getElementById("adam-training-error-message");
+    const trainingErrorClose = document.getElementById("adam-training-error-close");
     const deleteModal = document.getElementById("adam-delete-modal");
     const deleteModalCopy = document.getElementById("adam-delete-modal-copy");
     const deleteCancel = document.getElementById("adam-delete-cancel");
@@ -84,6 +90,8 @@
             || !datasetCategory || !trainingInput || !testingInput || !trainingImport || !testingImport
             || !trainingName || !testingName || !trainingModel || !classificationDeleteActions
             || !classificationDelete || !classificationDatasetField || !classificationDataset
+            || !classificationChartOpen || !classificationChartModal || !classificationChartModalImage
+            || !trainingErrorModal || !trainingErrorMessage || !trainingErrorClose
             || !deleteModal || !deleteModalCopy || !deleteCancel || !deleteConfirm) {
         return;
     }
@@ -119,6 +127,8 @@
 
         if (textClassificationSelected) {
             loadTextClassification();
+        } else if (datasetSelected) {
+            loadActiveDatasetNames();
         } else if (workRequestsSelected) {
             loadWorkRequests({force: true});
         }
@@ -236,6 +246,47 @@
         trainingModel.disabled = busy || !filesSelected;
     }
 
+    function renderActiveDatasetNames(training) {
+        if (selectedTrainingFile || selectedTestingFile) {
+            return;
+        }
+
+        const datasets = training?.datasets || [];
+        const trainingDataset = datasets.find((dataset) => dataset.purpose === "training");
+        const testingDataset = datasets.find((dataset) => dataset.purpose === "testing");
+
+        trainingName.value = trainingDataset?.file_name || "";
+        testingName.value = testingDataset?.file_name || "";
+    }
+
+    async function loadActiveDatasetNames() {
+        if (selectedTrainingFile || selectedTestingFile) {
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/adam/text-classification", {
+                cache: "no-store",
+                credentials: "same-origin",
+                headers: {"Accept": "application/json"},
+            });
+
+            if (handleAuthentication(response)) {
+                return;
+            }
+
+            const payload = await parseResponse(response);
+
+            if (!response.ok) {
+                throw new Error(payload.detail || ("HTTP " + response.status));
+            }
+
+            renderActiveDatasetNames(payload.training || null);
+        } catch (error) {
+            // Keep the dataset selection controls usable if model data is unavailable.
+        }
+    }
+
     function renderDataset(dataset) {
         activeDataset = dataset || null;
         const training = activeDataset && activeDataset.training;
@@ -322,6 +373,15 @@
         syncControls();
     }
 
+    function clearSelectedDatasets() {
+        selectedTrainingFile = null;
+        selectedTestingFile = null;
+        trainingInput.value = "";
+        testingInput.value = "";
+        trainingName.value = "";
+        testingName.value = "";
+    }
+
     async function queueTraining() {
         if (!selectedTrainingFile || !selectedTestingFile) { setStatus("Select both training and testing CSV files first.", true); return; }
         trainingInProgress = true; syncControls(); trainingModel.textContent = "Uploading and queueing..."; setState("Validating selected datasets"); setStatus("");
@@ -336,7 +396,13 @@
             if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
             selectedTrainingFile = null; selectedTestingFile = null; trainingInput.value = ""; testingInput.value = "";
             renderDataset(payload.dataset); setStatus(payload.message || "Training work request queued successfully."); setActiveView("work-requests");
-        } catch (error) { setState("Error"); setStatus(error.message, true); }
+        } catch (error) {
+            const message = error.message || "The training request could not be completed.";
+            clearSelectedDatasets();
+            setState("Error");
+            setStatus(message, true);
+            showTrainingError(message);
+        }
         finally { trainingInProgress = false; trainingModel.textContent = "Train Model"; syncControls(); }
     }
 
@@ -401,6 +467,7 @@
                 "No trained model available.";
             classificationChartWrap.hidden = true;
             classificationChart.removeAttribute("src");
+            closeClassificationChart();
             setState("Waiting for trained model");
             return;
         }
@@ -446,6 +513,35 @@
         if (!training.selected_category && selectedCategory) {
             window.setTimeout(loadTextClassification, 0);
         }
+    }
+
+    function openClassificationChart() {
+        const chartUrl = classificationChart.getAttribute("src");
+
+        if (!chartUrl) {
+            return;
+        }
+
+        classificationChartModalImage.src = chartUrl;
+        classificationChartModal.hidden = false;
+        document.body.classList.add("graph-modal-open");
+    }
+
+    function closeClassificationChart() {
+        classificationChartModal.hidden = true;
+        classificationChartModalImage.removeAttribute("src");
+        document.body.classList.remove("graph-modal-open");
+    }
+
+    function showTrainingError(message) {
+        trainingErrorMessage.textContent = message;
+        trainingErrorModal.hidden = false;
+        trainingErrorClose.focus();
+    }
+
+    function closeTrainingError() {
+        trainingErrorModal.hidden = true;
+        trainingModel.focus();
     }
 
     function openDeleteModal() {
@@ -554,7 +650,9 @@
                 throw new Error(payload.detail || `HTTP ${response.status}`);
             }
 
-            renderTextClassification(payload.training || null);
+            const training = payload.training || null;
+            renderTextClassification(training);
+            renderActiveDatasetNames(training);
         } catch (error) {
             classificationDetails.hidden = true;
             classificationEmpty.hidden = false;
@@ -635,7 +733,19 @@
     playgroundMode.addEventListener("change", syncPlaygroundControls);
     playgroundRun.addEventListener("click", runPlaygroundInference);
     classificationDataset.addEventListener("change", loadTextClassification);
+    classificationChartOpen.addEventListener("click", openClassificationChart);
+    classificationChartModal.addEventListener("click", (event) => {
+        if (event.target.closest("[data-adam-chart-modal-close]")) {
+            closeClassificationChart();
+        }
+    });
     classificationDelete.addEventListener("click", openDeleteModal);
+    trainingErrorClose.addEventListener("click", closeTrainingError);
+    trainingErrorModal.addEventListener("click", (event) => {
+        if (event.target === trainingErrorModal) {
+            closeTrainingError();
+        }
+    });
     deleteCancel.addEventListener("click", closeDeleteModal);
     deleteConfirm.addEventListener("click", queueDeletion);
     deleteModal.addEventListener("click", (event) => {
@@ -644,7 +754,14 @@
         }
     });
     document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && !deleteModal.hidden) {
+        if (event.key !== "Escape") {
+            return;
+        }
+        if (!classificationChartModal.hidden) {
+            closeClassificationChart();
+        } else if (!trainingErrorModal.hidden) {
+            closeTrainingError();
+        } else if (!deleteModal.hidden) {
             closeDeleteModal();
         }
     });
@@ -676,5 +793,6 @@
     setActiveView("wake-word");
     document.dispatchEvent(new CustomEvent("adam:wake-word:status:request"));
     renderDataset(null);
+    loadActiveDatasetNames();
     syncPlaygroundControls();
 })();

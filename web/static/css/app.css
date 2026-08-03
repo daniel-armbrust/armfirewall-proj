@@ -2237,6 +2237,20 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     height: auto;
 }
 
+.adam-classification-chart-trigger {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: zoom-in;
+}
+
+.adam-classification-chart-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+}
+
 .adam-classification-delete-actions {
     justify-content: flex-start;
 }
@@ -2314,6 +2328,11 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     margin-top: 18px;
     flex-direction: row;
     align-items: center;
+}
+
+#adam-training-error-modal .modal-actions {
+    margin-top: 0;
+    padding: 0 20px 20px;
 }
 
 #adam-delete-modal .modal-dialog {
