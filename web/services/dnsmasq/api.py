@@ -50,6 +50,9 @@ def default_config() -> dict[str, Any]:
         "domain_needed": BOOL_DEFAULTS["domain_needed"],
         "bogus_priv": BOOL_DEFAULTS["bogus_priv"],
         "dhcp_authoritative": BOOL_DEFAULTS["dhcp_authoritative"],
+        "ipv6_ra_enabled": False,
+        "ipv6_ra_names": True,
+        "ipv6_ra_lifetime": "4h",
         "extra_options": "",
     }
 
@@ -72,6 +75,9 @@ def default_interface_config(iface_name: str) -> dict[str, Any]:
         "dhcp_range_end": "",
         "lease_time": "12h",
         "dhcp_authoritative": BOOL_DEFAULTS["dhcp_authoritative"],
+        "ipv6_ra_enabled": False,
+        "ipv6_ra_names": True,
+        "ipv6_ra_lifetime": "4h",
     }
 
 
@@ -260,6 +266,23 @@ def ensure_dnsmasq_schema(conn: db.Connection) -> None:
     for name, definition in column_defs.items():
         if name not in columns:
             db.execute_on(conn, f"ALTER TABLE dnsmasq_settings ADD COLUMN {name} {definition}")
+    interface_columns = {
+        row["name"]
+        for row in db.execute_on(
+            conn, "PRAGMA table_info(dnsmasq_interface_configs)"
+        ).fetchall()
+    }
+    interface_column_defs = {
+        "ipv6_ra_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (ipv6_ra_enabled IN (0, 1))",
+        "ipv6_ra_names": "INTEGER NOT NULL DEFAULT 1 CHECK (ipv6_ra_names IN (0, 1))",
+        "ipv6_ra_lifetime": "TEXT NOT NULL DEFAULT '4h'",
+    }
+    for name, definition in interface_column_defs.items():
+        if name not in interface_columns:
+            db.execute_on(
+                conn,
+                f"ALTER TABLE dnsmasq_interface_configs ADD COLUMN {name} {definition}",
+            )
     db.execute_on(
         conn,
         """
@@ -312,7 +335,8 @@ def load_config_from_db() -> dict[str, Any] | None:
             SELECT id, iface, dns_enabled, local_domain, upstream_dns_servers_json,
                    pihole_upstream_enabled, cache_size, expand_hosts, domain_needed,
                    bogus_priv, dhcp_enabled, dhcp_range_start, dhcp_range_end,
-                   lease_time, dhcp_authoritative
+                   lease_time, dhcp_authoritative, ipv6_ra_enabled,
+                   ipv6_ra_names, ipv6_ra_lifetime
             FROM dnsmasq_interface_configs
             WHERE enabled = 1
             ORDER BY id
@@ -357,6 +381,9 @@ def load_config_from_db() -> dict[str, Any] | None:
                     "dhcp_range_end": row["dhcp_range_end"],
                     "lease_time": row["lease_time"],
                     "dhcp_authoritative": bool_from_db(row["dhcp_authoritative"]),
+                    "ipv6_ra_enabled": bool_from_db(row["ipv6_ra_enabled"]),
+                    "ipv6_ra_names": bool_from_db(row["ipv6_ra_names"]),
+                    "ipv6_ra_lifetime": row["ipv6_ra_lifetime"],
                 }
             )
 
@@ -471,9 +498,10 @@ def save_config_to_db(config: dict[str, Any]) -> int:
                     iface, dns_enabled, local_domain, upstream_dns_servers_json,
                     pihole_upstream_enabled, cache_size, expand_hosts, domain_needed,
                     bogus_priv, dhcp_enabled, dhcp_range_start, dhcp_range_end,
-                    lease_time, dhcp_authoritative, enabled
+                    lease_time, dhcp_authoritative, ipv6_ra_enabled,
+                    ipv6_ra_names, ipv6_ra_lifetime, enabled
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                 """,
                 (
                     item["iface"],
@@ -490,6 +518,9 @@ def save_config_to_db(config: dict[str, Any]) -> int:
                     item["dhcp_range_end"],
                     item["lease_time"],
                     int(item["dhcp_authoritative"]),
+                    int(item["ipv6_ra_enabled"]),
+                    int(item["ipv6_ra_names"]),
+                    item["ipv6_ra_lifetime"],
                 ),
             )
             interface_config_id = int(cursor.lastrowid)
@@ -696,6 +727,31 @@ def normalize_interface_config(item: dict[str, Any]) -> dict[str, Any]:
     config["dhcp_range_end"] = validate_optional_ip(item.get("dhcp_range_end"), f"{iface_name}.dhcp_range_end")
     config["lease_time"] = validate_lease_time(item.get("lease_time"))
     config["dhcp_authoritative"] = bool(item.get("dhcp_authoritative"))
+    config["ipv6_ra_enabled"] = bool(item.get("ipv6_ra_enabled"))
+    config["ipv6_ra_names"] = bool(item.get("ipv6_ra_names", True))
+    config["ipv6_ra_lifetime"] = validate_lease_time(item.get("ipv6_ra_lifetime") or "4h")
+
+    if config["ipv6_ra_enabled"]:
+        if iface_name == ALL_INTERFACES_TOKEN:
+            raise HTTPException(status_code=400, detail="IPv6 Router Advertisements require a specific interface.")
+        interface = next(
+            (item for item in list_interfaces() if item.get("name") == iface_name),
+            None,
+        )
+        has_routable_ipv6 = interface and any(
+            str(address.get("addr_family")) == "ipv6"
+            and not str(address.get("addr", "")).lower().startswith("fe80:")
+            and str(address.get("addr")) != "::1"
+            for address in interface.get("addresses", [])
+        )
+        if not has_routable_ipv6:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "IPv6 Router Advertisements require an interface with a "
+                    f"routable IPv6 prefix: {iface_name}."
+                ),
+            )
 
     if config["dhcp_enabled"] and (not config["dhcp_range_start"] or not config["dhcp_range_end"]):
         raise HTTPException(status_code=400, detail=f"DHCP range start and end are required for {iface_name}.")
@@ -720,6 +776,9 @@ def normalize_interface_configs(values: Any, fallback: dict[str, Any]) -> list[d
             config["dhcp_range_end"] = fallback.get("dhcp_range_end", "")
             config["lease_time"] = fallback.get("lease_time", "12h")
             config["dhcp_authoritative"] = bool(fallback.get("dhcp_authoritative"))
+            config["ipv6_ra_enabled"] = bool(fallback.get("ipv6_ra_enabled"))
+            config["ipv6_ra_names"] = bool(fallback.get("ipv6_ra_names", True))
+            config["ipv6_ra_lifetime"] = fallback.get("ipv6_ra_lifetime", "4h")
             configs.append(normalize_interface_config(config))
         return configs
     configs: list[dict[str, Any]] = []
@@ -822,12 +881,16 @@ def render_config(config: dict[str, Any]) -> str:
     has_listen_scope = bool(config.get("listen_interfaces"))
     dns_enabled = bool(config["dns_enabled"]) and has_listen_scope
     dhcp_enabled = any(item["dhcp_enabled"] for item in interface_configs) or bool(config["dhcp_enabled"])
+    ipv6_ra_enabled = any(item["ipv6_ra_enabled"] for item in interface_configs)
     lines = [
         "# ArmFirewall managed dnsmasq configuration.",
         "# Generated from Services / Dnsmasq.",
         f"port={53 if dns_enabled else 0}",
         "bind-interfaces",
     ]
+
+    if ipv6_ra_enabled:
+        lines.append("enable-ra")
 
     if ALL_INTERFACES_TOKEN in config["listen_interfaces"]:
         lines.append("# armfirewall-listen-all-interfaces=1")
@@ -874,6 +937,15 @@ def render_config(config: dict[str, Any]) -> str:
             if item["dhcp_authoritative"] and "dhcp-authoritative" not in rendered_directives:
                 lines.append("dhcp-authoritative")
                 rendered_directives.add("dhcp-authoritative")
+        if item["ipv6_ra_enabled"]:
+            options = ["ra-stateless"]
+            if item["ipv6_ra_names"]:
+                options.append("ra-names")
+            lines.append(f"# IPv6 Router Advertisement for {item['iface']}")
+            lines.append(
+                f"dhcp-range=::1,constructor:{item['iface']},"
+                f"{','.join(options)},{item['ipv6_ra_lifetime']}"
+            )
 
     if config["extra_options"]:
         lines.append("")

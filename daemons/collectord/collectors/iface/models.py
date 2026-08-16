@@ -1,4 +1,4 @@
-"""Data models used by the ArmFirewall interface daemon."""
+"""Data models for network interface collection."""
 
 from __future__ import annotations
 

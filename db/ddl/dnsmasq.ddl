@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS dnsmasq_interface_configs (
      dhcp_range_end TEXT NOT NULL DEFAULT '',
      lease_time TEXT NOT NULL DEFAULT '12h',
      dhcp_authoritative INTEGER NOT NULL DEFAULT 0 CHECK (dhcp_authoritative IN (0, 1)),
+     ipv6_ra_enabled INTEGER NOT NULL DEFAULT 0 CHECK (ipv6_ra_enabled IN (0, 1)),
+     ipv6_ra_names INTEGER NOT NULL DEFAULT 1 CHECK (ipv6_ra_names IN (0, 1)),
+     ipv6_ra_lifetime TEXT NOT NULL DEFAULT '4h',
      enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

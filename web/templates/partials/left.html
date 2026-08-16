@@ -44,6 +44,9 @@
         {% if request.app.state.service_installed('dnsmasq') %}
         <a class="menu-link child {% if current_path == '/services/dnsmasq' %}active{% endif %}" href="/services/dnsmasq">Dnsmasq</a>
         {% endif %}
+        {% if request.app.state.service_installed('adguardhome') %}
+        <a class="menu-link child {% if current_path == '/services/adguard' %}active{% endif %}" href="/services/adguard">AdGuard</a>
+        {% endif %}
         {% if request.app.state.service_installed('libreswan') %}
         <a class="menu-link child {% if current_path == '/services/libreswan' %}active{% endif %}" href="/services/libreswan">Libreswan</a>
         {% endif %}

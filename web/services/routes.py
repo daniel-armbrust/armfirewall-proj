@@ -8,6 +8,8 @@ from fastapi.responses import HTMLResponse
 
 from web.services.dnsmasq import api as services_dnsmasq_api
 from web.services.dnsmasq import views as services_dnsmasq_views
+from web.services.adguardhome import api as services_adguardhome_api
+from web.services.adguardhome import views as services_adguardhome_views
 from web.services.libreswan import api as services_libreswan_api
 from web.services.libreswan import views as services_libreswan_views
 from web.services.linkfailover import api as services_linkfailover_api
@@ -91,6 +93,30 @@ def api_uninstall_optional_service(service_name: str) -> dict[str, Any]:
 def api_dnsmasq_config() -> dict[str, Any]:
     """Return dnsmasq configuration and service status."""
     return services_dnsmasq_api.get_dnsmasq_config()
+
+
+@router.get("/api/services/adguardhome")
+def api_adguardhome_config() -> dict[str, Any]:
+    """Return AdGuard Home configuration and service status."""
+    return services_adguardhome_api.get_config()
+
+
+@router.put("/api/services/adguardhome")
+async def api_save_adguardhome_config(request: Request) -> dict[str, Any]:
+    """Persist AdGuard Home global settings from the GUI."""
+    return services_adguardhome_api.update_settings(await request.json())
+
+
+@router.post("/api/services/adguardhome/filters")
+async def api_add_adguardhome_filter(request: Request) -> dict[str, Any]:
+    """Add one AdGuard Home remote filter source."""
+    return services_adguardhome_api.add_filter(await request.json())
+
+
+@router.delete("/api/services/adguardhome/filters/{filter_id}")
+def api_delete_adguardhome_filter(filter_id: int) -> dict[str, Any]:
+    """Remove one AdGuard Home remote filter source."""
+    return services_adguardhome_api.delete_filter(filter_id)
 
 
 @router.get("/api/services/dnsmasq/work-requests")
@@ -207,6 +233,12 @@ def services_status(request: Request) -> HTMLResponse:
 def services_dnsmasq(request: Request) -> HTMLResponse:
     """Render the Dnsmasq service page."""
     return services_dnsmasq_views.render_dnsmasq(request)
+
+
+@router.get("/services/adguard", response_class=HTMLResponse)
+def services_adguardhome(request: Request) -> HTMLResponse:
+    """Render the AdGuard Home service page."""
+    return services_adguardhome_views.render_adguardhome(request)
 
 
 @router.get("/services/libreswan", response_class=HTMLResponse)

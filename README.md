@@ -41,7 +41,6 @@ ArmFirewall is organized by responsibility:
 ArmFirewall keeps the main runtime services under `supervisord`:
 
 - `armfirewall-api`: runs the FastAPI web application.
-- `armfirewall-ifaced`: maintains network interface inventory and counters.
 - `armfirewall-monitord`: runs monitoring collectors and generates RRD graphs.
 - `armfirewall-workreqd`: processes queued work requests.
 
@@ -60,7 +59,6 @@ Services are tracked through `services.db`. The web interface reads the service 
 Main services are installed with ArmFirewall:
 
 - `armfirewall-api`
-- `armfirewall-ifaced`
 - `armfirewall-monitord`
 - `armfirewall-workreqd`
 

@@ -119,6 +119,7 @@
     <nav class="local-tabs dnsmasq-tabs" aria-label="Dnsmasq configuration sections">
         <button class="local-tab active" type="button" data-dnsmasq-tab="dns">DNS</button>
         <button class="local-tab" type="button" data-dnsmasq-tab="dhcp">DHCP</button>
+        <button class="local-tab" type="button" data-dnsmasq-tab="ipv6">IPV6 RA</button>
     </nav>
 
     <section class="panel" data-dnsmasq-panel="dns">
@@ -171,7 +172,7 @@
                 </label>
                 <label class="check-line wide">
                     <input id="dnsmasq-pihole-upstream" name="pihole_upstream_enabled" type="checkbox">
-                    <span>Enable piHole DNS Upstream?</span>
+                    <span>Enable DNS Filtering Upstream?</span>
                 </label>
                 <label class="check-line wide">
                     <input id="dnsmasq-forwarded-domains-enabled" name="forwarded_domains_enabled" type="checkbox">
@@ -221,6 +222,16 @@
         </div>
     </section>
 
+    <section class="panel" data-dnsmasq-panel="ipv6" hidden>
+        <div class="panel-head">
+            <h2>IPv6 Router Advertisements</h2>
+            <span>scope=lan-interface</span>
+        </div>
+        <div class="edit-form">
+            <div class="dnsmasq-scope-list" id="dnsmasq-ipv6-ra-scope-list"></div>
+        </div>
+    </section>
+
     <section class="dnsmasq-form-actions">
         <div class="edit-form">
             <input id="dnsmasq-extra-options" name="extra_options" type="hidden" value="">
@@ -248,5 +259,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260512-dnsmasq-workreq-content-scroll" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260817-dnsmasq-ipv6-ra" defer></script>
 {% endblock %}

@@ -9,7 +9,6 @@ LOG_SOURCE = "svcmgmtd.py"
 PROTECTED_SERVICES = {
     "armfirewall-api",
     "armfirewall-workreqd",
-    "armfirewall-ifaced",
     "armfirewall-collectord",
 }
 

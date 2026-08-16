@@ -29,7 +29,7 @@ def api_policy_routing_work_requests() -> dict[str, Any]:
 
 @router.get("/api/network/neighbor-table")
 def api_neighbor_table() -> dict[str, Any]:
-    """Return the current operating system neighbor table."""
+    """Return the latest persisted neighbor-table snapshot."""
     return neighbor_table_views.get_neighbor_table()
 
 

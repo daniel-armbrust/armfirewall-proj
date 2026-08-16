@@ -8,6 +8,7 @@
     const activeInterfacesBody = document.querySelector("#dnsmasq-active-interfaces");
     const dnsScopeList = document.querySelector("#dnsmasq-dns-scope-list");
     const dhcpScopeList = document.querySelector("#dnsmasq-dhcp-scope-list");
+    const ipv6RaScopeList = document.querySelector("#dnsmasq-ipv6-ra-scope-list");
     const forwardedDomainsEnabled = document.querySelector("#dnsmasq-forwarded-domains-enabled");
     const forwardedDomainControls = Array.from(document.querySelectorAll(".dnsmasq-forwarded-domain-control"));
     const domainUpstreamDomain = document.querySelector("#dnsmasq-domain-upstream-domain");
@@ -303,6 +304,9 @@
             dhcp_range_end: currentConfig.dhcp_range_end || "",
             lease_time: currentConfig.lease_time || "12h",
             dhcp_authoritative: Boolean(currentConfig.dhcp_authoritative),
+            ipv6_ra_enabled: false,
+            ipv6_ra_names: true,
+            ipv6_ra_lifetime: "4h",
         };
     }
 
@@ -420,7 +424,7 @@
                     </label>
                     <label class="check-line wide">
                         <input data-global-dns-field="pihole_upstream_enabled" type="checkbox"${checkedAttr(config.pihole_upstream_enabled)}>
-                        <span>Enable piHole DNS Upstream?</span>
+                        <span>Enable DNS Filtering Upstream?</span>
                     </label>
                     <label class="check-line wide">
                         <input data-global-dns-field="forwarded_domains_enabled" type="checkbox"${checkedAttr(forwardedEnabled)}${config.pihole_upstream_enabled ? " disabled" : ""}>
@@ -501,9 +505,60 @@
         }).join("");
     }
 
+    function renderIpv6RaScopeCards() {
+        if (!ipv6RaScopeList) {
+            return;
+        }
+        const names = uniqueInterfaceNames(activeInterfaceNames()).filter((name) => {
+            const iface = interfaceMeta(name);
+            return name !== ALL_INTERFACES && (iface.addresses || []).some((address) => {
+                const value = HF.text(address.addr).toLowerCase();
+                return address.addr_family === "ipv6" && !value.startsWith("fe80:") && value !== "::1";
+            });
+        });
+        if (!names.length) {
+            ipv6RaScopeList.innerHTML = `
+                <div class="terminal-empty"><span class="prompt">$</span><span>add an interface with a routable IPv6 prefix to configure Router Advertisements</span></div>
+            `;
+            return;
+        }
+        ipv6RaScopeList.innerHTML = names.map((name) => {
+            const config = configForInterface(name);
+            return `
+                <section class="dnsmasq-scope-card" data-dnsmasq-scope="ipv6-ra" data-iface="${HF.escapeHtml(name)}">
+                    <div class="dnsmasq-scope-head">
+                        <strong>IPv6 Router Advertisement</strong>
+                        <span><b>${HF.escapeHtml(interfaceDisplayName(name))}</b> / SLAAC stateless</span>
+                    </div>
+                    <div class="form-grid dnsmasq-scope-form">
+                        <label class="field">
+                            <span>Router Advertisements</span>
+                            <select data-scope-field="ipv6_ra_enabled">
+                                <option value="1"${selectedAttr(config.ipv6_ra_enabled ? "1" : "0", "1")}>enabled</option>
+                                <option value="0"${selectedAttr(config.ipv6_ra_enabled ? "1" : "0", "0")}>disabled</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>Register hostnames</span>
+                            <select data-scope-field="ipv6_ra_names">
+                                <option value="1"${selectedAttr(config.ipv6_ra_names ? "1" : "0", "1")}>enabled</option>
+                                <option value="0"${selectedAttr(config.ipv6_ra_names ? "1" : "0", "0")}>disabled</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>RA lifetime</span>
+                            <input data-scope-field="ipv6_ra_lifetime" type="text" autocomplete="off" value="${fieldValue(config.ipv6_ra_lifetime, "4h")}">
+                        </label>
+                    </div>
+                </section>
+            `;
+        }).join("");
+    }
+
     function renderScopeCards() {
         renderDnsScopeCards();
         renderDhcpScopeCards();
+        renderIpv6RaScopeCards();
         removeDuplicateScopeCards();
     }
 
@@ -929,6 +984,9 @@
             domain_needed: Boolean(dnsConfig.domain_needed),
             bogus_priv: Boolean(dnsConfig.bogus_priv),
             dhcp_authoritative: interfaceConfigs.some((item) => item.dhcp_authoritative),
+            ipv6_ra_enabled: interfaceConfigs.some((item) => item.ipv6_ra_enabled),
+            ipv6_ra_names: interfaceConfigs.some((item) => item.ipv6_ra_names),
+            ipv6_ra_lifetime: "4h",
             extra_options: document.querySelector("#dnsmasq-extra-options")?.value || "",
         };
     }

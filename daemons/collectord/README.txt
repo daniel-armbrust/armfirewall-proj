@@ -35,9 +35,10 @@ Execution Flow
 1. supervisord starts armfirewall-collectord.
 2. collectord builds the registered collector list.
 3. Each collector runs only when its own interval is due.
-4. Collector failures are logged and isolated from the main daemon loop.
-5. BIRD diagnostic command output is stored in bird.db.
-6. The GUI reads bird.db through the web API.
+4. Before running, each collector verifies that its dependency is available.
+5. Collector failures are logged and isolated from the main daemon loop.
+6. BIRD diagnostic command output is stored in bird.db only while BIRD is running.
+7. The GUI reads bird.db through the web API.
 
 Files
 -----
@@ -52,20 +53,54 @@ collectord.py
     Main daemon process, collector registration, scheduler loop and error
     isolation between collectors.
 
-constants.py
+core/constants.py
     Shared scheduler settings, BIRD command settings, command timeout,
-    retention limit, database path and daemon log source.
-
-models.py
-    Shared typing contracts used by the daemon, including the collector
-    protocol.
+    retention limit and daemon log source, all prefixed with COLLECTORD_.
 
 collectors/__init__.py
     Marks the collectors directory as a Python package.
 
-collectors/bird.py
-    BIRD diagnostics collector. It runs birdcl show protocols, stores raw
-    command output, parses protocol rows, and prunes old command history.
+collectors/bird/
+    BIRD diagnostics collector package.
+
+collectors/bird/collector.py
+    Coordinates BIRD commands, parsing, and persistence for one collection
+    cycle.
+
+collectors/bird/client.py
+    Runs birdcl commands and measures their duration.
+
+collectors/bird/parser.py
+    Parses protocol and route command output into structured rows.
+
+collectors/bird/repository.py
+    Persists diagnostic command output, protocol rows, and RIP route snapshots.
+
+collectors/bird/models.py
+    Defines structured BIRD protocol and route rows.
+
+collectors/iface/
+    Network-interface collection package.
+
+collectors/iface/collector.py
+    Coordinates interface snapshot collection into iface.db.
+
+collectors/iface/parser.py
+    Parses ifconfig output and reads optional ethtool metadata.
+
+collectors/iface/repository.py
+    Persists interfaces, addresses, counters and proc network settings.
+
+collectors/iface/models.py
+    Defines structured interface, address and traffic-counter data.
+
+Collector Availability
+----------------------
+
+Collectors remain registered so availability can be re-evaluated on every
+scheduled cycle. A collector only runs while its required service and command
+are available. For example, the BIRD collector requires both the configured
+birdcl executable and the supervisord BIRD program in the RUNNING state.
 
 Responsibility Boundary
 -----------------------

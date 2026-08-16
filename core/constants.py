@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -17,6 +18,8 @@ OCI_CONFIG_PATH = OCI_CONF_DIR / "oci.config"
 LOG_DIR = ROOT_DIR / "logs"
 SUPERVISOR_CONF = CONF_DIR / "supervisord.conf"
 IFACE_DB_PATH = DB_DIR / "iface.db"
+SYSTEM_DB_PATH = DB_DIR / "system.db"
+NETWORK_DB_PATH = DB_DIR / "network.db"
 LOG_DB_PATH = DB_DIR / "logs.db"
 USERS_DB_PATH = DB_DIR / "users.db"
 WORK_REQUEST_DB_PATH = DB_DIR / "work-requests.db"
@@ -30,6 +33,8 @@ RUNTIME_SETTINGS_DB_PATH = DB_DIR / "runtime_settings.db"
 
 BIRD_DB_PATH = DB_DIR / "bird.db"
 BIRD_DDL_PATH = DB_DIR / "ddl" / "bird.ddl"
+SYSTEM_DDL_PATH = DB_DIR / "ddl" / "system.ddl"
+NETWORK_DDL_PATH = DB_DIR / "ddl" / "network.ddl"
 BIRD_CONFIG_PATH = CONF_DIR / "bird.conf"
 BIRD_LOG_PATH = LOG_DIR / "bird.out.log"
 BIRD_ERR_LOG_PATH = LOG_DIR / "bird.err.log"
@@ -43,6 +48,41 @@ BIRD_RIP_VERSIONS = {"1", "2", "ng"}
 BIRD_RIP_MODES = {"multicast", "broadcast"}
 BIRD_RIP_AUTHENTICATIONS = {"none", "plaintext", "cryptographic"}
 BIRD_BGP_SESSION_TYPES = {"auto", "ibgp", "ebgp"}
+
+COLLECTORD_LOG_SOURCE = "collectord.py"
+COLLECTORD_SCHEDULER_TICK_SECONDS = int(os.environ.get("ARMFW_COLLECTORD_SCHEDULER_TICK", "1"))
+COLLECTORD_BIRD_PROTOCOLS_INTERVAL_SECONDS = int(
+    os.environ.get("ARMFW_COLLECTORD_BIRD_PROTOCOLS_INTERVAL", "5")
+)
+COLLECTORD_BIRD_COMMAND_TIMEOUT_SECONDS = int(
+    os.environ.get("ARMFW_COLLECTORD_BIRD_COMMAND_TIMEOUT", "5")
+)
+COLLECTORD_BIRD_COMMAND_RETENTION = int(
+    os.environ.get("ARMFW_COLLECTORD_BIRD_COMMAND_RETENTION", "500")
+)
+COLLECTORD_BIRDCL_PATH = os.environ.get("ARMFW_BIRDCL_PATH", "/usr/sbin/birdcl")
+COLLECTORD_BIRD_SHOW_PROTOCOLS_COMMAND = [COLLECTORD_BIRDCL_PATH, "show", "protocols"]
+COLLECTORD_BIRD_RIP_DIAGNOSTIC_COMMANDS = (
+    ("status", [COLLECTORD_BIRDCL_PATH, "show", "protocols", "all", "rip1"]),
+    ("learned-routes", [COLLECTORD_BIRDCL_PATH, "show", "route", "protocol", "rip1"]),
+    ("exported-routes", [COLLECTORD_BIRDCL_PATH, "show", "route", "export", "rip1"]),
+)
+COLLECTORD_IFACE_INTERVAL_SECONDS = int(os.environ.get("ARMFW_COLLECTORD_IFACE_INTERVAL", "10"))
+COLLECTORD_IFACE_PROC_ITEMS = (
+    ("ipv4", "forwarding", "Enables IPv4 packet forwarding on this interface."),
+    ("ipv4", "rp_filter", "Controls reverse path filtering for IPv4 packets."),
+    ("ipv4", "accept_redirects", "Controls whether ICMP redirect messages are accepted."),
+    ("ipv4", "send_redirects", "Controls whether ICMP redirect messages are sent."),
+    ("ipv4", "accept_source_route", "Controls whether source-routed IPv4 packets are accepted."),
+    ("ipv4", "log_martians", "Controls logging of packets with impossible or suspicious source addresses."),
+    ("ipv4", "arp_filter", "Controls whether ARP replies are filtered according to the route table."),
+    ("ipv4", "arp_ignore", "Controls when the kernel replies to ARP requests for local addresses."),
+    ("ipv4", "arp_announce", "Controls how local source IP addresses are announced in ARP requests."),
+    ("ipv6", "disable_ipv6", "Controls whether IPv6 is disabled on this interface."),
+    ("ipv6", "forwarding", "Enables IPv6 packet forwarding on this interface."),
+    ("ipv6", "accept_redirects", "Controls whether ICMPv6 redirect messages are accepted."),
+    ("ipv6", "accept_ra", "Controls whether IPv6 Router Advertisement messages are accepted."),
+)
 
 ADAM_DATASET_DIR = ROOT_DIR / "daemons" / "adamd" / "datasets"
 ADAM_DATASET_MAX_BYTES = 5 * 1024 * 1024
@@ -140,3 +180,11 @@ ADAM_TRAINING_OOM_POLICY = "stop"
 
 RRD_DIR = ROOT_DIR / "rrd"
 RRD_IMG_DIR = RRD_DIR / "img"
+
+ADGUARD_HOME_SERVICE_NAME = "adguardhome"
+ADGUARD_HOME_ARCHIVE_URL = "https://github.com/AdguardTeam/AdGuardHome/releases/latest/download/AdGuardHome_linux_arm64.tar.gz"
+ADGUARD_HOME_DIR = ROOT_DIR / "daemons" / "adguardhome"
+ADGUARD_HOME_BINARY = ADGUARD_HOME_DIR / "AdGuardHome"
+ADGUARD_HOME_WORK_DIR = ROOT_DIR / "data" / "adguardhome"
+ADGUARD_HOME_DB_PATH = DB_DIR / "adguardhome.db"
+ADGUARD_HOME_DDL_PATH = DB_DIR / "ddl" / "adguardhome.ddl"

@@ -60,6 +60,10 @@ daemons/adamd/models/
 daemons/adamd/charts/
 daemons/adamd/.delete-staging/
 
+# AdGuard Home downloaded runtime and generated state
+daemons/adguardhome/
+data/adguardhome/
+
 # Temporary, backup, and editor files
 tmp/
 temp/

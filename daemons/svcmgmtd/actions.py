@@ -6,12 +6,17 @@ import sys
 
 from core import db
 from core import log as logger
-from core.constants import CONF_DIR, ROOT_DIR, SERVICES_DB_PATH
+from core.constants import ADGUARD_HOME_SERVICE_NAME, CONF_DIR, ROOT_DIR, SERVICES_DB_PATH
 
 from .constants import LOG_SOURCE
 from .models import ControllableService, OptionalService
 from .commons import run_bounded_command
-from .packages import install_package, uninstall_package
+from .packages import (
+    install_adguard_home,
+    install_package,
+    uninstall_adguard_home,
+    uninstall_package,
+)
 from .supervisor import (
     register_supervisor_program,
     remove_supervisor_program,
@@ -55,7 +60,10 @@ def restart_service(service_name: str) -> None:
 
 def install_service(service: OptionalService) -> None:
     """Install a package and register its supervisor program."""
-    install_package(service.package)
+    if service.name == ADGUARD_HOME_SERVICE_NAME:
+        install_adguard_home()
+    else:
+        install_package(service.package)
     register_supervisor_program(service)
     reread_and_update()
     sync_supervisor_statuses()
@@ -69,7 +77,10 @@ def uninstall_service(service: OptionalService) -> None:
         remove_supervisor_program(service.name)
         reread_and_update()
     
-    uninstall_package(service.package)
+    if service.name == ADGUARD_HOME_SERVICE_NAME:
+        uninstall_adguard_home()
+    else:
+        uninstall_package(service.package)
     sync_supervisor_statuses()
     
     logger.log(f"Uninstalled optional service {service.name}.", source=LOG_SOURCE)

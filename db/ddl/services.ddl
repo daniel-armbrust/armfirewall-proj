@@ -35,7 +35,6 @@ INSERT OR IGNORE INTO services (
     protected, restart_allowed, sort_order
 ) VALUES
     ('armfirewall-api', 'armfirewall-api', 'web', 'ArmFirewall HTTPS API and web GUI.', 'main', 1, 1, 10),
-    ('armfirewall-ifaced', 'armfirewall-ifaced', 'daemon', 'Interface inventory and network metrics collector.', 'main', 1, 0, 20),
     ('armfirewall-monitord', 'armfirewall-monitord', 'daemon', 'RRD monitoring collector and graph generator.', 'main', 0, 0, 30),
     ('armfirewall-collectord', 'armfirewall-collectord', 'daemon', 'Operating-system state collector for web GUI snapshots.', 'main', 1, 0, 35),
     ('armfirewall-workreqd', 'armfirewall-workreqd', 'daemon', 'Work request executor for operating system changes.', 'main', 1, 0, 40),
@@ -131,6 +130,34 @@ stderr_logfile_maxbytes=10MB
 stderr_logfile_backups=5
 ',
         120
+    ),
+    (
+        'adguardhome',
+        'AdGuard Home',
+        'dns-filter',
+        'Network-wide DNS filtering for advertisements and trackers.',
+        'optional',
+        0,
+        0,
+        'adguardhome',
+        '{root}/daemons/adguardhome/AdGuardHome',
+        '[program:adguardhome]
+directory={root}
+command={root}/daemons/adguardhome/AdGuardHome --no-check-update --web-addr 127.0.0.1:3001 --work-dir {root}/data/adguardhome
+autostart=false
+autorestart=true
+startsecs=3
+stopsignal=TERM
+stopasgroup=true
+killasgroup=true
+stdout_logfile={root}/logs/adguardhome.out.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
+stderr_logfile={root}/logs/adguardhome.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=5
+',
+        105
     ),
     (
         'libreswan',
