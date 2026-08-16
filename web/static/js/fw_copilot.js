@@ -14,13 +14,8 @@
         .map((alias) => alias.trim())
         .filter(Boolean);
     const wakeWords = Array.from(new Set([wakeWord, ...wakeWordAliases]));
-    const wakeTranscriptionAliases = (copilot.dataset.wakeTranscriptionAliases || "")
-        .split(",")
-        .map((alias) => alias.trim())
-        .filter(Boolean);
     const spokenWakeWord = wakeWordAliases[0] || wakeWord;
     const wakeProfileKey = copilot.dataset.wakeProfileKey || "default";
-    const modelUrl = copilot.dataset.modelUrl;
     const workletUrl = copilot.dataset.workletUrl;
     const detectorWorkerUrl = copilot.dataset.detectorWorkerUrl;
     const minConfidence = Number.parseFloat(copilot.dataset.minConfidence) || 0.70;
@@ -41,10 +36,8 @@
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-    const debugLog = () => {};
     let trackingTimer = null;
     let wakeAlertTimer = null;
-    let modelPromise = null;
     let mediaStream = null;
     let audioContext = null;
     let audioSource = null;
@@ -54,23 +47,13 @@
     let detectorEnrolled = false;
     let enrollmentInProgress = false;
     let enrollmentCompletedSamples = 0;
-    let enrollmentRecognizer = null;
-    let enrollmentRecognizerChannel = null;
-    let enrollmentResultSegments = [];
-    let enrollmentPartialTranscript = "";
-    let enrollmentFinalizationTimer = null;
     let pendingEnrollmentStart = false;
     let serverWakeProfile = null;
-    let recognizer = null;
-    let recognizerChannel = null;
     let commandTimeout = null;
     let commandSilenceTimer = null;
-    let commandFinalizeTimer = null;
     let commandStartedAt = 0;
-    let commandSpeechDetected = false;
-    let commandResultSegments = [];
-    let commandPartialTranscript = "";
-    let recognizerRemovalRequested = false;
+    let commandAudioChunks = [];
+    let commandCaptureFinalizing = false;
     let commandConfidence = 0;
     let listeningEnabled = false;
     let commandRecognitionActive = false;
@@ -129,7 +112,7 @@
         const socket = new WebSocket(websocketUrl());
         adamWebSocket = socket;
         socket.addEventListener("open", () => {
-            debugLog("ADAM WebSocket connected");
+
             socketHeartbeatTimer = window.setInterval(() => {
                 if (socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({type: "session.ping"}));
@@ -139,9 +122,9 @@
         socket.addEventListener("message", (event) => {
             try {
                 const message = JSON.parse(event.data);
-                debugLog("ADAM WebSocket event", message.type, message.request_id || "");
+
             } catch (_error) {
-                debugLog("ADAM WebSocket returned an invalid event");
+
             }
         });
         socket.addEventListener("close", (event) => {
@@ -152,13 +135,13 @@
             socketHeartbeatTimer = null;
             if (event.code === 4403) {
                 adamDisabled = true;
-                debugLog("ADAM WebSocket closed because ADAM is disabled");
+
                 return;
             }
             scheduleWebSocketReconnect();
         });
         socket.addEventListener("error", () => {
-            debugLog("ADAM WebSocket connection failed");
+
         });
     }
 
@@ -220,9 +203,7 @@
             || !navigator.mediaDevices.getUserMedia
             || !AudioContextClass
             || !window.AudioWorkletNode
-            || !window.WebAssembly
             || !window.Worker
-            || !window.MessageChannel
             || !window.indexedDB) {
             return "Microphone is not supported.";
         }
@@ -274,7 +255,7 @@
         }));
     }
 
-    function setWakeAlertState({ autoTransition = true } = {}) {
+    function setWakeAlertState({ autoTransition = false } = {}) {
         window.clearTimeout(wakeAlertTimer);
         copilot.dataset.state = "wake-alert";
         copilot.setAttribute(
@@ -309,9 +290,7 @@
     function commandAfterWakeWord(text) {
         const recognizedWakeWords = Array.from(new Set([
             ...wakeWords,
-            ...wakeTranscriptionAliases,
             ...wakeWords.map((word) => normalizeText(word)),
-            ...wakeTranscriptionAliases.map((word) => normalizeText(word)),
         ]));
         const alternatives = recognizedWakeWords
             .sort((left, right) => right.length - left.length)
@@ -319,17 +298,6 @@
             .join("|");
         const expression = new RegExp(`^\\s*(?:${alternatives})\\b[\\s,:;.!?-]*`, "i");
         return text.replace(expression, "").trim();
-    }
-
-    function loadOfflineModel() {
-        if (!modelPromise) {
-            modelPromise = window.Vosk.createModel(modelUrl)
-                .catch((error) => {
-                    modelPromise = null;
-                    throw error;
-                });
-        }
-        return modelPromise;
     }
 
     function forwardAudioToDetector(event) {
@@ -357,12 +325,13 @@
     }
 
     function observeCommandAudio(audio) {
-        if (!commandRecognitionActive
-            || recognizerRemovalRequested
-            || audioLevel(audio) < commandSilenceThreshold) {
+        if (!commandRecognitionActive || commandCaptureFinalizing) {
             return;
         }
-        commandSpeechDetected = true;
+        commandAudioChunks.push(audio.slice());
+        if (audioLevel(audio) < commandSilenceThreshold) {
+            return;
+        }
         window.clearTimeout(commandSilenceTimer);
         const elapsed = performance.now() - commandStartedAt;
         const remainingMinimum = Math.max(0, commandMinCaptureMs - elapsed);
@@ -372,86 +341,86 @@
         );
     }
 
-    function finishCommandCapture() {
+    function wavBlob(samples) {
+        const buffer = new ArrayBuffer(44 + (samples.length * 2));
+        const view = new DataView(buffer);
+        const writeText = (offset, value) => {
+            for (let index = 0; index < value.length; index += 1) {
+                view.setUint8(offset + index, value.charCodeAt(index));
+            }
+        };
+        writeText(0, "RIFF");
+        view.setUint32(4, 36 + (samples.length * 2), true);
+        writeText(8, "WAVE");
+        writeText(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, commandSampleRate, true);
+        view.setUint32(28, commandSampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeText(36, "data");
+        view.setUint32(40, samples.length * 2, true);
+        for (let index = 0; index < samples.length; index += 1) {
+            const sample = Math.max(-1, Math.min(1, samples[index]));
+            view.setInt16(44 + (index * 2), sample * 0x7fff, true);
+        }
+        return new Blob([buffer], { type: "audio/wav" });
+    }
+
+    function mergedCommandAudio() {
+        const length = commandAudioChunks.reduce((total, chunk) => total + chunk.length, 0);
+        const audio = new Float32Array(length);
+        let offset = 0;
+        for (const chunk of commandAudioChunks) {
+            audio.set(chunk, offset);
+            offset += chunk.length;
+        }
+        return audio;
+    }
+
+    async function transcribeCommandAudio() {
+        const formData = new FormData();
+        formData.append("audio", wavBlob(mergedCommandAudio()), "adam-command.wav");
+        formData.append("language", speechLanguage);
+        const response = await window.fetch("/api/adam/transcription", {
+            method: "POST",
+            credentials: "same-origin",
+            body: formData,
+        });
+        if (!response.ok) {
+            throw new Error("Unable to transcribe the ADAM command.");
+        }
+        const payload = await response.json();
+        return String(payload.text || "").trim();
+    }
+
+    async function finishCommandCapture() {
         window.clearTimeout(commandSilenceTimer);
         commandSilenceTimer = null;
-        if (!commandRecognitionActive || recognizerRemovalRequested) {
+        if (!commandRecognitionActive || commandCaptureFinalizing) {
             return;
         }
-        if (!recognizer) {
-            debugLog("command capture ended without an active recognizer");
-            stopCommandRecognition();
-            return;
-        }
-        debugLog("command capture finishing", {
-            speechDetected: commandSpeechDetected,
-            finalSegments: commandResultSegments.length,
-            partial: commandPartialTranscript,
-        });
-        recognizerRemovalRequested = true;
-        if (audioProcessor) {
-            audioProcessor.port.postMessage({ action: "stopRecognizer" });
-        }
-        // Give Vosk time to emit the final result before freeing the recognizer.
-        // This is important when Firefox delivers the last audio chunk slightly
-        // later than Chromium-based browsers.
-        commandFinalizeTimer = window.setTimeout(() => {
-            commandFinalizeTimer = null;
-            if (!commandRecognitionActive) {
-                return;
-            }
-            if (recognizer) {
-                recognizer.remove();
-            }
-            const transcript = (commandResultSegments.join(" ").trim() || commandPartialTranscript).trim();
+        commandCaptureFinalizing = true;
+        setSilentState("processing", "transcribing command");
+        try {
+            const transcript = await transcribeCommandAudio();
             const command = commandAfterWakeWord(transcript);
-            debugLog("command capture finalized", { transcript, command });
             if (command) {
                 acceptCommand(transcript, command);
-            } else {
-                stopCommandRecognition();
+                return;
             }
-        }, 1000);
+        } catch {
+            setState("error", "I could not transcribe the command. Please repeat it.");
+        }
+        stopCommandRecognition();
     }
 
-    function enrollmentTranscriptIsValid(transcript) {
-        const normalizedTranscript = normalizeText(transcript)
-            .replace(/[^a-z0-9\s]/g, "")
-            .replace(/\s+/g, " ")
-            .trim();
-        const normalizedWakeWord = normalizeText(wakeWord);
-        return normalizedTranscript === normalizedWakeWord;
-    }
-
-    async function beginEnrollmentSample(sampleNumber) {
-        const model = await loadOfflineModel();
+    function beginEnrollmentSample(sampleNumber) {
         if (!enrollmentInProgress || !audioProcessor || !detectorWorker) {
             return;
         }
-        enrollmentResultSegments = [];
-        enrollmentPartialTranscript = "";
-        enrollmentRecognizerChannel = new MessageChannel();
-        model.registerPort(enrollmentRecognizerChannel.port1);
-        enrollmentRecognizer = new model.KaldiRecognizer(commandSampleRate);
-        const activeRecognizer = enrollmentRecognizer;
-        enrollmentRecognizer.on("result", (result) => {
-            if (enrollmentRecognizer === activeRecognizer) {
-                const text = (result.result.text || "").trim();
-                if (text && enrollmentResultSegments.at(-1) !== text) {
-                    enrollmentResultSegments.push(text);
-                }
-            }
-        });
-        enrollmentRecognizer.on("partialresult", (result) => {
-            if (enrollmentRecognizer === activeRecognizer) {
-                enrollmentPartialTranscript = (result.result.partial || "").trim();
-            }
-        });
-        audioProcessor.port.postMessage({
-            action: "startRecognizer",
-            recognizerId: enrollmentRecognizer.id,
-            sampleRate: commandSampleRate,
-        }, [enrollmentRecognizerChannel.port2]);
         detectorWorker.postMessage({ type: "recordEnrollmentSample" });
         publishWakeWordStatus("recording", `Say “${spokenWakeWord}” now.`, {sampleNumber});
     }
@@ -466,11 +435,7 @@
         );
         window.setTimeout(() => {
             if (enrollmentInProgress && detectorWorker) {
-                beginEnrollmentSample(sampleNumber).catch(() => {
-                    enrollmentInProgress = false;
-                    setState("error", "Unable to verify the wake word.");
-                    publishWakeWordStatus("error", "Unable to verify the wake word.");
-                });
+                beginEnrollmentSample(sampleNumber);
             }
         }, delay);
     }
@@ -486,74 +451,15 @@
         publishWakeWordStatus("starting", "Preparing wake word setup.");
     }
 
-    function finishEnrollmentRecognition() {
-        if (!enrollmentRecognizer || !audioProcessor || !detectorWorker) {
-            return;
-        }
-        audioProcessor.port.postMessage({ action: "stopRecognizer" });
-        window.clearTimeout(enrollmentFinalizationTimer);
-        enrollmentFinalizationTimer = window.setTimeout(() => {
-            const transcript = (
-                enrollmentResultSegments.join(" ").trim() || enrollmentPartialTranscript
-            ).trim();
-            enrollmentRecognizer.remove();
-            enrollmentRecognizer = null;
-            if (enrollmentRecognizerChannel) {
-                enrollmentRecognizerChannel.port1.close();
-                enrollmentRecognizerChannel = null;
-            }
-            if (enrollmentTranscriptIsValid(transcript)) {
-                detectorWorker.postMessage({ type: "acceptEnrollmentSample" });
-                return;
-            }
-            detectorWorker.postMessage({ type: "rejectEnrollmentSample" });
-            setState("retry", `Only “${spokenWakeWord}” is valid. Please try again.`);
-            publishWakeWordStatus("invalid", `Only “${spokenWakeWord}” is valid. Please try again.`);
-        }, 450);
-    }
-
-    function discardEnrollmentRecognition() {
-        window.clearTimeout(enrollmentFinalizationTimer);
-        enrollmentFinalizationTimer = null;
-        if (audioProcessor) {
-            audioProcessor.port.postMessage({ action: "stopRecognizer" });
-        }
-        if (enrollmentRecognizer) {
-            enrollmentRecognizer.remove();
-            enrollmentRecognizer = null;
-        }
-        if (enrollmentRecognizerChannel) {
-            enrollmentRecognizerChannel.port1.close();
-            enrollmentRecognizerChannel = null;
-        }
-        enrollmentResultSegments = [];
-        enrollmentPartialTranscript = "";
-    }
-
     async function stopCommandRecognition({ resumeDetector = true } = {}) {
         window.clearTimeout(commandTimeout);
         window.clearTimeout(commandSilenceTimer);
-        window.clearTimeout(commandFinalizeTimer);
         commandTimeout = null;
         commandSilenceTimer = null;
-        commandFinalizeTimer = null;
         commandRecognitionActive = false;
-        if (audioProcessor) {
-            audioProcessor.port.postMessage({ action: "stopRecognizer" });
-        }
-        if (recognizer && !recognizerRemovalRequested) {
-            recognizer.remove();
-        }
-        recognizer = null;
-        recognizerRemovalRequested = false;
         commandStartedAt = 0;
-        commandSpeechDetected = false;
-        commandResultSegments = [];
-        commandPartialTranscript = "";
-        if (recognizerChannel) {
-            recognizerChannel.port1.close();
-            recognizerChannel = null;
-        }
+        commandAudioChunks = [];
+        commandCaptureFinalizing = false;
         if (resumeDetector && detectorWorker) {
             detectorWorker.postMessage({ type: "resumeDetection" });
             setListeningState();
@@ -577,10 +483,10 @@
     async function sendTranscription(event) {
         const text = (event.detail.command || event.detail.transcript || "").trim();
         if (!text) {
-            debugLog("transcription skipped because the command is empty", event.detail);
+
             return;
         }
-        debugLog("sending transcription", { text, language: speechLanguage });
+
         if (adamWebSocket && adamWebSocket.readyState === WebSocket.OPEN) {
             const requestId = createRequestId();
             adamWebSocket.send(JSON.stringify({
@@ -598,107 +504,29 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ text, language: speechLanguage }),
             });
-            debugLog("transcription response", response.status);
+
         } catch {
-            debugLog("transcription request failed");
+
             // Transcription delivery is intentionally silent in this initial version.
         }
     }
 
-    function processCommandResult(message) {
-        if (!commandRecognitionActive
-            || !recognizer
-            || message.recognizerId !== recognizer.id) {
-            return;
-        }
-        const segment = (message.result.text || "").trim();
-        if (segment && commandResultSegments.at(-1) !== segment) {
-            commandResultSegments.push(segment);
-            debugLog("Vosk final result", segment);
-        }
-        if (!recognizerRemovalRequested) {
-            return;
-        }
-        const transcript = (commandResultSegments.join(" ").trim() || commandPartialTranscript).trim();
-        if (!transcript) {
-            stopCommandRecognition();
-            return;
-        }
-        const command = commandAfterWakeWord(transcript);
-        if (command) {
-            acceptCommand(transcript, command);
-        }
-    }
-
-    function processCommandPartialResult(message) {
-        if (!commandRecognitionActive
-            || !recognizer
-            || message.recognizerId !== recognizer.id) {
-            return;
-        }
-        commandPartialTranscript = (message.result.partial || "").trim();
-        if (commandPartialTranscript) {
-            debugLog("Vosk partial result", commandPartialTranscript);
-        }
-    }
-
-    async function startCommandRecognition(message) {
+    function startCommandRecognition(message) {
         if (commandRecognitionActive || !audioProcessor || !audioContext) {
             return;
         }
         commandRecognitionActive = true;
         commandConfidence = message.score;
         commandStartedAt = performance.now();
-        commandSpeechDetected = false;
-        commandResultSegments = [];
-        commandPartialTranscript = "";
-        recognizerRemovalRequested = false;
-        debugLog("starting command recognizer", {
-            wakeScore: message.score,
-            sampleRate: commandSampleRate,
-            preRollSamples: message.preRoll ? message.preRoll.length : 0,
-        });
+        commandAudioChunks = message.preRoll?.length ? [message.preRoll] : [];
+        commandCaptureFinalizing = false;
+
         setWakeAlertState();
         copilot.classList.add("is-pulsing");
         window.setTimeout(() => copilot.classList.remove("is-pulsing"), 700);
-        try {
-            const model = await loadOfflineModel();
-            if (!commandRecognitionActive) {
-                return;
-            }
-            recognizerChannel = new MessageChannel();
-            model.registerPort(recognizerChannel.port1);
-            recognizer = new model.KaldiRecognizer(commandSampleRate);
-            debugLog("command recognizer ready", { recognizerId: recognizer.id });
-            const activeRecognizer = recognizer;
-            recognizer.on("result", (result) => {
-                if (recognizer === activeRecognizer) {
-                    processCommandResult(result);
-                }
-            });
-            recognizer.on("partialresult", (result) => {
-                if (recognizer === activeRecognizer) {
-                    processCommandPartialResult(result);
-                }
-            });
-            audioProcessor.port.postMessage({
-                action: "startRecognizer",
-                recognizerId: recognizer.id,
-                sampleRate: commandSampleRate,
-            }, [recognizerChannel.port2]);
-            const preRoll = message.preRoll;
-            audioProcessor.port.postMessage({
-                action: "preRoll",
-                data: preRoll,
-                sampleRate: 16000,
-            }, [preRoll.buffer]);
-            commandTimeout = window.setTimeout(() => {
-                finishCommandCapture();
-            }, commandTimeoutMs);
-        } catch {
-            debugLog("command recognizer failed to start");
-            stopCommandRecognition();
-        }
+        commandTimeout = window.setTimeout(() => {
+            finishCommandCapture();
+        }, commandTimeoutMs);
     }
 
     function handleDetectorMessage(event) {
@@ -719,7 +547,7 @@
         } else if (message.type === "enrollmentReady") {
             scheduleEnrollmentSample(1);
         } else if (message.type === "enrollmentSampleCaptured") {
-            finishEnrollmentRecognition();
+            detectorWorker.postMessage({ type: "acceptEnrollmentSample" });
         } else if (message.type === "enrollmentSampleComplete") {
             enrollmentCompletedSamples = message.count;
             publishWakeWordStatus(
@@ -733,7 +561,6 @@
             const nextSample = Math.min(enrollmentSamples, enrollmentCompletedSamples + 1);
             scheduleEnrollmentSample(nextSample, 1200);
         } else if (message.type === "enrollmentTooQuiet") {
-            discardEnrollmentRecognition();
             setState("retry", `I couldn't hear you. Say “${spokenWakeWord}” again.`);
             const nextSample = Math.min(enrollmentSamples, enrollmentCompletedSamples + 1);
             scheduleEnrollmentSample(nextSample, 1200);
@@ -749,17 +576,13 @@
                 });
             }
         } else if (message.type === "enrollmentCancelled") {
-            discardEnrollmentRecognition();
             enrollmentInProgress = false;
             setEnrollmentPrompt();
         } else if (message.type === "wakeWord") {
-            debugLog("wake word detected", {
-                score: message.score,
-                threshold: minConfidence,
-            });
+
             // Show the visual confirmation for every detector event, even when
             // the confidence gate rejects it as a command trigger.
-            setWakeAlertState({ autoTransition: message.score >= minConfidence });
+            setWakeAlertState({ autoTransition: message.score < minConfidence });
             if (message.score >= minConfidence) {
                 startCommandRecognition(message);
             } else if (detectorWorker) {
@@ -795,16 +618,6 @@
 
     async function stopAudio() {
         await stopCommandRecognition({ resumeDetector: false });
-        window.clearTimeout(enrollmentFinalizationTimer);
-        enrollmentFinalizationTimer = null;
-        if (enrollmentRecognizer) {
-            enrollmentRecognizer.remove();
-            enrollmentRecognizer = null;
-        }
-        if (enrollmentRecognizerChannel) {
-            enrollmentRecognizerChannel.port1.close();
-            enrollmentRecognizerChannel = null;
-        }
         if (detectorWorker) {
             detectorWorker.terminate();
             detectorWorker = null;
@@ -829,10 +642,6 @@
     }
 
     async function enableListening({enrollWakeWord = false} = {}) {
-        if (!window.Vosk) {
-            setState("error", "Microphone is not supported.");
-            return;
-        }
         const errorMessage = supportError();
         if (errorMessage) {
             setState("error", errorMessage);
@@ -874,7 +683,6 @@
             audioSource.connect(audioProcessor);
             audioProcessor.connect(audioContext.destination);
             saveListeningPreference(true);
-            loadOfflineModel().catch(() => {});
             if (enrollWakeWord) {
                 pendingEnrollmentStart = true;
             }
@@ -929,7 +737,6 @@
     });
     document.addEventListener("adam:wake-word:cancel", () => {
         if (detectorWorker && enrollmentInProgress) {
-            discardEnrollmentRecognition();
             detectorWorker.postMessage({ type: "cancelEnrollment" });
         }
     });
@@ -986,8 +793,5 @@
         listeningEnabled = false;
         sessionId += 1;
         stopAudio();
-        if (modelPromise) {
-            modelPromise.then((model) => model.terminate()).catch(() => {});
-        }
     });
 })();

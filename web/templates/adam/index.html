@@ -40,10 +40,6 @@
     <button class="local-tab" type="button" id="adam-text-classification-toggle">
         TEXT CLASSIFICATION
     </button>
-    <button class="local-tab" type="button" id="adam-llm-toggle"
-            title="LLM integration is not available yet" disabled>
-        LLM
-    </button>
     <button class="local-tab" type="button" id="adam-playground-toggle"
             aria-controls="adam-playground-panel" aria-expanded="false">
         PLAYGROUND
@@ -61,10 +57,10 @@
     <div class="edit-form adam-wake-word-form">
         <div class="adam-wake-word-progress" aria-live="polite">
             <span>Samples</span>
-            <strong id="adam-wake-word-progress">0/5</strong>
+            <strong id="adam-wake-word-progress">0/{{ menu.adam_wake_enrollment_samples }}</strong>
         </div>
         <p class="field-help">
-            Adam must be the only spoken wake word in every sample. Any other word is rejected.
+            Say “Adam” clearly in every sample.
         </p>
     </div>
 </section>

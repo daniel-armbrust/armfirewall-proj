@@ -21,13 +21,10 @@ from core.constants import (
     ADAM_WAKE_ENROLLMENT_SAMPLES,
     ADAM_WAKE_PRE_ROLL_MS,
     ADAM_WAKE_PROFILE_KEY,
-    ADAM_WAKE_TRANSCRIPTION_ALIASES,
     ADAM_WAKE_WORD,
     ADAM_WAKE_WORD_ALIASES,
-    ADAM_WAKE_WORD_ENGINE_URL,
     ADAM_WAKE_WORD_MIN_CONFIDENCE,
-    ADAM_WAKE_WORD_MODEL_URL,
-    ADAM_WAKE_WORD_WORKLET_URL,
+    ADAM_WAKE_AUDIO_PROCESSOR_URL,
 )
 from web.services.api import service_enabled, service_installed
 
@@ -68,11 +65,8 @@ def menu_context() -> dict[str, Any]:
         "adam_wake_enrollment_samples": ADAM_WAKE_ENROLLMENT_SAMPLES,
         "adam_wake_pre_roll_ms": ADAM_WAKE_PRE_ROLL_MS,
         "adam_wake_profile_key": ADAM_WAKE_PROFILE_KEY,
-        "adam_wake_transcription_aliases": ADAM_WAKE_TRANSCRIPTION_ALIASES,
         "adam_wake_word": ADAM_WAKE_WORD,
         "adam_wake_word_aliases": ADAM_WAKE_WORD_ALIASES,
-        "adam_wake_word_engine_url": ADAM_WAKE_WORD_ENGINE_URL,
         "adam_wake_word_min_confidence": ADAM_WAKE_WORD_MIN_CONFIDENCE,
-        "adam_wake_word_model_url": ADAM_WAKE_WORD_MODEL_URL,
-        "adam_wake_word_worklet_url": ADAM_WAKE_WORD_WORKLET_URL,
+        "adam_wake_audio_processor_url": ADAM_WAKE_AUDIO_PROCESSOR_URL,
     }

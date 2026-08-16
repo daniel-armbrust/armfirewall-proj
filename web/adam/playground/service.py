@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-
 from core.constants import ADAM_TRANSCRIPTION_MAX_CHARS
-from web.adam.text_classification.inference import (
-    AdamInferenceError,
-    IntentPrediction,
-    infer_intent,
-)
+from .models import PlaygroundInferenceResult
+from web.adam.text_classification.inference import AdamInferenceError, infer_intent
 
 
 TEXT_CLASSIFICATION_MODE = "text-classification"
@@ -17,18 +12,6 @@ TEXT_CLASSIFICATION_MODE = "text-classification"
 
 class PlaygroundInferenceError(RuntimeError):
     """Raised when a Playground inference request cannot be completed."""
-
-
-@dataclass(frozen=True)
-class PlaygroundInferenceResult:
-    """One result returned by the ADAM Playground inference service."""
-
-    mode: str
-    prediction: IntentPrediction
-
-    def to_dict(self) -> dict[str, object]:
-        """Return an API-safe representation of the inference result."""
-        return {"mode": self.mode, "prediction": asdict(self.prediction)}
 
 
 def infer_text_classification(text: str) -> PlaygroundInferenceResult:
@@ -55,7 +38,6 @@ def infer_text_classification(text: str) -> PlaygroundInferenceResult:
 
 __all__ = [
     "PlaygroundInferenceError",
-    "PlaygroundInferenceResult",
     "TEXT_CLASSIFICATION_MODE",
     "infer_text_classification",
 ]

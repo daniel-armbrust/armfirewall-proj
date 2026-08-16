@@ -8,7 +8,6 @@
         data-wake-word="{{ menu.adam_wake_word }}"
         data-wake-word-aliases="{{ menu.adam_wake_word_aliases | join(',') }}"
         data-wake-profile-key="{{ menu.adam_wake_profile_key }}"
-        data-wake-transcription-aliases="{{ menu.adam_wake_transcription_aliases | join(',') }}"
         data-min-confidence="{{ menu.adam_wake_word_min_confidence }}"
         data-detector-worker-url="{{ menu.adam_wake_detector_worker_url }}"
         data-enrollment-samples="{{ menu.adam_wake_enrollment_samples }}"
@@ -22,8 +21,7 @@
         data-command-silence-threshold="{{ menu.adam_command_silence_threshold }}"
         data-command-timeout-ms="{{ menu.adam_command_timeout_ms }}"
         data-command-trailing-silence-ms="{{ menu.adam_command_trailing_silence_ms }}"
-        data-model-url="{{ menu.adam_wake_word_model_url }}"
-        data-worklet-url="{{ menu.adam_wake_word_worklet_url }}">
+        data-worklet-url="{{ menu.adam_wake_audio_processor_url }}">
     <span class="fw-copilot-head" aria-hidden="true">
         <span class="fw-copilot-eye left"></span>
         <span class="fw-copilot-eye right"></span>

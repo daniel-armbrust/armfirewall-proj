@@ -1,17 +1,17 @@
 """Route declarations for ADAM transcription."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, Form, UploadFile
 
-from .api import api_receive_transcription
-from .models import AdamTranscriptionPayload
+from .api import api_transcribe_command
 
 
 router = APIRouter()
 
 
 @router.post("/api/adam/transcription")
-def receive_transcription(
-    payload: AdamTranscriptionPayload,
+async def transcribe_command(
+    audio: UploadFile = File(...),
+    language: str = Form(...),
 ) -> dict[str, str]:
-    """Receive a browser voice transcription."""
-    return api_receive_transcription(payload)
+    """Transcribe an ADAM command recorded in the browser."""
+    return await api_transcribe_command(audio, language)

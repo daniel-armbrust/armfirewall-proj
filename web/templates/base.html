@@ -21,8 +21,7 @@
     <script src="{{ url_for('static', path='/js/globals.js') }}?v=20260512-http-error-detail" defer></script>
     {% if menu.adam_enabled %}
     {% include "partials/fw_copilot.html" %}
-    <script src="{{ menu.adam_wake_word_engine_url }}?v=0.0.5-armfirewall-silent-3" defer></script>
-    <script src="{{ url_for('static', path='/js/fw_copilot.js') }}?v=20260803-wake-word-reliable-capture" defer></script>
+    <script src="{{ url_for('static', path='/js/fw_copilot.js') }}?v=20260816-whisper-processing-state" defer></script>
     {% endif %}
     {% block scripts %}{% endblock %}
 </body>

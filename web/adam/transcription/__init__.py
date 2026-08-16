@@ -1,1 +1,1 @@
-"""ADAM transcription package."""
+"""ADAM Whisper transcription package."""

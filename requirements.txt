@@ -9,3 +9,6 @@ numpy==2.5.1
 matplotlib==3.11.1
 oci==2.183.0
 python-multipart==0.0.32
+spacy==3.8.11
+word2number==1.1
+faster-whisper==1.1.1

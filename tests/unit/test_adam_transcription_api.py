@@ -2,27 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
+from io import BytesIO
 import unittest
+from unittest.mock import patch
 
-from pydantic import ValidationError
+from fastapi import UploadFile
 
-from web.adam.transcription.api import api_receive_transcription
-from web.adam.transcription.models import AdamTranscriptionPayload
+from web.adam.transcription.api import api_transcribe_command
 from web.adam.transcription.routes import router
 
 
 class AdamTranscriptionApiTests(unittest.TestCase):
-    def test_receive_transcription_without_processing(self) -> None:
-        payload = AdamTranscriptionPayload(
-            text="check if port twenty two is open",
-            language="en-US",
-        )
+    def test_transcribes_browser_audio(self) -> None:
+        audio = UploadFile(filename="command.wav", file=BytesIO(b"wav-audio"))
 
-        self.assertEqual(api_receive_transcription(payload), {"status": "received"})
+        with patch(
+            "web.adam.transcription.api.transcribe_command",
+            return_value="check if port 22 is open",
+        ):
+            result = asyncio.run(api_transcribe_command(audio, "en-US"))
 
-    def test_empty_transcription_is_rejected(self) -> None:
-        with self.assertRaises(ValidationError):
-            AdamTranscriptionPayload(text="", language="en-US")
+        self.assertEqual(result, {"text": "check if port 22 is open"})
 
     def test_transcription_post_route_is_registered(self) -> None:
         matching_routes = [

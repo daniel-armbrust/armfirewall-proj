@@ -1,6 +1,0 @@
-Package: vosk-browser 0.0.5
-Source: https://github.com/ccoreilly/vosk-browser
-Distribution: https://cdn.jsdelivr.net/npm/vosk-browser@0.0.5/dist/vosk.js
-License: Apache-2.0
-Local change: silenced informational debug and Vosk stdout logs; warnings and errors remain enabled
-Local bundle SHA-256: 5bcf07a44195adc07306e7552df20d074199e9c340b7a6f59adec216b97dbb2c
