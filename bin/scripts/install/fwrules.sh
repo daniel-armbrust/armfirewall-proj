@@ -22,6 +22,21 @@ filter_rules_db() {
     esac
 }
 
+# Return the NAT rules database path for the selected IP family.
+nat_rules_db() {
+    local family="$1"
+
+    case "$family" in
+        ipv4)
+            printf '%s\n' "$IPV4_NAT_RULES_DB"
+            ;;
+
+        ipv6)
+            printf '%s\n' "$IPV6_NAT_RULES_DB"
+            ;;
+    esac
+}
+
 # Return the wildcard address for the selected IP family.
 filter_any_addr() {
     local family="$1"
@@ -168,6 +183,117 @@ record_loopback_rules() {
     for family in ipv4 ipv6; do
         record_loopback_rule "$family" INPUT
         record_loopback_rule "$family" OUTPUT
+    done
+}
+
+# Record one protected DNS redirect to the local DNS service.
+record_dns_redirect_rule() {
+    local family="$1"
+    local protocol="$2"
+    local iface="$3"
+    local db_path
+    local any_addr
+
+    db_path="$(nat_rules_db "$family")"
+    any_addr="$(filter_any_addr "$family")"
+
+    sqlite_exec "$db_path" "
+        INSERT INTO nat_prerouting_rules (
+            iface_in, rule_order, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code,
+            nat_action, to_addr, to_port,
+            protected, enabled, created_at, updated_at
+        )
+        SELECT
+            $(sql_quote "$iface"), 0,
+            $(sql_quote "$any_addr"), NULL, $(sql_quote "$any_addr"), 53,
+            $(sql_quote "$protocol"), NULL, NULL,
+            'REDIRECT', NULL, 53,
+            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM nat_prerouting_rules
+            WHERE iface_in = $(sql_quote "$iface")
+              AND protocol_name = $(sql_quote "$protocol")
+              AND dst_port = 53
+              AND nat_action = 'REDIRECT'
+              AND to_port = 53
+              AND protected = 1
+        );
+    "
+}
+
+# Record one protected LAN block for DNS-over-TLS.
+record_dns_over_tls_block_rule() {
+    local family="$1"
+    local iface="$2"
+    local db_path
+    local any_addr
+
+    db_path="$(filter_rules_db "$family")"
+    any_addr="$(filter_any_addr "$family")"
+
+    sqlite_exec "$db_path" "
+        INSERT INTO filter_forward_rules (
+            iface_in, iface_out, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at
+        )
+        SELECT
+            $(sql_quote "$iface"), 'ANY', 0, 0, 0, 0, 0,
+            $(sql_quote "$any_addr"), NULL, $(sql_quote "$any_addr"), 853,
+            'tcp', NULL, NULL, 'REJECT',
+            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM filter_forward_rules
+            WHERE iface_in = $(sql_quote "$iface")
+              AND protocol_name = 'tcp'
+              AND dst_port = 853
+              AND action = 'REJECT'
+              AND protected = 1
+        );
+    "
+}
+
+# Apply one DNS redirect to the local DNS service.
+apply_dns_redirect_rule() {
+    local binary="$1"
+    local protocol="$2"
+    local iface="$3"
+
+    "$binary" -t nat -C PREROUTING -i "$iface" -p "$protocol" --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || \
+    "$binary" -t nat -I PREROUTING 1 -i "$iface" -p "$protocol" --dport 53 -j REDIRECT --to-ports 53
+}
+
+# Apply one DNS-over-TLS block for LAN clients.
+apply_dns_over_tls_block_rule() {
+    local binary="$1"
+    local iface="$2"
+
+    "$binary" -t filter -C FORWARD -i "$iface" -p tcp --dport 853 -j REJECT 2>/dev/null || \
+    "$binary" -t filter -I FORWARD 1 -i "$iface" -p tcp --dport 853 -j REJECT
+}
+
+# Persist and apply DNS enforcement rules for LAN clients.
+enforce_lan_dns() {
+    local lan_iface="$1"
+    local family binary protocol
+
+    log "Enforcing protected DNS redirection and DNS-over-TLS blocking on ${lan_iface}."
+
+    for family in ipv4 ipv6; do
+        record_dns_redirect_rule "$family" tcp "$lan_iface"
+        record_dns_redirect_rule "$family" udp "$lan_iface"
+        record_dns_over_tls_block_rule "$family" "$lan_iface"
+    done
+
+    for binary in iptables ip6tables; do
+        for protocol in tcp udp; do
+            apply_dns_redirect_rule "$binary" "$protocol" "$lan_iface"
+        done
+        apply_dns_over_tls_block_rule "$binary" "$lan_iface"
     done
 }
 
@@ -478,13 +604,19 @@ record_install_filter_apply_work_request() {
 }
 
 # Record install-time apply requests for the default filter chains.
-record_install_apply_work_request() {
+record_install_filter_apply_work_requests() {
     record_install_filter_apply_work_request ipv4 INPUT filter_input_rules DROP
     record_install_filter_apply_work_request ipv4 FORWARD filter_forward_rules DROP
     record_install_filter_apply_work_request ipv4 OUTPUT filter_output_rules ACCEPT
     record_install_filter_apply_work_request ipv6 INPUT filter_input_rules DROP
     record_install_filter_apply_work_request ipv6 FORWARD filter_forward_rules DROP
     record_install_filter_apply_work_request ipv6 OUTPUT filter_output_rules ACCEPT
+}
+
+# Record the already applied DNS redirect rules in the installation history.
+record_install_dns_nat_apply_work_requests() {
+    record_install_apply_work_request "NAT_RULES.IPV4.nat_prerouting_rules" "fwrules.sh"
+    record_install_apply_work_request "NAT_RULES.IPV6.nat_prerouting_rules" "fwrules.sh"
 }
 
 # Set restrictive default policies for IPv4 and IPv6 filter chains.
@@ -530,10 +662,12 @@ main() {
     apply_conntrack_base_rules
     record_loopback_rules
     apply_loopback_rules
+    enforce_lan_dns "$LAN_IFACE"
     allow_required_icmpv6
     record_default_filter_policies
     set_default_filter_policies
-    record_install_apply_work_request
+    record_install_filter_apply_work_requests
+    record_install_dns_nat_apply_work_requests
 }
 
 main "$@"
