@@ -17,6 +17,7 @@
     const actionTitle = document.querySelector("#dnsmasq-action-title");
     const actionMessage = document.querySelector("#dnsmasq-action-message");
     const actionConfirm = document.querySelector("[data-dnsmasq-modal-confirm]");
+    const actionCancelButtons = Array.from(document.querySelectorAll("#dnsmasq-action-modal [data-dnsmasq-modal-cancel]"));
     const tabPanels = Array.from(document.querySelectorAll("[data-dnsmasq-panel]"));
     const viewButtons = Array.from(document.querySelectorAll("[data-dnsmasq-view]"));
     const workRequestsPanel = document.querySelector("#dnsmasq-work-requests-panel");
@@ -35,6 +36,8 @@
     const WORK_REQUESTS_POLL_MS = 5000;
     const DHCP_LEASES_POLL_MS = 5000;
     const DHCP_LEASE_SEARCH_INVALID_CHARS_RE = /[^a-zA-Z0-9.:-]/g;
+    const STATIC_LEASE_MAC_INVALID_CHARS_RE = /[^0-9A-Fa-f:]/g;
+    const STATIC_LEASE_IPV4_INVALID_CHARS_RE = /[^0-9.]/g;
     const ALL_INTERFACES = "__all__";
     const ALL_INTERFACES_LABEL = "Global configuration applied to all interfaces";
     const DNS_DOMAIN_LABEL_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
@@ -46,6 +49,7 @@
     let dhcpLeases = [];
     let dirty = false;
     let pendingAction = null;
+    let actionModalInformational = false;
     let availableInterfaces = [];
     let activeInterfaces = [];
     let savedInterfaceNames = new Set();
@@ -1019,12 +1023,12 @@
             return;
         }
         if (!data.dhcp_active) {
-            dhcpLeasesBody.innerHTML = `<tr><td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(data.message || "DHCP service is not active or configured.")}</span></div></td></tr>`;
+            dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(data.message || "DHCP service is not active or configured.")}</span></div></td></tr>`;
             return;
         }
         if (!leases.length) {
             const message = search ? "No DHCP lease matches the search." : data.message || "No DHCP leases found.";
-            dhcpLeasesBody.innerHTML = `<tr><td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(message)}</span></div></td></tr>`;
+            dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(message)}</span></div></td></tr>`;
             return;
         }
         dhcpLeasesBody.innerHTML = leases.map((lease) => `
@@ -1032,10 +1036,9 @@
                 <td>${HF.escapeHtml(lease.ip_address)}</td>
                 <td>${HF.escapeHtml(lease.mac_address)}</td>
                 <td>${HF.escapeHtml(lease.hostname)}</td>
-                <td>${HF.escapeHtml(lease.client_id)}</td>
                 <td>${HF.escapeHtml(lease.expires_at)}</td>
                 <td>${lease.is_static
-                    ? `<button class="text-button compact danger" type="button" data-dnsmasq-remove-static-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-remove-static-ip="${HF.escapeHtml(lease.ip_address)}">Remove Static</button>`
+                    ? `<button class="text-button compact danger" type="button" data-dnsmasq-remove-static-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-remove-static-ip="${HF.escapeHtml(lease.ip_address)}">Remove</button>`
                     : `<button class="text-button compact" type="button" data-dnsmasq-make-static-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-make-static-ip="${HF.escapeHtml(lease.ip_address)}">Make Static</button>`}</td>
             </tr>
         `).join("");
@@ -1058,7 +1061,7 @@
                 dhcpLeasesSummary.textContent = "Offline";
             }
             if (dhcpLeasesBody) {
-                dhcpLeasesBody.innerHTML = `<tr><td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div></td></tr>`;
+                dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div></td></tr>`;
             }
         } finally {
             dhcpLeasesLoading = false;
@@ -1340,6 +1343,7 @@
     }
 
     function openActionModal(action, label, run) {
+        actionModalInformational = false;
         pendingAction = {action, run};
         if (actionTitle) {
             actionTitle.textContent = label;
@@ -1351,6 +1355,30 @@
             actionConfirm.textContent = action === "stop" ? "Stop" : action === "make-static" ? "Yes" : "Confirm";
             actionConfirm.classList.toggle("danger", action === "stop");
         }
+        actionCancelButtons.forEach((button) => {
+            button.hidden = false;
+        });
+        if (actionModal) {
+            actionModal.hidden = false;
+        }
+    }
+
+    function openInformationalModal(message) {
+        actionModalInformational = true;
+        pendingAction = null;
+        if (actionTitle) {
+            actionTitle.textContent = "Configuration error";
+        }
+        if (actionMessage) {
+            actionMessage.textContent = message;
+        }
+        if (actionConfirm) {
+            actionConfirm.textContent = "OK";
+            actionConfirm.classList.remove("danger");
+        }
+        actionCancelButtons.forEach((button) => {
+            button.hidden = true;
+        });
         if (actionModal) {
             actionModal.hidden = false;
         }
@@ -1358,13 +1386,21 @@
 
     function closeActionModal() {
         pendingAction = null;
+        actionModalInformational = false;
         if (actionModal) {
             actionModal.hidden = true;
         }
     }
 
     async function runPendingAction() {
-        if (!pendingAction || !actionConfirm) {
+        if (!actionConfirm) {
+            return;
+        }
+        if (actionModalInformational) {
+            closeActionModal();
+            return;
+        }
+        if (!pendingAction) {
             return;
         }
         actionConfirm.disabled = true;
@@ -1372,9 +1408,7 @@
             await pendingAction.run();
             closeActionModal();
         } catch (error) {
-            if (actionMessage) {
-                actionMessage.textContent = error.message;
-            }
+            openInformationalModal(error.message);
         } finally {
             actionConfirm.disabled = false;
         }
@@ -1501,7 +1535,7 @@
             return;
         }
 
-        if (event.target.closest("[data-dnsmasq-modal-cancel]") || event.target === actionModal) {
+        if (event.target.closest("[data-dnsmasq-modal-cancel]") || (event.target === actionModal && !actionModalInformational)) {
             closeActionModal();
         }
 
@@ -1523,6 +1557,23 @@
 
     if (staticLeaseApply) {
         staticLeaseApply.addEventListener("click", applyStaticLease);
+    }
+
+    if (staticLeaseMac) {
+        staticLeaseMac.addEventListener("input", () => {
+            staticLeaseMac.value = staticLeaseMac.value
+                .replace(STATIC_LEASE_MAC_INVALID_CHARS_RE, "")
+                .toUpperCase()
+                .slice(0, 17);
+        });
+    }
+
+    if (staticLeaseIp) {
+        staticLeaseIp.addEventListener("input", () => {
+            staticLeaseIp.value = staticLeaseIp.value
+                .replace(STATIC_LEASE_IPV4_INVALID_CHARS_RE, "")
+                .slice(0, 15);
+        });
     }
 
     if (dhcpLeasesSearch) {

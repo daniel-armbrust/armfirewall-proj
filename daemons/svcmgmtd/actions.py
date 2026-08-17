@@ -19,6 +19,7 @@ from .catalog import set_service_autostart_enabled
 from .models import ControllableService, OptionalService
 from .commons import run_bounded_command
 from .packages import (
+    configure_adguard_home_dns_listener,
     install_adguard_home,
     install_package,
     uninstall_adguard_home,
@@ -104,6 +105,8 @@ def control_service(service: ControllableService, action: str) -> None:
     service_name = service.name
 
     ensure_dnsmasq_lease_directory(service_name)
+    if service_name == ADGUARD_HOME_SERVICE_NAME and action in {"start", "restart"}:
+        configure_adguard_home_dns_listener()
     reread_and_update()
 
     state = supervisor_status(service_name)

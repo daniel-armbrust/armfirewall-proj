@@ -4,11 +4,11 @@ from typing import Any
 
 from fastapi import Body, HTTPException
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from web.services.dnsmasq import api as services_dnsmasq_api
 from web.services.dnsmasq import views as services_dnsmasq_views
-from web.services.adguardhome import api as services_adguardhome_api
+from web.services.adguardhome import proxy as services_adguardhome_proxy
 from web.services.adguardhome import views as services_adguardhome_views
 from web.services.libreswan import api as services_libreswan_api
 from web.services.libreswan import views as services_libreswan_views
@@ -118,28 +118,11 @@ async def api_dnsmasq_remove_static_lease(request: Request) -> dict[str, Any]:
     return services_dnsmasq_api.remove_static_lease(await request.json())
 
 
-@router.get("/api/services/adguardhome")
-def api_adguardhome_config() -> dict[str, Any]:
-    """Return AdGuard Home configuration and service status."""
-    return services_adguardhome_api.get_config()
-
-
-@router.put("/api/services/adguardhome")
-async def api_save_adguardhome_config(request: Request) -> dict[str, Any]:
-    """Persist AdGuard Home global settings from the GUI."""
-    return services_adguardhome_api.update_settings(await request.json())
-
-
-@router.post("/api/services/adguardhome/filters")
-async def api_add_adguardhome_filter(request: Request) -> dict[str, Any]:
-    """Add one AdGuard Home remote filter source."""
-    return services_adguardhome_api.add_filter(await request.json())
-
-
-@router.delete("/api/services/adguardhome/filters/{filter_id}")
-def api_delete_adguardhome_filter(filter_id: int) -> dict[str, Any]:
-    """Remove one AdGuard Home remote filter source."""
-    return services_adguardhome_api.delete_filter(filter_id)
+@router.api_route("/services/adguard/ui", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@router.api_route("/services/adguard/ui/{path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+async def proxy_adguardhome_ui(request: Request, path: str = "") -> Response:
+    """Expose the native AdGuard Home UI through ArmFirewall's authenticated origin."""
+    return await services_adguardhome_proxy.proxy_adguardhome(request, path)
 
 
 @router.get("/api/services/dnsmasq/work-requests")

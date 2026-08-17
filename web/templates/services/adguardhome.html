@@ -3,53 +3,11 @@
 {% block content %}
 <section class="page-head">
     <div><p class="eyebrow">services/adguard</p><h1>AdGuard Home</h1></div>
-    <div class="refresh-state" id="adguard-state">Loading</div>
+    <div class="refresh-state">native administration</div>
 </section>
 
-<section class="summary-grid compact" aria-label="AdGuard Home summary">
-    <div class="metric"><span class="metric-label">Service</span><strong id="adguard-service">-</strong></div>
-    <div class="metric"><span class="metric-label">Protection</span><strong id="adguard-protection">-</strong></div>
-    <div class="metric"><span class="metric-label">Filters</span><strong id="adguard-filters-count">-</strong></div>
-    <div class="metric"><span class="metric-label">Pending apply</span><strong id="adguard-pending">-</strong></div>
+<section class="panel adguardhome-panel">
+    <div class="panel-head"><h2>Administration</h2><span>localhost proxy</span></div>
+    <iframe class="adguardhome-frame" src="/services/adguard/ui/" title="AdGuard Home administration"></iframe>
 </section>
-
-<form id="adguard-form">
-    <section class="panel">
-        <div class="panel-head"><h2>DNS filtering</h2><span>local upstream</span></div>
-        <div class="edit-form"><div class="form-grid">
-            <label class="field"><span>Protection</span><select name="protection_enabled"><option value="1">enabled</option><option value="0">disabled</option></select></label>
-            <label class="field"><span>Filtering</span><select name="filtering_enabled"><option value="1">enabled</option><option value="0">disabled</option></select></label>
-            <label class="field"><span>Safe browsing</span><select name="safe_browsing_enabled"><option value="1">enabled</option><option value="0">disabled</option></select></label>
-            <label class="field"><span>Parental control</span><select name="parental_enabled"><option value="1">enabled</option><option value="0">disabled</option></select></label>
-            <label class="field"><span>Safe search</span><select name="safe_search_enabled"><option value="1">enabled</option><option value="0">disabled</option></select></label>
-            <label class="field"><span>Filter update interval (hours)</span><input name="filter_update_interval_hours" type="number" min="1" max="720"></label>
-            <label class="field wide"><span>Upstream DNS servers</span><textarea name="upstream_dns_servers" rows="2" spellcheck="false"></textarea></label>
-            <label class="field wide"><span>Fallback DNS servers</span><textarea name="fallback_dns_servers" rows="2" spellcheck="false"></textarea></label>
-            <label class="field wide"><span>Bootstrap DNS servers</span><textarea name="bootstrap_dns_servers" rows="2" spellcheck="false"></textarea></label>
-        </div></div>
-    </section>
-    <section class="panel">
-        <div class="panel-head"><h2>Local endpoints and retention</h2><span>localhost only by default</span></div>
-        <div class="edit-form"><div class="form-grid">
-            <label class="field"><span>DNS bind host</span><input name="dns_bind_host" type="text"></label>
-            <label class="field"><span>DNS port</span><input name="dns_port" type="number" min="1" max="65535"></label>
-            <label class="field"><span>Web bind host</span><input name="web_bind_host" type="text"></label>
-            <label class="field"><span>Web port</span><input name="web_port" type="number" min="1" max="65535"></label>
-            <label class="field"><span>Query log</span><select name="query_log_enabled"><option value="1">enabled</option><option value="0">disabled</option></select></label>
-            <label class="field"><span>Query log retention (hours)</span><input name="query_log_retention_hours" type="number" min="1" max="8760"></label>
-            <label class="field"><span>Statistics interval (hours)</span><input name="statistics_interval_hours" type="number" min="1" max="720"></label>
-        </div></div>
-    </section>
-    <section class="panel">
-        <div class="panel-head"><h2>Filter sources</h2><span>block lists</span></div>
-        <div class="edit-form"><div class="form-grid">
-            <label class="field"><span>Name</span><input id="adguard-filter-name" type="text"></label>
-            <label class="field wide"><span>Source URL</span><input id="adguard-filter-url" type="url" placeholder="https://example.net/filter.txt"></label>
-            <div class="field"><span>Action</span><button class="text-button compact" id="adguard-filter-add" type="button">Add filter</button></div>
-        </div>
-        <div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>URL</th><th>State</th><th>Action</th></tr></thead><tbody id="adguard-filters"></tbody></table></div></div>
-    </section>
-    <section class="dnsmasq-form-actions"><div class="edit-form"><div class="form-actions"><button class="text-button primary" type="submit">Save configuration</button></div><div class="form-status" id="adguard-status" hidden></div></div></section>
-</form>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', path='/js/services_adguardhome.js') }}?v=20260817-adguard-config" defer></script>{% endblock %}

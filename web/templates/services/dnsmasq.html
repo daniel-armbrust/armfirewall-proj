@@ -67,13 +67,12 @@
                     <th>IP Address</th>
                     <th>MAC Address</th>
                     <th>Hostname</th>
-                    <th>Client ID</th>
                     <th>Expires</th>
                     <th>Action</th>
                 </tr>
             </thead>
             <tbody id="dnsmasq-dhcp-leases-body">
-                <tr><td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>loading DHCP leases</span></div></td></tr>
+                <tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>loading DHCP leases</span></div></td></tr>
             </tbody>
         </table>
     </div>
@@ -275,11 +274,11 @@
             <div class="dnsmasq-static-lease-fields">
                 <label class="field">
                     <span>MAC Address</span>
-                    <input id="dnsmasq-static-lease-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off">
+                    <input id="dnsmasq-static-lease-mac" type="text" inputmode="text" pattern="[0-9A-Fa-f:]+" maxlength="17" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off">
                 </label>
                 <label class="field">
                     <span>IP Address</span>
-                    <input id="dnsmasq-static-lease-ip" type="text" inputmode="decimal" placeholder="192.168.1.50" autocomplete="off">
+                    <input id="dnsmasq-static-lease-ip" type="text" inputmode="decimal" pattern="[0-9.]+" maxlength="15" placeholder="192.168.1.50" autocomplete="off">
                 </label>
             </div>
             <div class="form-status" id="dnsmasq-static-lease-status" hidden></div>
@@ -293,5 +292,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260819-dhcp-scope-actions" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260819-dhcp-lease-columns" defer></script>
 {% endblock %}

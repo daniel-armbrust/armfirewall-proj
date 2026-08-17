@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import tarfile
 import tempfile
@@ -11,6 +12,9 @@ from urllib.request import urlretrieve
 from core.constants import (
     ADGUARD_HOME_ARCHIVE_URL,
     ADGUARD_HOME_BINARY,
+    ADGUARD_HOME_CONFIG_PATH,
+    ADGUARD_HOME_DNS_HOST,
+    ADGUARD_HOME_DNS_PORT,
     ADGUARD_HOME_DIR,
     ADGUARD_HOME_WORK_DIR,
 )
@@ -87,6 +91,40 @@ def install_adguard_home() -> None:
             raise RuntimeError("AdGuard Home archive does not contain the expected binary.")
         source_binary.chmod(0o755)
         shutil.move(str(source_dir), str(ADGUARD_HOME_DIR))
+
+
+def configure_adguard_home_dns_listener() -> bool:
+    """Bind AdGuard Home DNS locally on its dedicated upstream port.
+
+    DNSMasq owns port 53 for LAN clients and forwards filtered queries to this
+    listener.  Returning ``False`` is expected before AdGuard's initial setup
+    has created its configuration file.
+    """
+    if not ADGUARD_HOME_CONFIG_PATH.is_file():
+        return False
+
+    config_text = ADGUARD_HOME_CONFIG_PATH.read_text(encoding="utf-8")
+    dns_section = re.search(r"(?ms)^dns:\n(?P<body>.*?)(?=^[^\s]|\Z)", config_text)
+    if dns_section is None:
+        raise RuntimeError("AdGuard Home configuration does not contain a DNS section.")
+
+    body = dns_section.group("body")
+    bind_hosts = f"  bind_hosts:\n    - {ADGUARD_HOME_DNS_HOST}\n"
+    if re.search(r"(?m)^  bind_hosts:\n(?:^    - .*\n)*", body):
+        body = re.sub(r"(?m)^  bind_hosts:\n(?:^    - .*\n)*", bind_hosts, body, count=1)
+    else:
+        body = bind_hosts + body
+
+    port_line = f"  port: {ADGUARD_HOME_DNS_PORT}"
+    if re.search(r"(?m)^  port: .*?$", body):
+        body = re.sub(r"(?m)^  port: .*?$", port_line, body, count=1)
+    else:
+        body = f"{body.rstrip()}\n{port_line}\n"
+
+    updated_text = f"{config_text[:dns_section.start('body')]}{body}{config_text[dns_section.end('body'):]}"
+    if updated_text != config_text:
+        ADGUARD_HOME_CONFIG_PATH.write_text(updated_text, encoding="utf-8")
+    return True
 
 
 def uninstall_adguard_home() -> None:

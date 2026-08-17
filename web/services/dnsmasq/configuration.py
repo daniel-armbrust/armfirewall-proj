@@ -5,7 +5,16 @@ import re
 import shutil
 import subprocess
 from typing import Any
-from core.constants import DNSMASQ_ALL_INTERFACES_TOKEN, DNSMASQ_BOOL_DEFAULTS, DNSMASQ_CONF_PATH, DNSMASQ_INTERFACE_CONFIG_PREFIX, DNSMASQ_LEASES_PATH
+from core.constants import (
+    ADGUARD_HOME_DNS_HOST,
+    ADGUARD_HOME_DNS_PORT,
+    DNSMASQ_ALL_INTERFACES_TOKEN,
+    DNSMASQ_BOOL_DEFAULTS,
+    DNSMASQ_CONF_PATH,
+    DNSMASQ_DNS_PORT,
+    DNSMASQ_INTERFACE_CONFIG_PREFIX,
+    DNSMASQ_LEASES_PATH,
+)
 
 def default_config() -> dict[str, Any]:
     """Return default dnsmasq settings used by ArmFirewall."""
@@ -225,7 +234,7 @@ def render_config(config: dict[str, Any]) -> str:
     lines = [
         "# ArmFirewall managed dnsmasq configuration.",
         "# Generated from Services / Dnsmasq.",
-        f"port={53 if dns_enabled else 0}",
+        f"port={DNSMASQ_DNS_PORT if dns_enabled else 0}",
         "bind-interfaces",
     ]
 
@@ -262,7 +271,11 @@ def render_config(config: dict[str, Any]) -> str:
         ):
             if enabled:
                 lines.append(directive)
-        if not config["adguardhome_upstream_enabled"]:
+        if config["adguardhome_upstream_enabled"]:
+            # Resolve exclusively through the local AdGuard Home listener.
+            lines.append("no-resolv")
+            lines.append(f"server={ADGUARD_HOME_DNS_HOST}#{ADGUARD_HOME_DNS_PORT}")
+        else:
             for server in config["upstream_dns_servers"]:
                 lines.append(f"server={server}")
             for domain_item in config["domain_upstreams"]:
@@ -328,4 +341,3 @@ def validate_dnsmasq_syntax(config_text: str) -> tuple[bool, str]:
         return False, output or "dnsmasq syntax check failed."
     tmp_path.unlink(missing_ok=True)
     return result.returncode == 0, output or "dnsmasq syntax check completed."
-
