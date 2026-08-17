@@ -134,6 +134,45 @@ sqlite_exec() {
     sqlite3 "$db_path" "$sql" || fatal "Could not update SQLite database: ${db_path}."
 }
 
+# Record an installer operation that has already been applied to the operating system.
+record_install_apply_work_request() {
+    local category_name="$1"
+    local installer_name="$2"
+    local request_uid
+    local payload_json
+
+    [[ -f "$WORK_REQUEST_DB" ]] || fatal "Work request database was not found: ${WORK_REQUEST_DB}."
+    sqlite_table_exists "$WORK_REQUEST_DB" "work_requests" || fatal "Work request table was not found: ${WORK_REQUEST_DB}."
+    [[ "$(sqlite_query "$WORK_REQUEST_DB" "SELECT 1 FROM work_request_categories WHERE name = $(sql_quote "$category_name") LIMIT 1;")" == "1" ]] || fatal "Unknown work request category: ${category_name}."
+    [[ "$(sqlite_query "$WORK_REQUEST_DB" "SELECT 1 FROM work_request_actions WHERE name = 'apply' LIMIT 1;")" == "1" ]] || fatal "Work request action was not found: apply."
+
+    request_uid="$(cat /proc/sys/kernel/random/uuid)"
+    payload_json="{\"installer\":\"${installer_name}\"}"
+
+    sqlite_exec "$WORK_REQUEST_DB" "
+        INSERT INTO work_requests (
+            request_uid, source, category_name, action_name,
+            target_rule_id, priority, status, payload_json
+        ) VALUES (
+            $(sql_quote "$request_uid"),
+            'system',
+            $(sql_quote "$category_name"),
+            'apply',
+            NULL,
+            10,
+            'success',
+            $(sql_quote "$payload_json")
+        );
+
+        INSERT INTO work_request_events (work_request_id, event_type, message)
+        VALUES (
+            last_insert_rowid(),
+            'success',
+            $(sql_quote "Applied during installation by ${installer_name}.")
+        );
+    "
+}
+
 # Execute a SQLite query using tab-separated output.
 sqlite_query() {
     local db_path="$1"
