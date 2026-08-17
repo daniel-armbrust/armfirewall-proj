@@ -98,6 +98,79 @@ apply_conntrack_base_rules() {
     ip6tables -t filter -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 }
 
+# Record one protected loopback rule in the selected filter rules database.
+record_loopback_rule() {
+    local family="$1"
+    local chain_name="$2"
+    local table_name iface_column
+    local db_path
+    local any_addr
+
+    db_path="$(filter_rules_db "$family")"
+    any_addr="$(filter_any_addr "$family")"
+
+    case "$chain_name" in
+        INPUT)
+            table_name="filter_input_rules"
+            iface_column="iface_in"
+            ;;
+        OUTPUT)
+            table_name="filter_output_rules"
+            iface_column="iface_out"
+            ;;
+        *)
+            fatal "Unsupported loopback filter chain: ${chain_name}."
+            ;;
+    esac
+
+    sqlite_exec "$db_path" "
+        INSERT INTO ${table_name} (
+            ${iface_column}, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at
+        )
+        SELECT
+            'lo', 0, 0, 0, 0, 0,
+            $(sql_quote "$any_addr"), NULL, $(sql_quote "$any_addr"), NULL,
+            'all', NULL, NULL, 'ACCEPT',
+            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM ${table_name}
+            WHERE ${iface_column} = 'lo'
+              AND protocol_name = 'all'
+              AND action = 'ACCEPT'
+              AND protected = 1
+        );
+    "
+}
+
+# Apply protected loopback INPUT and OUTPUT rules for IPv4 and IPv6.
+apply_loopback_rules() {
+    local binary
+
+    log "Applying protected loopback rules for IPv4 and IPv6."
+
+    for binary in iptables ip6tables; do
+        "$binary" -t filter -C INPUT -i lo -j ACCEPT 2>/dev/null || \
+        "$binary" -t filter -I INPUT 1 -i lo -j ACCEPT
+
+        "$binary" -t filter -C OUTPUT -o lo -j ACCEPT 2>/dev/null || \
+        "$binary" -t filter -I OUTPUT 1 -o lo -j ACCEPT
+    done
+}
+
+# Persist protected loopback INPUT and OUTPUT rules for IPv4 and IPv6.
+record_loopback_rules() {
+    local family
+
+    for family in ipv4 ipv6; do
+        record_loopback_rule "$family" INPUT
+        record_loopback_rule "$family" OUTPUT
+    done
+}
+
 # Record one INPUT conntrack return rule in SQLite.
 record_input_conntrack_return_rule() {
     local family="$1"
@@ -408,8 +481,10 @@ record_install_filter_apply_work_request() {
 record_install_apply_work_request() {
     record_install_filter_apply_work_request ipv4 INPUT filter_input_rules DROP
     record_install_filter_apply_work_request ipv4 FORWARD filter_forward_rules DROP
+    record_install_filter_apply_work_request ipv4 OUTPUT filter_output_rules ACCEPT
     record_install_filter_apply_work_request ipv6 INPUT filter_input_rules DROP
     record_install_filter_apply_work_request ipv6 FORWARD filter_forward_rules DROP
+    record_install_filter_apply_work_request ipv6 OUTPUT filter_output_rules ACCEPT
 }
 
 # Set restrictive default policies for IPv4 and IPv6 filter chains.
@@ -453,6 +528,8 @@ main() {
     allow_lan_services "$LAN_IFACE"
     record_conntrack_base_rules
     apply_conntrack_base_rules
+    record_loopback_rules
+    apply_loopback_rules
     allow_required_icmpv6
     record_default_filter_policies
     set_default_filter_policies
