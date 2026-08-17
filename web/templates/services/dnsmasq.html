@@ -49,6 +49,10 @@
 <section class="panel" id="dnsmasq-dhcp-leases-panel" hidden>
     <div class="panel-head">
         <h2>DHCP Leases</h2>
+        <label class="field compact-field">
+            <span class="sr-only">Search DHCP leases</span>
+            <input id="dnsmasq-dhcp-leases-search" type="search" placeholder="Search IP, MAC or hostname">
+        </label>
         <span id="dnsmasq-dhcp-leases-summary">leases=0</span>
     </div>
     <div class="table-wrap wide">
@@ -60,12 +64,16 @@
                     <th>Hostname</th>
                     <th>Client ID</th>
                     <th>Expires</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="dnsmasq-dhcp-leases-body">
-                <tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>loading DHCP leases</span></div></td></tr>
+                <tr><td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>loading DHCP leases</span></div></td></tr>
             </tbody>
         </table>
+    </div>
+    <div class="form-actions">
+        <button class="text-button primary" type="button" id="dnsmasq-add-static-address">Add Static Address</button>
     </div>
 </section>
 
@@ -281,8 +289,34 @@
         </div>
     </section>
 </div>
+
+<div class="modal-backdrop" id="dnsmasq-static-lease-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="dnsmasq-static-lease-title">
+        <div class="modal-head">
+            <h2 id="dnsmasq-static-lease-title">Add Static Address</h2>
+            <button class="icon-button" type="button" data-dnsmasq-static-lease-cancel aria-label="Close">x</button>
+        </div>
+        <div class="edit-form">
+            <div class="form-grid">
+                <label class="field">
+                    <span>MAC Address</span>
+                    <input id="dnsmasq-static-lease-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>IP Address</span>
+                    <input id="dnsmasq-static-lease-ip" type="text" inputmode="decimal" placeholder="192.168.1.50" autocomplete="off">
+                </label>
+            </div>
+            <div class="form-status" id="dnsmasq-static-lease-status" hidden></div>
+        </div>
+        <div class="form-actions">
+            <button class="text-button compact" type="button" data-dnsmasq-static-lease-cancel>Cancel</button>
+            <button class="text-button compact primary" type="button" id="dnsmasq-static-lease-apply">Apply</button>
+        </div>
+    </section>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260818-dnsmasq-server-start-restart" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260818-dnsmasq-static-leases" defer></script>
 {% endblock %}

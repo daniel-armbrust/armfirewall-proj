@@ -6,12 +6,12 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .constants import DNSMASQ_CONF, DNSMASQ_DB_PATH, LOG_SOURCE, WORK_REQUEST_DB_PATH
+from .constants import DNSMASQ_DB_PATH, LOG_SOURCE, WORK_REQUEST_DB_PATH
 from .models import DnsmasqWorkRequest
 
 from core import db
 from core import log as logger
-from core.constants import DNSMASQ_LEASES_PATH
+from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_LEASES_PATH
 from core.payload import decode_json_payload
 from web.services.dnsmasq import api as dnsmasq_config
 
@@ -41,10 +41,10 @@ def validate_request(request: DnsmasqWorkRequest) -> None:
 
 def write_dnsmasq_conf(config_text: str) -> None:
     """Atomically write the rendered dnsmasq.conf file."""
-    DNSMASQ_CONF.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = DNSMASQ_CONF.with_suffix(".conf.tmp")
+    DNSMASQ_CONF_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = DNSMASQ_CONF_PATH.with_suffix(".conf.tmp")
     tmp_path.write_text(config_text, encoding="utf-8")
-    tmp_path.replace(DNSMASQ_CONF)
+    tmp_path.replace(DNSMASQ_CONF_PATH)
 
 
 def clear_pending_apply() -> None:

@@ -34,6 +34,17 @@ KERNEL_PARAMS_WORK_REQUEST_PRIORITY = 70
 SERVICES_DB_PATH = DB_DIR / "services.db"
 DNSMASQ_DB_PATH = DB_DIR / "dnsmasq.db"
 DNSMASQ_LEASES_PATH = Path("/var/lib/dnsmasq/dnsmasq.leases")
+DNSMASQ_CONF_PATH = CONF_DIR / "dnsmasq.conf"
+DNSMASQ_DOMAIN_LABEL_PATTERN = r"^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
+DNSMASQ_MAC_ADDRESS_PATTERN = r"^[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}$"
+DNSMASQ_BOOL_DEFAULTS = {
+    "expand_hosts": True,
+    "domain_needed": True,
+    "bogus_priv": True,
+    "dhcp_authoritative": True,
+}
+DNSMASQ_ALL_INTERFACES_TOKEN = "__all__"
+DNSMASQ_INTERFACE_CONFIG_PREFIX = "# armfirewall-interface-config="
 LATENCY_DB_PATH = DB_DIR / "latency.db"
 LINKFAILOVER_DB_PATH = DB_DIR / "linkfailover.db"
 POLICY_ROUTING_DB_PATH = DB_DIR / "policy-routing.db"

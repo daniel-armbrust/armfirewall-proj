@@ -76,3 +76,12 @@ ON dnsmasq_domain_upstreams (interface_config_id, domain);
 
 CREATE INDEX IF NOT EXISTS idx_dnsmasq_global_domain_upstreams_domain
 ON dnsmasq_global_domain_upstreams (domain);
+
+-- Stores persistent IPv4 DHCP reservations managed by ArmFirewall.
+CREATE TABLE IF NOT EXISTS dnsmasq_static_leases (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     mac_address TEXT NOT NULL UNIQUE,
+     ip_address TEXT NOT NULL UNIQUE,
+     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

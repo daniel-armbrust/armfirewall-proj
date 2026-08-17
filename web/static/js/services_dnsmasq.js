@@ -28,6 +28,13 @@
     const dhcpLeasesPanel = document.querySelector("#dnsmasq-dhcp-leases-panel");
     const dhcpLeasesBody = document.querySelector("#dnsmasq-dhcp-leases-body");
     const dhcpLeasesSummary = document.querySelector("#dnsmasq-dhcp-leases-summary");
+    const dhcpLeasesSearch = document.querySelector("#dnsmasq-dhcp-leases-search");
+    const addStaticAddressButton = document.querySelector("#dnsmasq-add-static-address");
+    const staticLeaseModal = document.querySelector("#dnsmasq-static-lease-modal");
+    const staticLeaseMac = document.querySelector("#dnsmasq-static-lease-mac");
+    const staticLeaseIp = document.querySelector("#dnsmasq-static-lease-ip");
+    const staticLeaseStatus = document.querySelector("#dnsmasq-static-lease-status");
+    const staticLeaseApply = document.querySelector("#dnsmasq-static-lease-apply");
     const WORK_REQUESTS_POLL_MS = 5000;
     const DHCP_LEASES_POLL_MS = 5000;
     const ALL_INTERFACES = "__all__";
@@ -38,6 +45,7 @@
     let workRequestsPollTimer = null;
     let dhcpLeasesLoading = false;
     let dhcpLeasesPollTimer = null;
+    let dhcpLeases = [];
     let dirty = false;
     let pendingAction = null;
     let availableInterfaces = [];
@@ -997,7 +1005,14 @@
     }
 
     function renderDhcpLeases(data) {
-        const leases = data.leases || [];
+        dhcpLeases = data.leases || [];
+        const search = String(dhcpLeasesSearch?.value || "").trim().toLowerCase();
+        const leases = dhcpLeases.filter((lease) => !search || [
+            lease.ip_address,
+            lease.mac_address,
+            lease.hostname,
+            lease.client_id,
+        ].some((value) => String(value || "").toLowerCase().includes(search)));
         if (dhcpLeasesSummary) {
             dhcpLeasesSummary.textContent = `leases=${leases.length}`;
         }
@@ -1005,11 +1020,12 @@
             return;
         }
         if (!data.dhcp_active) {
-            dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(data.message || "DHCP service is not active or configured.")}</span></div></td></tr>`;
+            dhcpLeasesBody.innerHTML = `<tr><td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(data.message || "DHCP service is not active or configured.")}</span></div></td></tr>`;
             return;
         }
         if (!leases.length) {
-            dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(data.message || "No DHCP leases found.")}</span></div></td></tr>`;
+            const message = search ? "No DHCP lease matches the search." : data.message || "No DHCP leases found.";
+            dhcpLeasesBody.innerHTML = `<tr><td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(message)}</span></div></td></tr>`;
             return;
         }
         dhcpLeasesBody.innerHTML = leases.map((lease) => `
@@ -1019,6 +1035,7 @@
                 <td>${HF.escapeHtml(lease.hostname)}</td>
                 <td>${HF.escapeHtml(lease.client_id)}</td>
                 <td>${HF.escapeHtml(lease.expires_at)}</td>
+                <td><button class="text-button compact" type="button" data-dnsmasq-make-static-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-make-static-ip="${HF.escapeHtml(lease.ip_address)}" ${lease.is_static ? "disabled" : ""}>${lease.is_static ? "Static" : "Make Static"}</button></td>
             </tr>
         `).join("");
     }
@@ -1039,7 +1056,7 @@
                 dhcpLeasesSummary.textContent = "Offline";
             }
             if (dhcpLeasesBody) {
-                dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div></td></tr>`;
+                dhcpLeasesBody.innerHTML = `<tr><td colspan="6"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div></td></tr>`;
             }
         } finally {
             dhcpLeasesLoading = false;
@@ -1054,6 +1071,49 @@
     function stopDhcpLeasesPolling() {
         clearTimeout(dhcpLeasesPollTimer);
         dhcpLeasesPollTimer = null;
+    }
+
+    function openStaticLeaseModal(macAddress = "", ipAddress = "") {
+        if (staticLeaseMac) staticLeaseMac.value = macAddress;
+        if (staticLeaseIp) staticLeaseIp.value = ipAddress;
+        if (staticLeaseStatus) {
+            staticLeaseStatus.hidden = true;
+            staticLeaseStatus.textContent = "";
+            staticLeaseStatus.classList.remove("error");
+        }
+        if (staticLeaseModal) staticLeaseModal.hidden = false;
+    }
+
+    function closeStaticLeaseModal() {
+        if (staticLeaseModal) staticLeaseModal.hidden = true;
+    }
+
+    async function queueStaticLease(macAddress, ipAddress) {
+        await HF.fetchJson("/api/services/dnsmasq/static-leases", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({mac_address: macAddress, ip_address: ipAddress}),
+        });
+        showWorkRequests();
+        await loadWorkRequests();
+        await loadDnsmasq();
+    }
+
+    async function applyStaticLease() {
+        if (!staticLeaseApply) return;
+        staticLeaseApply.disabled = true;
+        try {
+            await queueStaticLease(staticLeaseMac?.value || "", staticLeaseIp?.value || "");
+            closeStaticLeaseModal();
+        } catch (error) {
+            if (staticLeaseStatus) {
+                staticLeaseStatus.textContent = error.message;
+                staticLeaseStatus.classList.add("error");
+                staticLeaseStatus.hidden = false;
+            }
+        } finally {
+            staticLeaseApply.disabled = false;
+        }
     }
 
     function setActiveView(viewName) {
@@ -1283,7 +1343,7 @@
             actionMessage.textContent = `${label}?`;
         }
         if (actionConfirm) {
-            actionConfirm.textContent = action === "stop" ? "Stop" : "Confirm";
+            actionConfirm.textContent = action === "stop" ? "Stop" : action === "make-static" ? "Yes" : "Confirm";
             actionConfirm.classList.toggle("danger", action === "stop");
         }
         if (actionModal) {
@@ -1355,6 +1415,19 @@
             return;
         }
 
+        const makeStaticButton = event.target.closest("[data-dnsmasq-make-static-mac]");
+        if (makeStaticButton) {
+            const macAddress = makeStaticButton.dataset.dnsmasqMakeStaticMac;
+            const ipAddress = makeStaticButton.dataset.dnsmasqMakeStaticIp;
+            openActionModal("make-static", "Make this DHCP lease static", () => queueStaticLease(macAddress, ipAddress));
+            return;
+        }
+
+        if (event.target.closest("#dnsmasq-add-static-address")) {
+            openStaticLeaseModal();
+            return;
+        }
+
         const viewButton = event.target.closest("[data-dnsmasq-view]");
         if (viewButton) {
             setActiveView(viewButton.dataset.dnsmasqView || "config");
@@ -1406,16 +1479,29 @@
         if (event.target.closest("[data-dnsmasq-modal-cancel]") || event.target === actionModal) {
             closeActionModal();
         }
+
+        if (event.target.closest("[data-dnsmasq-static-lease-cancel]") || event.target === staticLeaseModal) {
+            closeStaticLeaseModal();
+        }
     });
 
     window.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
             closeActionModal();
+            closeStaticLeaseModal();
         }
     });
 
     if (actionConfirm) {
         actionConfirm.addEventListener("click", runPendingAction);
+    }
+
+    if (staticLeaseApply) {
+        staticLeaseApply.addEventListener("click", applyStaticLease);
+    }
+
+    if (dhcpLeasesSearch) {
+        dhcpLeasesSearch.addEventListener("input", () => renderDhcpLeases({leases: dhcpLeases, dhcp_active: true}));
     }
 
     if (interfacePicker && interfaceAddButton) {
