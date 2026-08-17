@@ -168,6 +168,13 @@ def control_service(name: str, action: str) -> dict[str, Any]:
     }
 
 
+def start_or_restart_service(name: str) -> dict[str, Any]:
+    """Queue the appropriate start action using the persisted service state."""
+    status = service_status_by_name(name)
+    action = "restart" if status["state"] == "RUNNING" else "start"
+    return control_service(name, action)
+
+
 def install_optional_service(name: str) -> dict[str, Any]:
     """Validate optional service installation and return the work request payload."""
     service = get_optional_service(name)

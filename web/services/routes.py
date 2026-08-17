@@ -57,7 +57,12 @@ def api_services_status_work_requests() -> dict[str, Any]:
 def api_control_service(service_name: str, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
     """Control one non-protected ArmFirewall supervisord service."""
     try:
-        service_request = services_api.control_service(service_name, str(payload.get("action", "")))
+        action = str(payload.get("action", ""))
+        service_request = (
+            services_api.start_or_restart_service(service_name)
+            if action == "start-restart"
+            else services_api.control_service(service_name, action)
+        )
         return post_service_work_request(service_request)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -28,17 +28,18 @@
     const dhcpLeasesPanel = document.querySelector("#dnsmasq-dhcp-leases-panel");
     const dhcpLeasesBody = document.querySelector("#dnsmasq-dhcp-leases-body");
     const dhcpLeasesSummary = document.querySelector("#dnsmasq-dhcp-leases-summary");
+    const WORK_REQUESTS_POLL_MS = 5000;
     const DHCP_LEASES_POLL_MS = 5000;
     const ALL_INTERFACES = "__all__";
     const ALL_INTERFACES_LABEL = "Global configuration applied to all interfaces";
     const DNS_DOMAIN_LABEL_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
     let loading = false;
     let workRequestsLoading = false;
+    let workRequestsPollTimer = null;
     let dhcpLeasesLoading = false;
     let dhcpLeasesPollTimer = null;
     let dirty = false;
     let pendingAction = null;
-    let currentServiceState = "";
     let availableInterfaces = [];
     let activeInterfaces = [];
     let domainUpstreams = [];
@@ -895,7 +896,6 @@
         currentConfig = config;
         const summary = data.summary || {};
         const service = data.service || {};
-        currentServiceState = String(service.state || "").toUpperCase();
         renderInterfaces(data.interfaces || [], config.listen_interfaces || []);
 
         setBoolean("#dnsmasq-dns-enabled", config.dns_enabled);
@@ -968,6 +968,9 @@
         try {
             const data = await HF.fetchJson("/api/services/dnsmasq/work-requests");
             renderWorkRequests(data);
+            if (!workRequestsPanel.hidden) {
+                scheduleWorkRequestsPolling();
+            }
         } catch (error) {
             if (workRequestsBody) {
                 workRequestsBody.innerHTML = `
@@ -981,6 +984,16 @@
         } finally {
             workRequestsLoading = false;
         }
+    }
+
+    function scheduleWorkRequestsPolling() {
+        clearTimeout(workRequestsPollTimer);
+        workRequestsPollTimer = window.setTimeout(loadWorkRequests, WORK_REQUESTS_POLL_MS);
+    }
+
+    function stopWorkRequestsPolling() {
+        clearTimeout(workRequestsPollTimer);
+        workRequestsPollTimer = null;
     }
 
     function renderDhcpLeases(data) {
@@ -1060,6 +1073,8 @@
         });
         if (isWorkRequests) {
             loadWorkRequests();
+        } else {
+            stopWorkRequestsPolling();
         }
         if (isDhcpLeases) {
             loadDhcpLeases();
@@ -1218,7 +1233,6 @@
             } else {
                 const summary = data.summary || {};
                 const service = data.service || {};
-                currentServiceState = String(service.state || "").toUpperCase();
                 setText("#dnsmasq-summary-service", service.state || "-");
                 setText("#dnsmasq-summary-version", service.version || "-");
                 setText("#dnsmasq-summary-pid", service.pid || "-");
@@ -1248,12 +1262,11 @@
     }
 
     async function runServiceAction(action) {
-        const resolvedAction = action === "start-restart" && currentServiceState === "RUNNING" ? "restart" : action === "start-restart" ? "start" : action;
         clearFormStatus();
         await HF.fetchJson("/api/services/status/dnsmasq/action", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({action: resolvedAction}),
+            body: JSON.stringify({action}),
         });
         clearFormStatus();
         showWorkRequests();

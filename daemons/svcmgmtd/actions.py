@@ -6,7 +6,13 @@ import sys
 
 from core import db
 from core import log as logger
-from core.constants import ADGUARD_HOME_SERVICE_NAME, CONF_DIR, ROOT_DIR, SERVICES_DB_PATH
+from core.constants import (
+    ADGUARD_HOME_SERVICE_NAME,
+    CONF_DIR,
+    DNSMASQ_LEASES_PATH,
+    ROOT_DIR,
+    SERVICES_DB_PATH,
+)
 
 from .constants import LOG_SOURCE
 from .models import ControllableService, OptionalService
@@ -58,6 +64,12 @@ def restart_service(service_name: str) -> None:
         raise RuntimeError(f"Service {service_name} did not return to RUNNING after restart: {state}")
 
 
+def ensure_dnsmasq_lease_directory(service_name: str) -> None:
+    """Create the runtime directory required by Dnsmasq before it starts."""
+    if service_name == "dnsmasq":
+        DNSMASQ_LEASES_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+
 def install_service(service: OptionalService) -> None:
     """Install a package and register its supervisor program."""
     if service.name == ADGUARD_HOME_SERVICE_NAME:
@@ -89,7 +101,8 @@ def uninstall_service(service: OptionalService) -> None:
 def control_service(service: ControllableService, action: str) -> None:
     """Start, stop, or restart one ArmFirewall supervisord service."""
     service_name = service.name
-    
+
+    ensure_dnsmasq_lease_directory(service_name)
     reread_and_update()
 
     state = supervisor_status(service_name)

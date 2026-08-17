@@ -11,6 +11,7 @@ from .models import DnsmasqWorkRequest
 
 from core import db
 from core import log as logger
+from core.constants import DNSMASQ_LEASES_PATH
 from core.payload import decode_json_payload
 from web.services.dnsmasq import api as dnsmasq_config
 
@@ -61,6 +62,7 @@ def clear_pending_apply() -> None:
 
 def apply_config() -> None:
     """Render SQLite Dnsmasq settings to conf/dnsmasq.conf only."""
+    DNSMASQ_LEASES_PATH.parent.mkdir(parents=True, exist_ok=True)
     config = dnsmasq_config.load_config_from_db()
     if config is None:
         raise RuntimeError("No Dnsmasq configuration was found in dnsmasq.db.")
