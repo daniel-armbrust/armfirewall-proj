@@ -33,14 +33,14 @@ END;
 
 INSERT OR IGNORE INTO services (
     name, display_name, kind, description, service_group,
-    protected, restart_allowed, sort_order
+    protected, restart_allowed, autostart_enabled, sort_order
 ) VALUES
-    ('armfirewall-api', 'armfirewall-api', 'web', 'ArmFirewall HTTPS API and web GUI.', 'main', 1, 1, 10),
-    ('armfirewall-monitord', 'armfirewall-monitord', 'daemon', 'RRD monitoring collector and graph generator.', 'main', 0, 0, 30),
-    ('armfirewall-collectord', 'armfirewall-collectord', 'daemon', 'Operating-system state collector for web GUI snapshots.', 'main', 1, 1, 35),
-    ('armfirewall-workreqd', 'armfirewall-workreqd', 'daemon', 'Work request executor for operating system changes.', 'main', 1, 0, 40),
-    ('armfirewall-adam', 'armfirewall-adam', 'ai', 'ADAM AI menu and copilot feature.', 'main', 0, 0, 45),
-    ('armfirewall-linkfailover', 'armfirewall-linkfailover', 'daemon', 'Ping-based default route failover daemon.', 'main', 0, 0, 50);
+    ('armfirewall-api', 'armfirewall-api', 'web', 'ArmFirewall HTTPS API and web GUI.', 'main', 1, 1, 1, 10),
+    ('armfirewall-monitord', 'armfirewall-monitord', 'daemon', 'RRD monitoring collector and graph generator.', 'main', 0, 0, 1, 30),
+    ('armfirewall-collectord', 'armfirewall-collectord', 'daemon', 'Operating-system state collector for web GUI snapshots.', 'main', 1, 1, 1, 35),
+    ('armfirewall-workreqd', 'armfirewall-workreqd', 'daemon', 'Work request executor for operating system changes.', 'main', 1, 0, 1, 40),
+    ('armfirewall-adam', 'armfirewall-adam', 'ai', 'ADAM AI menu and copilot feature.', 'main', 0, 0, 1, 45),
+    ('armfirewall-linkfailover', 'armfirewall-linkfailover', 'daemon', 'Ping-based default route failover daemon.', 'main', 0, 0, 0, 50);
 
 INSERT OR IGNORE INTO services (
     name, display_name, kind, description, service_group,

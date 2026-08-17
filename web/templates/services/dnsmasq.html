@@ -50,7 +50,7 @@
     <div class="panel-head">
         <div class="dnsmasq-leases-head-start">
             <h2>DHCP Leases</h2>
-            <input class="dnsmasq-leases-search" id="dnsmasq-dhcp-leases-search" type="search" placeholder="Search IP, MAC or hostname" aria-label="Search DHCP leases" pattern="[A-Za-z0-9.:-]*" maxlength="255">
+            <input class="dnsmasq-leases-search" id="dnsmasq-dhcp-leases-search" type="search" placeholder="Search IP, MAC or hostname" aria-label="Search DHCP leases" pattern="[A-Za-z0-9.:-]*" maxlength="255" disabled>
         </div>
         <span id="dnsmasq-dhcp-leases-summary">leases=0</span>
     </div>
@@ -72,7 +72,7 @@
         </table>
     </div>
     <div class="form-actions dnsmasq-leases-actions">
-        <button class="text-button primary" type="button" id="dnsmasq-add-static-address">Add Static Address</button>
+        <button class="text-button primary" type="button" id="dnsmasq-add-static-address" disabled>Add Static Address</button>
     </div>
 </section>
 
@@ -317,5 +317,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260819-adguardhome-upstream" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260819-dhcp-lease-controls" defer></script>
 {% endblock %}

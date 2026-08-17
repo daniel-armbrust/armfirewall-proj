@@ -55,6 +55,16 @@
     let interfaceConfigs = [];
     let currentConfig = {};
 
+    function setDhcpLeaseControlsEnabled(enabled) {
+        const controlsEnabled = Boolean(enabled);
+        if (dhcpLeasesSearch) {
+            dhcpLeasesSearch.disabled = !controlsEnabled;
+        }
+        if (addStaticAddressButton) {
+            addStaticAddressButton.disabled = !controlsEnabled;
+        }
+    }
+
     function setDirty(value) {
         dirty = Boolean(value);
         if (applyButton) {
@@ -905,7 +915,10 @@
         currentConfig = config;
         const summary = data.summary || {};
         const service = data.service || {};
+        const dhcpConfigured = Boolean(config.dhcp_enabled) || (config.interface_configs || []).some((item) => item.dhcp_enabled);
+        const dhcpActive = dhcpConfigured && String(service.state || "").toUpperCase() === "RUNNING";
         renderInterfaces(data.interfaces || [], config.listen_interfaces || []);
+        setDhcpLeaseControlsEnabled(dhcpActive);
 
         setBoolean("#dnsmasq-dns-enabled", config.dns_enabled);
         setBoolean("#dnsmasq-dhcp-enabled", config.dhcp_enabled);
@@ -1006,6 +1019,7 @@
     }
 
     function renderDhcpLeases(data) {
+        setDhcpLeaseControlsEnabled(data.dhcp_active);
         dhcpLeases = data.leases || [];
         const search = String(dhcpLeasesSearch?.value || "").trim().toLowerCase();
         const leases = dhcpLeases.filter((lease) => !search || [
@@ -1055,6 +1069,7 @@
                 scheduleDhcpLeasesPolling();
             }
         } catch (error) {
+            setDhcpLeaseControlsEnabled(false);
             if (dhcpLeasesSummary) {
                 dhcpLeasesSummary.textContent = "Offline";
             }
@@ -1445,7 +1460,7 @@
             return;
         }
 
-        if (event.target.closest("#dnsmasq-add-static-address")) {
+        if (event.target.closest("#dnsmasq-add-static-address") && !addStaticAddressButton?.disabled) {
             openStaticLeaseModal();
             return;
         }
