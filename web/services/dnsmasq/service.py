@@ -10,22 +10,14 @@ from datetime import datetime
 from typing import Any
 from fastapi import HTTPException
 from core import db
-from core import iface as iface_module
 from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_DB_PATH, DNSMASQ_LEASES_PATH, DNSMASQ_MAC_ADDRESS_PATTERN, WORK_REQUEST_DB_PATH
 from web.services.api import service_status_by_name
 from web.workrequests.api import list_work_requests
 from .configuration import default_config, parse_dnsmasq_config, read_config_lines, render_config, validate_dnsmasq_syntax
+from .interfaces import list_interfaces
 from .repository import load_config_from_db, save_config_to_db, ensure_dnsmasq_schema
 from .validation import normalize_config, validate_optional_ipv4
 MAC_ADDRESS_RE = re.compile(DNSMASQ_MAC_ADDRESS_PATTERN)
-
-def list_interfaces() -> list[dict[str, Any]]:
-    """Return available interfaces for dnsmasq binding."""
-    try:
-        return iface_module.get_interfaces().get("interfaces", [])
-    except (FileNotFoundError, db.DatabaseError):
-        return []
-
 
 def dnsmasq_version() -> str:
     """Return the installed dnsmasq version when available."""

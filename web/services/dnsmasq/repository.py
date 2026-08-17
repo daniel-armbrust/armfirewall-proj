@@ -1,6 +1,7 @@
 """SQLite persistence for DNSMasq settings and reservations."""
 from __future__ import annotations
 import json
+import uuid
 from typing import Any
 from core import db
 from core.constants import DNSMASQ_DB_PATH, DNSMASQ_CONF_PATH, WORK_REQUEST_DB_PATH

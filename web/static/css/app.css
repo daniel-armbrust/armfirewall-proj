@@ -1909,16 +1909,14 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .dnsmasq-interface-picker {
     display: grid;
-    grid-template-columns: minmax(320px, 680px) 34px;
+    grid-template-columns: minmax(320px, 680px) auto;
     gap: 8px;
     align-items: center;
     max-width: 722px;
 }
 
-.dnsmasq-interface-picker .icon-button {
-    width: 34px;
-    height: 34px;
-    font-size: 16px;
+.dnsmasq-interface-picker .text-button {
+    min-height: 34px;
 }
 
 .dnsmasq-interface-field {
@@ -2040,6 +2038,11 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     margin-bottom: 14px;
 }
 
+.dnsmasq-dhcp-scope-list:not(:empty) {
+    margin-top: 18px;
+    padding-top: 14px;
+}
+
 .dnsmasq-scope-card {
     border: 1px solid var(--line);
     border-radius: 3px;
@@ -2103,7 +2106,44 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 }
 
 .dnsmasq-scope-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
     padding: 12px;
+}
+
+.dnsmasq-scope-options,
+.dnsmasq-scope-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.dnsmasq-scope-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.dnsmasq-scope-option {
+    color: var(--ink);
+    text-transform: none;
+}
+
+.dnsmasq-scope-option input {
+    width: auto;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.dnsmasq-scope-actions {
+    gap: 14px;
+    margin-top: 4px;
+    padding-top: 14px;
+}
+
+.dnsmasq-form-actions .form-actions {
+    justify-content: flex-start;
 }
 
 .text-button {

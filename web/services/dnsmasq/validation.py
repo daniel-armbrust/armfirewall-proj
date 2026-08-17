@@ -5,7 +5,8 @@ import re
 from typing import Any
 from fastapi import HTTPException
 from core.constants import DNSMASQ_ALL_INTERFACES_TOKEN, DNSMASQ_DOMAIN_LABEL_PATTERN
-from .configuration import default_config
+from .configuration import default_config, default_interface_config
+from .interfaces import list_interfaces
 from .repository import load_config_from_db
 DOMAIN_LABEL_RE = re.compile(DNSMASQ_DOMAIN_LABEL_PATTERN)
 
@@ -245,4 +246,3 @@ def normalize_config(payload: dict[str, Any]) -> dict[str, Any]:
 
     config["interface_configs"] = normalize_interface_configs(payload.get("interface_configs"), config)
     return config
-

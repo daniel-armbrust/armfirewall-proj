@@ -41,9 +41,15 @@
 </section>
 
 <nav class="local-tabs" aria-label="DNSMasq menu">
-    <button class="local-tab active" type="button" data-dnsmasq-view="config">DNSMasq</button>
+    <button class="local-tab active" type="button" data-dnsmasq-view="dns">DNS</button>
+    <button class="local-tab" type="button" data-dnsmasq-view="dhcp">DHCP</button>
     <button class="local-tab" type="button" data-dnsmasq-view="dhcp-leases">DHCP Leases</button>
     <button class="local-tab firewall-work-tab" type="button" data-dnsmasq-view="work-requests">WORK REQUESTS</button>
+</nav>
+
+<nav class="local-tabs dnsmasq-action-tabs" aria-label="DNSMasq service controls">
+    <button class="local-tab" type="button" data-dnsmasq-action="start-restart">START / RESTART</button>
+    <button class="local-tab" type="button" data-dnsmasq-action="stop">STOP</button>
 </nav>
 
 <section class="panel" id="dnsmasq-dhcp-leases-panel" hidden>
@@ -105,54 +111,6 @@
 </section>
 
 <form id="dnsmasq-form">
-    <nav class="local-tabs dnsmasq-action-tabs" aria-label="DNSMasq service controls">
-        <button class="local-tab" type="button" data-dnsmasq-action="start-restart">START / RESTART</button>
-        <button class="local-tab" type="button" data-dnsmasq-action="stop">STOP</button>
-    </nav>
-
-    <section class="panel">
-        <div class="panel-head">
-            <h2>Listen interfaces</h2>
-            <span>bind-interfaces</span>
-        </div>
-        <div class="edit-form">
-            <div class="form-grid dnsmasq-interface-config">
-                <label class="field dnsmasq-interface-field">
-                    <span>Interfaces</span>
-                    <div class="dnsmasq-interface-picker">
-                        <select id="dnsmasq-interface-picker" name="interface_picker"></select>
-                        <button class="icon-button" type="button" id="dnsmasq-interface-add" title="Add interface" aria-label="Add interface">+</button>
-                    </div>
-                </label>
-                <div class="table-wrap wide dnsmasq-interface-scroll">
-                    <table class="data-table dnsmasq-interface-table">
-                        <thead>
-                            <tr>
-                                <th>Interface</th>
-                                <th>Role</th>
-                                <th>IPv4 Address</th>
-                                <th>IPv6 Address</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dnsmasq-active-interfaces">
-                            <tr>
-                                <td colspan="5">
-                                    <div class="terminal-empty"><span class="prompt">$</span><span>no active interfaces</span></div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <nav class="local-tabs dnsmasq-tabs" aria-label="Dnsmasq configuration sections">
-        <button class="local-tab active" type="button" data-dnsmasq-tab="dns">DNS</button>
-        <button class="local-tab" type="button" data-dnsmasq-tab="dhcp">DHCP</button>
-        <button class="local-tab" type="button" data-dnsmasq-tab="ipv6">IPV6 RA</button>
-    </nav>
 
     <section class="panel" data-dnsmasq-panel="dns">
         <div class="panel-head">
@@ -246,21 +204,39 @@
 
     <section class="panel" data-dnsmasq-panel="dhcp" hidden>
         <div class="panel-head">
-            <h2>DHCP</h2>
-            <span>scope=dhcp</span>
+            <h2>DHCP Interface Configurations</h2>
+            <span>interface-based</span>
         </div>
         <div class="edit-form">
-            <div class="dnsmasq-scope-list" id="dnsmasq-dhcp-scope-list"></div>
-        </div>
-    </section>
-
-    <section class="panel" data-dnsmasq-panel="ipv6" hidden>
-        <div class="panel-head">
-            <h2>IPv6 Router Advertisements</h2>
-            <span>scope=lan-interface</span>
-        </div>
-        <div class="edit-form">
-            <div class="dnsmasq-scope-list" id="dnsmasq-ipv6-ra-scope-list"></div>
+            <div class="form-grid dnsmasq-interface-config">
+                <label class="field dnsmasq-interface-field">
+                    <span>Network interface</span>
+                    <div class="dnsmasq-interface-picker">
+                        <select id="dnsmasq-interface-picker" name="interface_picker"></select>
+                        <button class="text-button compact primary" type="button" id="dnsmasq-interface-add">Add</button>
+                    </div>
+                </label>
+                <div class="table-wrap wide dnsmasq-interface-scroll">
+                    <table class="data-table dnsmasq-interface-table">
+                        <thead>
+                            <tr>
+                                <th>Interface</th>
+                                <th>IPv4 Address</th>
+                                <th>IPv6 Address</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dnsmasq-active-interfaces">
+                            <tr>
+                                <td colspan="4">
+                                    <div class="terminal-empty"><span class="prompt">$</span><span>no DHCP interface configurations</span></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="dnsmasq-scope-list dnsmasq-dhcp-scope-list" id="dnsmasq-dhcp-scope-list"></div>
         </div>
     </section>
 
@@ -317,5 +293,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260819-dhcp-lease-controls" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260819-dhcp-scope-actions" defer></script>
 {% endblock %}
