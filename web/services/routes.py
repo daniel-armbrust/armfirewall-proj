@@ -95,6 +95,12 @@ def api_dnsmasq_config() -> dict[str, Any]:
     return services_dnsmasq_api.get_dnsmasq_config()
 
 
+@router.get("/api/services/dnsmasq/leases")
+def api_dnsmasq_leases() -> dict[str, Any]:
+    """Return the DHCP leases maintained by Dnsmasq."""
+    return services_dnsmasq_api.get_dhcp_leases()
+
+
 @router.get("/api/services/adguardhome")
 def api_adguardhome_config() -> dict[str, Any]:
     """Return AdGuard Home configuration and service status."""

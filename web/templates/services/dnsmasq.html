@@ -4,12 +4,12 @@
 <section class="page-head">
     <div>
         <p class="eyebrow">services/dnsmasq</p>
-        <h1>Dnsmasq</h1>
+        <h1>DNSMasq</h1>
     </div>
     <div class="refresh-state" id="dnsmasq-state">Loading</div>
 </section>
 
-<section class="summary-grid compact" aria-label="Dnsmasq summary">
+<section class="summary-grid compact" aria-label="DNSMasq summary">
     <div class="metric">
         <span class="metric-label">Service</span>
         <strong id="dnsmasq-summary-service">-</strong>
@@ -27,7 +27,7 @@
         <strong id="dnsmasq-summary-interfaces">-</strong>
     </div>
     <div class="metric">
-        <span class="metric-label">Dnsmasq version</span>
+        <span class="metric-label">DNSMasq version</span>
         <strong id="dnsmasq-summary-version">-</strong>
     </div>
     <div class="metric">
@@ -40,10 +40,34 @@
     </div>
 </section>
 
-<nav class="local-tabs" aria-label="Dnsmasq menu">
-    <button class="local-tab active" type="button" data-dnsmasq-view="config">DNSMASQ</button>
-    <button class="local-tab" type="button" data-dnsmasq-view="work-requests">WORK REQUESTS</button>
+<nav class="local-tabs" aria-label="DNSMasq menu">
+    <button class="local-tab active" type="button" data-dnsmasq-view="config">DNSMasq</button>
+    <button class="local-tab" type="button" data-dnsmasq-view="dhcp-leases">DHCP Leases</button>
+    <button class="local-tab firewall-work-tab" type="button" data-dnsmasq-view="work-requests">WORK REQUESTS</button>
 </nav>
+
+<section class="panel" id="dnsmasq-dhcp-leases-panel" hidden>
+    <div class="panel-head">
+        <h2>DHCP Leases</h2>
+        <span id="dnsmasq-dhcp-leases-summary">leases=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>MAC Address</th>
+                    <th>Hostname</th>
+                    <th>Client ID</th>
+                    <th>Expires</th>
+                </tr>
+            </thead>
+            <tbody id="dnsmasq-dhcp-leases-body">
+                <tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>loading DHCP leases</span></div></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
 
 <section class="panel" id="dnsmasq-work-requests-panel" hidden>
     <div class="panel-head">
@@ -74,7 +98,7 @@
 </section>
 
 <form id="dnsmasq-form">
-    <nav class="local-tabs dnsmasq-action-tabs" aria-label="Dnsmasq service controls">
+    <nav class="local-tabs dnsmasq-action-tabs" aria-label="DNSMasq service controls">
         <button class="local-tab" type="button" data-dnsmasq-action="start-restart">START / RESTART</button>
         <button class="local-tab" type="button" data-dnsmasq-action="stop">STOP</button>
     </nav>
@@ -99,13 +123,14 @@
                             <tr>
                                 <th>Interface</th>
                                 <th>Role</th>
-                                <th>Description</th>
+                                <th>IPv4 Address</th>
+                                <th>IPv6 Address</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="dnsmasq-active-interfaces">
                             <tr>
-                                <td colspan="4">
+                                <td colspan="5">
                                     <div class="terminal-empty"><span class="prompt">$</span><span>no active interfaces</span></div>
                                 </td>
                             </tr>
@@ -259,5 +284,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260817-dnsmasq-ipv6-ra" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260818-dnsmasq-interface-picker-default" defer></script>
 {% endblock %}

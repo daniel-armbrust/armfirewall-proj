@@ -33,6 +33,7 @@ KERNEL_PARAMS_WORK_REQUEST_ACTION = "apply"
 KERNEL_PARAMS_WORK_REQUEST_PRIORITY = 70
 SERVICES_DB_PATH = DB_DIR / "services.db"
 DNSMASQ_DB_PATH = DB_DIR / "dnsmasq.db"
+DNSMASQ_LEASES_PATH = Path("/var/lib/dnsmasq/dnsmasq.leases")
 LATENCY_DB_PATH = DB_DIR / "latency.db"
 LINKFAILOVER_DB_PATH = DB_DIR / "linkfailover.db"
 POLICY_ROUTING_DB_PATH = DB_DIR / "policy-routing.db"

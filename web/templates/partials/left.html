@@ -43,7 +43,7 @@
         <div class="menu-group">Services</div>
         <a class="menu-link child {% if current_path == '/services/status' %}active{% endif %}" href="/services/status">Status</a>
         {% if request.app.state.service_installed('dnsmasq') %}
-        <a class="menu-link child {% if current_path == '/services/dnsmasq' %}active{% endif %}" href="/services/dnsmasq">Dnsmasq</a>
+        <a class="menu-link child {% if current_path == '/services/dnsmasq' %}active{% endif %}" href="/services/dnsmasq">DNSMasq</a>
         {% endif %}
         {% if request.app.state.service_installed('adguardhome') %}
         <a class="menu-link child {% if current_path == '/services/adguard' %}active{% endif %}" href="/services/adguard">AdGuard</a>

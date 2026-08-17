@@ -48,7 +48,7 @@ INSERT OR IGNORE INTO services (
 ) VALUES
     (
         'dnsmasq',
-        'Dnsmasq',
+        'DNSMasq',
         'dns-dhcp',
         'DNS/DHCP service.',
         'optional',

@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 from core import db
 from core import iface as iface_module
-from core.constants import DNSMASQ_DB_PATH, ROOT_DIR, WORK_REQUEST_DB_PATH
+from core.constants import DNSMASQ_DB_PATH, DNSMASQ_LEASES_PATH, ROOT_DIR, WORK_REQUEST_DB_PATH
 from web.workrequests.api import list_work_requests
 from web.services.api import service_status_by_name
 
@@ -25,7 +25,7 @@ BOOL_DEFAULTS = {
     "expand_hosts": True,
     "domain_needed": True,
     "bogus_priv": True,
-    "dhcp_authoritative": False,
+    "dhcp_authoritative": True,
 }
 ALL_INTERFACES_TOKEN = "__all__"
 INTERFACE_CONFIG_PREFIX = "# armfirewall-interface-config="
@@ -501,7 +501,7 @@ def save_config_to_db(config: dict[str, Any]) -> int:
                     lease_time, dhcp_authoritative, ipv6_ra_enabled,
                     ipv6_ra_names, ipv6_ra_lifetime, enabled
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                 """,
                 (
                     item["iface"],
@@ -557,7 +557,7 @@ def save_config_to_db(config: dict[str, Any]) -> int:
             conn,
             """
             INSERT INTO work_request_events (work_request_id, event_type, message)
-            VALUES (?, 'queue', 'Queued Dnsmasq configuration apply.')
+            VALUES (?, 'queue', 'Queued DNSMasq configuration apply.')
             """,
             (work_request_id,),
         )
@@ -641,6 +641,58 @@ def get_dnsmasq_config() -> dict[str, Any]:
     }
 
 
+def get_dhcp_leases() -> dict[str, Any]:
+    """Return the DHCP leases currently maintained by Dnsmasq."""
+    config = load_config_from_db()
+    if config is None:
+        config = parse_dnsmasq_config(read_config_lines())
+    dhcp_configured = bool(config.get("dhcp_enabled")) or any(
+        item.get("dhcp_enabled") for item in config.get("interface_configs", [])
+    )
+    dhcp_active = dhcp_configured and str(dnsmasq_status().get("state") or "").upper() == "RUNNING"
+    if not dhcp_active:
+        return {
+            "leases": [],
+            "count": 0,
+            "dhcp_active": False,
+            "message": "DHCP service is not active or configured.",
+        }
+
+    if not DNSMASQ_LEASES_PATH.is_file():
+        return {
+            "leases": [],
+            "count": 0,
+            "dhcp_active": True,
+            "message": "No DHCP leases found.",
+        }
+
+    leases = []
+    for line in DNSMASQ_LEASES_PATH.read_text(encoding="utf-8", errors="replace").splitlines():
+        fields = line.split()
+        if len(fields) < 5:
+            continue
+        try:
+            expires_at = int(fields[0])
+        except ValueError:
+            continue
+        leases.append(
+            {
+                "expires_at": "never" if expires_at == 0 else datetime.fromtimestamp(expires_at).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
+                "mac_address": fields[1],
+                "ip_address": fields[2],
+                "hostname": "-" if fields[3] == "*" else fields[3],
+                "client_id": "-" if fields[4] == "*" else fields[4],
+            }
+        )
+
+    return {
+        "leases": leases,
+        "count": len(leases),
+        "dhcp_active": True,
+        "message": "No DHCP leases found." if not leases else "",
+    }
+
+
 def validate_ip(value: str, field_name: str) -> str:
     """Validate and normalize one IP address."""
     try:
@@ -653,6 +705,14 @@ def validate_optional_ip(value: Any, field_name: str) -> str:
     """Validate an optional IP address field."""
     text = str(value or "").strip()
     return validate_ip(text, field_name) if text else ""
+
+
+def validate_optional_ipv4(value: Any, field_name: str) -> str:
+    """Validate an optional IPv4 address used by a DHCP range."""
+    normalized = validate_optional_ip(value, field_name)
+    if normalized and ipaddress.ip_address(normalized).version != 4:
+        raise HTTPException(status_code=400, detail=f"{field_name} must be an IPv4 address.")
+    return normalized
 
 
 def validate_dns_domain(value: Any, field_name: str) -> str:
@@ -723,8 +783,8 @@ def normalize_interface_config(item: dict[str, Any]) -> dict[str, Any]:
     config["upstream_dns_servers"] = []
     config["domain_upstreams"] = []
     config["dhcp_enabled"] = bool(item.get("dhcp_enabled"))
-    config["dhcp_range_start"] = validate_optional_ip(item.get("dhcp_range_start"), f"{iface_name}.dhcp_range_start")
-    config["dhcp_range_end"] = validate_optional_ip(item.get("dhcp_range_end"), f"{iface_name}.dhcp_range_end")
+    config["dhcp_range_start"] = validate_optional_ipv4(item.get("dhcp_range_start"), f"{iface_name}.dhcp_range_start")
+    config["dhcp_range_end"] = validate_optional_ipv4(item.get("dhcp_range_end"), f"{iface_name}.dhcp_range_end")
     config["lease_time"] = validate_lease_time(item.get("lease_time"))
     config["dhcp_authoritative"] = bool(item.get("dhcp_authoritative"))
     config["ipv6_ra_enabled"] = bool(item.get("ipv6_ra_enabled"))
@@ -834,8 +894,8 @@ def normalize_config(payload: dict[str, Any]) -> dict[str, Any]:
     config["upstream_dns_servers"] = normalize_upstream_list(payload.get("upstream_dns_servers"), "upstream_dns_servers")
     config["domain_upstreams"] = validate_domain_upstreams(payload.get("domain_upstreams"))
     config["pihole_upstream_enabled"] = bool(payload.get("pihole_upstream_enabled"))
-    config["dhcp_range_start"] = validate_optional_ip(payload.get("dhcp_range_start"), "dhcp_range_start")
-    config["dhcp_range_end"] = validate_optional_ip(payload.get("dhcp_range_end"), "dhcp_range_end")
+    config["dhcp_range_start"] = validate_optional_ipv4(payload.get("dhcp_range_start"), "dhcp_range_start")
+    config["dhcp_range_end"] = validate_optional_ipv4(payload.get("dhcp_range_end"), "dhcp_range_end")
     config["lease_time"] = validate_lease_time(payload.get("lease_time"))
     config["cache_size"] = validate_cache_size(payload.get("cache_size", config["cache_size"]))
     config["expand_hosts"] = bool(payload.get("expand_hosts"))
@@ -891,6 +951,9 @@ def render_config(config: dict[str, Any]) -> str:
 
     if ipv6_ra_enabled:
         lines.append("enable-ra")
+
+    if dhcp_enabled:
+        lines.append(f"dhcp-leasefile={DNSMASQ_LEASES_PATH}")
 
     if ALL_INTERFACES_TOKEN in config["listen_interfaces"]:
         lines.append("# armfirewall-listen-all-interfaces=1")
@@ -998,7 +1061,7 @@ def save_dnsmasq_config(payload: dict[str, Any]) -> dict[str, Any]:
         "saved": True,
         "queued": True,
         "work_request_id": work_request_id,
-        "message": "Dnsmasq configuration queued for apply.",
+        "message": "DNSMasq configuration queued for apply.",
         "config": config,
         "summary": {
             "config_path": str(DNSMASQ_CONF),

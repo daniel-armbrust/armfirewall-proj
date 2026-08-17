@@ -25,9 +25,9 @@ def page_context(request: Request, title: str) -> dict[str, Any]:
 
 
 def render_dnsmasq(request: Request) -> HTMLResponse:
-    """Render the Dnsmasq service template."""
+    """Render the DNSMasq service template."""
     return templates.TemplateResponse(
         request,
         "services/dnsmasq.html",
-        context=page_context(request, "Dnsmasq"),
+        context=page_context(request, "DNSMasq"),
     )

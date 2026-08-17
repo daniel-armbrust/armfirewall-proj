@@ -1885,7 +1885,7 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     grid-column: 1 / -1;
     width: 100%;
     max-height: 166px;
-    overflow-x: hidden;
+    overflow-x: auto;
     overflow-y: auto;
     overscroll-behavior: contain;
 }
@@ -1898,7 +1898,7 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .dnsmasq-interface-table {
     width: 100%;
-    min-width: 0;
+    min-width: 880px;
     table-layout: fixed;
 }
 
@@ -1910,16 +1910,19 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
 .dnsmasq-interface-table th:first-child,
 .dnsmasq-interface-table td:first-child {
-    width: 30%;
+    width: 150px;
 }
 
 .dnsmasq-interface-table th:nth-child(2),
 .dnsmasq-interface-table td:nth-child(2) {
-    width: 110px;
+    width: 90px;
 }
 
 .dnsmasq-interface-table th:nth-child(3),
-.dnsmasq-interface-table td:nth-child(3) {
+.dnsmasq-interface-table td:nth-child(3),
+.dnsmasq-interface-table th:nth-child(4),
+.dnsmasq-interface-table td:nth-child(4) {
+    width: 250px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1929,6 +1932,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 .dnsmasq-interface-table td:last-child {
     width: 100px;
     text-align: right;
+}
+
+.dnsmasq-address {
+    cursor: help;
 }
 
 .dnsmasq-domain-upstream-servers {
@@ -2117,6 +2124,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 }
 
 .local-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
     min-height: 34px;
     padding: 0 13px;
     border: 1px solid var(--line);
@@ -2128,6 +2139,7 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     font-weight: 900;
     text-transform: uppercase;
     cursor: pointer;
+    text-decoration: none;
     white-space: nowrap;
 }
 

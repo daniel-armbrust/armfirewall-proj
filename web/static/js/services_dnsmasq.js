@@ -25,12 +25,17 @@
     const workRequestsPanel = document.querySelector("#dnsmasq-work-requests-panel");
     const workRequestsBody = document.querySelector("#dnsmasq-work-requests-body");
     const workRequestsCount = document.querySelector("#dnsmasq-work-requests-count");
-    const POLL_MS = 8000;
+    const dhcpLeasesPanel = document.querySelector("#dnsmasq-dhcp-leases-panel");
+    const dhcpLeasesBody = document.querySelector("#dnsmasq-dhcp-leases-body");
+    const dhcpLeasesSummary = document.querySelector("#dnsmasq-dhcp-leases-summary");
+    const DHCP_LEASES_POLL_MS = 5000;
     const ALL_INTERFACES = "__all__";
     const ALL_INTERFACES_LABEL = "Global configuration applied to all interfaces";
     const DNS_DOMAIN_LABEL_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
     let loading = false;
     let workRequestsLoading = false;
+    let dhcpLeasesLoading = false;
+    let dhcpLeasesPollTimer = null;
     let dirty = false;
     let pendingAction = null;
     let currentServiceState = "";
@@ -231,10 +236,7 @@
         if (name === ALL_INTERFACES) {
             return ALL_INTERFACES_LABEL;
         }
-        const iface = interfaceMeta(name);
-        const role = iface.role || "UNKNOWN";
-        const description = iface.description || "-";
-        return `${name} (${role}) - ${description}`;
+        return name;
     }
 
     function activeInterfaceNames() {
@@ -303,7 +305,7 @@
             dhcp_range_start: currentConfig.dhcp_range_start || "",
             dhcp_range_end: currentConfig.dhcp_range_end || "",
             lease_time: currentConfig.lease_time || "12h",
-            dhcp_authoritative: Boolean(currentConfig.dhcp_authoritative),
+            dhcp_authoritative: currentConfig.dhcp_authoritative !== false,
             ipv6_ra_enabled: false,
             ipv6_ra_names: true,
             ipv6_ra_lifetime: "4h",
@@ -353,6 +355,36 @@
         }
         interfaceConfigs = interfaceConfigs.filter((item) => item.iface !== name).concat(config);
         domainUpstreams = config.domain_upstreams || [];
+    }
+
+    function suggestedDhcpRange(ifaceName) {
+        const iface = interfaceMeta(ifaceName);
+        const address = (iface.addresses || []).find((item) => item.addr_family === "ipv4" && item.addr);
+        if (!address) {
+            return null;
+        }
+        const octets = HF.text(address.addr).split(".").map(Number);
+        const prefixLength = Number(address.prefixlen);
+        if (octets.length !== 4 || octets.some((item) => !Number.isInteger(item) || item < 0 || item > 255)
+            || !Number.isInteger(prefixLength) || prefixLength < 1 || prefixLength > 30) {
+            return null;
+        }
+        const addressNumber = octets.reduce((value, octet) => value * 256 + octet, 0);
+        const subnetSize = 2 ** (32 - prefixLength);
+        const networkAddress = Math.floor(addressNumber / subnetSize) * subnetSize;
+        const firstUsableAddress = networkAddress + 1;
+        const lastUsableAddress = networkAddress + subnetSize - 2;
+        const preferredStartAddress = networkAddress + 10;
+        const startAddress = Math.max(firstUsableAddress, Math.min(preferredStartAddress, lastUsableAddress));
+
+        return {
+            start: ipv4AddressFromNumber(startAddress),
+            end: ipv4AddressFromNumber(lastUsableAddress),
+        };
+    }
+
+    function ipv4AddressFromNumber(value) {
+        return [24, 16, 8, 0].map((shift) => Math.floor(value / (2 ** shift)) % 256).join(".");
     }
 
     function renderDomainRowsForConfig(config) {
@@ -482,11 +514,11 @@
                         </label>
                         <label class="field">
                             <span>DHCP range start</span>
-                            <input data-scope-field="dhcp_range_start" type="text" autocomplete="off" value="${fieldValue(config.dhcp_range_start)}">
+                            <input data-scope-field="dhcp_range_start" type="text" inputmode="decimal" pattern="[0-9.]+" maxlength="15" autocomplete="off" value="${fieldValue(config.dhcp_range_start)}"${config.dhcp_enabled ? "" : " disabled"}>
                         </label>
                         <label class="field">
                             <span>DHCP range end</span>
-                            <input data-scope-field="dhcp_range_end" type="text" autocomplete="off" value="${fieldValue(config.dhcp_range_end)}">
+                            <input data-scope-field="dhcp_range_end" type="text" inputmode="decimal" pattern="[0-9.]+" maxlength="15" autocomplete="off" value="${fieldValue(config.dhcp_range_end)}"${config.dhcp_enabled ? "" : " disabled"}>
                         </label>
                         <label class="field">
                             <span>Lease time</span>
@@ -585,7 +617,7 @@
             ...availableInterfaces.filter((iface) => !activeSet.has(iface.name)),
         ];
         interfacePicker.innerHTML = options.length
-            ? options.map((iface) => {
+            ? ['<option value="" selected>Select interface</option>', ...options.map((iface) => {
                 if (iface.name === ALL_INTERFACES) {
                     return `<option value="${HF.escapeHtml(iface.name)}">${HF.escapeHtml(iface.description)}</option>`;
                 }
@@ -593,10 +625,10 @@
                 const description = HF.text(iface.description || "-");
                 const label = `${HF.text(iface.name)} (${role}) - ${description}`;
                 return `<option value="${HF.escapeHtml(iface.name)}">${HF.escapeHtml(label)}</option>`;
-            }).join("")
+            })].join("")
             : '<option value="">no interfaces available</option>';
         if (interfaceAddButton) {
-            interfaceAddButton.disabled = !options.length;
+            interfaceAddButton.disabled = !options.length || !interfacePicker.value;
         }
     }
 
@@ -608,7 +640,7 @@
         if (!activeInterfaces.length) {
             activeInterfacesBody.innerHTML = `
                 <tr>
-                    <td colspan="4"><div class="terminal-empty"><span class="prompt">$</span><span>no active interfaces</span></div></td>
+                    <td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>no active interfaces</span></div></td>
                 </tr>
             `;
             renderScopeCards();
@@ -620,17 +652,20 @@
             if (name === ALL_INTERFACES) {
                 return `
                     <tr>
-                        <td colspan="3"><strong>${HF.escapeHtml(iface.description)}</strong></td>
+                        <td colspan="4"><strong>${HF.escapeHtml(iface.description)}</strong></td>
                         <td><button class="text-button compact danger" type="button" data-dnsmasq-interface-remove="${HF.escapeHtml(name)}">Remove</button></td>
                     </tr>
                 `;
             }
             const displayName = interfaceDisplayName(name);
+            const ipv4Addresses = interfaceAddressLabel(iface, "ipv4");
+            const ipv6Addresses = interfaceAddressLabel(iface, "ipv6");
             return `
                 <tr>
                     <td><strong>${HF.escapeHtml(displayName)}</strong></td>
                     <td>${HF.escapeHtml(iface.role || "-")}</td>
-                    <td>${HF.escapeHtml(iface.description || "-")}</td>
+                    <td>${ipv4Addresses}</td>
+                    <td>${ipv6Addresses}</td>
                     <td><button class="text-button compact danger" type="button" data-dnsmasq-interface-remove="${HF.escapeHtml(name)}">Remove</button></td>
                 </tr>
             `;
@@ -642,6 +677,19 @@
             const activeButton = tabButtons.find((button) => button.classList.contains("active"));
             showTab(activeButton?.dataset.dnsmasqTab || "dns");
         }
+    }
+
+    function interfaceAddressLabel(iface, family) {
+        const addresses = Array.isArray(iface.addresses) ? iface.addresses : [];
+        const values = addresses
+            .filter((address) => address.addr_family === family && address.addr)
+            .map((address) => `${HF.text(address.addr)}/${HF.text(address.prefixlen)}`);
+        if (!values.length) {
+            return "-";
+        }
+        const fullValue = values.join(", ");
+        const shortValue = fullValue.length > 24 ? `${fullValue.slice(0, 24)}...` : fullValue;
+        return `<span class="dnsmasq-address" title="${HF.escapeHtml(fullValue)}">${HF.escapeHtml(shortValue)}</span>`;
     }
 
     function renderInterfaces(interfaces, selected) {
@@ -935,19 +983,88 @@
         }
     }
 
+    function renderDhcpLeases(data) {
+        const leases = data.leases || [];
+        if (dhcpLeasesSummary) {
+            dhcpLeasesSummary.textContent = `leases=${leases.length}`;
+        }
+        if (!dhcpLeasesBody) {
+            return;
+        }
+        if (!data.dhcp_active) {
+            dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(data.message || "DHCP service is not active or configured.")}</span></div></td></tr>`;
+            return;
+        }
+        if (!leases.length) {
+            dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(data.message || "No DHCP leases found.")}</span></div></td></tr>`;
+            return;
+        }
+        dhcpLeasesBody.innerHTML = leases.map((lease) => `
+            <tr>
+                <td>${HF.escapeHtml(lease.ip_address)}</td>
+                <td>${HF.escapeHtml(lease.mac_address)}</td>
+                <td>${HF.escapeHtml(lease.hostname)}</td>
+                <td>${HF.escapeHtml(lease.client_id)}</td>
+                <td>${HF.escapeHtml(lease.expires_at)}</td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadDhcpLeases() {
+        if (dhcpLeasesLoading || !dhcpLeasesPanel || dhcpLeasesPanel.hidden) {
+            return;
+        }
+        dhcpLeasesLoading = true;
+        try {
+            const data = await HF.fetchJson("/api/services/dnsmasq/leases");
+            renderDhcpLeases(data);
+            if (data.dhcp_active && !dhcpLeasesPanel.hidden) {
+                scheduleDhcpLeasesPolling();
+            }
+        } catch (error) {
+            if (dhcpLeasesSummary) {
+                dhcpLeasesSummary.textContent = "Offline";
+            }
+            if (dhcpLeasesBody) {
+                dhcpLeasesBody.innerHTML = `<tr><td colspan="5"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div></td></tr>`;
+            }
+        } finally {
+            dhcpLeasesLoading = false;
+        }
+    }
+
+    function scheduleDhcpLeasesPolling() {
+        clearTimeout(dhcpLeasesPollTimer);
+        dhcpLeasesPollTimer = window.setTimeout(loadDhcpLeases, DHCP_LEASES_POLL_MS);
+    }
+
+    function stopDhcpLeasesPolling() {
+        clearTimeout(dhcpLeasesPollTimer);
+        dhcpLeasesPollTimer = null;
+    }
+
     function setActiveView(viewName) {
         const isWorkRequests = viewName === "work-requests";
+        const isDhcpLeases = viewName === "dhcp-leases";
         if (workRequestsPanel) {
             workRequestsPanel.hidden = !isWorkRequests;
         }
+        if (dhcpLeasesPanel) {
+            dhcpLeasesPanel.hidden = !isDhcpLeases;
+        }
         if (form) {
-            form.hidden = isWorkRequests;
+            form.hidden = isWorkRequests || isDhcpLeases;
         }
         viewButtons.forEach((button) => {
             button.classList.toggle("active", button.dataset.dnsmasqView === viewName);
         });
         if (isWorkRequests) {
             loadWorkRequests();
+        }
+        if (isDhcpLeases) {
+            loadDhcpLeases();
+        } else {
+            stopDhcpLeasesPolling();
         }
     }
 
@@ -1028,6 +1145,9 @@
         if (!field) {
             return false;
         }
+        if (field === "dhcp_range_start" || field === "dhcp_range_end") {
+            element.value = element.value.replace(/[^0-9.]/g, "");
+        }
         if (field === "forwarded_domains_enabled") {
             const config = configForInterface(iface);
             if (!element.checked) {
@@ -1039,8 +1159,21 @@
             renderScopeCards();
             return true;
         }
-        updateInterfaceConfig(iface, field, scopeFieldValue(element, field));
+        const value = scopeFieldValue(element, field);
+        updateInterfaceConfig(iface, field, value);
         setDirty(true);
+        if (field === "dhcp_enabled") {
+            const config = configForInterface(iface);
+            if (value && !config.dhcp_range_start && !config.dhcp_range_end) {
+                const range = suggestedDhcpRange(iface);
+                if (range) {
+                    updateInterfaceConfig(iface, "dhcp_range_start", range.start);
+                    updateInterfaceConfig(iface, "dhcp_range_end", range.end);
+                }
+            }
+            renderScopeCards();
+            return true;
+        }
         if (field === "pihole_upstream_enabled") {
             if (scopeFieldValue(element, field)) {
                 updateInterfaceConfig(iface, "forwarded_domains_enabled", false);
@@ -1078,7 +1211,7 @@
         }
         loading = true;
         try {
-            setState("Polling");
+            setState("Loading");
             const data = await HF.fetchJson("/api/services/dnsmasq");
             if (!dirty) {
                 renderConfig(data);
@@ -1196,7 +1329,7 @@
             if (!dirty) {
                 return;
             }
-            openActionModal("apply", "Apply Dnsmasq configuration", applyDnsmasq);
+            openActionModal("apply", "Apply DNSMasq configuration", applyDnsmasq);
         });
     }
 
@@ -1204,7 +1337,7 @@
         const actionButton = event.target.closest("[data-dnsmasq-action]");
         if (actionButton) {
             const action = actionButton.dataset.dnsmasqAction;
-            const label = action === "start-restart" ? "START / RESTART Dnsmasq service" : `${HF.text(action).toUpperCase()} Dnsmasq service`;
+            const label = action === "start-restart" ? "START / RESTART DNSMasq service" : `${HF.text(action).toUpperCase()} DNSMasq service`;
             openActionModal(action, label, () => runServiceAction(action));
             return;
         }
@@ -1272,10 +1405,14 @@
         actionConfirm.addEventListener("click", runPendingAction);
     }
 
+    if (interfacePicker && interfaceAddButton) {
+        interfacePicker.addEventListener("change", () => {
+            interfaceAddButton.disabled = !interfacePicker.value;
+        });
+    }
+
     showTab("dns");
     setActiveView("config");
     setDirty(false);
     loadDnsmasq();
-    setInterval(loadDnsmasq, POLL_MS);
-    setInterval(loadWorkRequests, POLL_MS);
 }());
