@@ -200,11 +200,14 @@ def normalize_config(payload: dict[str, Any]) -> dict[str, Any]:
     config["extra_options"] = normalize_extra_options(payload.get("extra_options"))
 
     if not config["listen_interfaces"] and not has_interface_configs:
-        config["dns_enabled"] = False
         config["dhcp_enabled"] = False
-        config["domain_upstreams"] = []
         config["interface_configs"] = []
-        return config
+        if config["dns_enabled"]:
+            # DNS is global and must remain reachable when DHCP has no interface configuration.
+            config["listen_interfaces"] = [DNSMASQ_ALL_INTERFACES_TOKEN]
+        else:
+            config["domain_upstreams"] = []
+            return config
 
     if has_interface_configs:
         config["interface_configs"] = normalize_interface_configs(payload.get("interface_configs"), config)
