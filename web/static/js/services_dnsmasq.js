@@ -1057,6 +1057,7 @@
         try {
             const data = await HF.fetchJson("/api/services/dnsmasq/leases");
             renderDhcpLeases(data);
+            setState("Live", data.updated_at || "-");
             if (data.dhcp_active && !dhcpLeasesPanel.hidden) {
                 scheduleDhcpLeasesPolling();
             }

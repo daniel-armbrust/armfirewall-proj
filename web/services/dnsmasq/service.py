@@ -91,6 +91,7 @@ def get_dhcp_leases() -> dict[str, Any]:
             "count": 0,
             "dhcp_active": False,
             "message": "DHCP service is not active or configured.",
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
     if not DNSMASQ_LEASES_PATH.is_file():
@@ -99,6 +100,7 @@ def get_dhcp_leases() -> dict[str, Any]:
             "count": 0,
             "dhcp_active": True,
             "message": "No DHCP leases found.",
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
     static_leases = {
@@ -130,6 +132,7 @@ def get_dhcp_leases() -> dict[str, Any]:
         "count": len(leases),
         "dhcp_active": True,
         "message": "No DHCP leases found." if not leases else "",
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
 
