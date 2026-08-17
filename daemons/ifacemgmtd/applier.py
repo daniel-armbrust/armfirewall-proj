@@ -8,6 +8,7 @@ from typing import Any
 from core import db
 from core.constants import COLLECTORD_IFACE_PROC_ITEMS, IFACE_DB_PATH
 from core.process import command_exists, run_command
+from web.network.kernel_params import param_by_path
 
 
 PROC_ROOT = Path("/proc/sys/net")
@@ -89,3 +90,15 @@ def apply_interface_config(payload: dict[str, Any]) -> None:
         )
         if cursor.rowcount == 0:
             raise LookupError("Network interface was not found in iface.db.")
+
+
+def apply_global_kernel_param(proc_path: str, current_value: object) -> None:
+    """Apply one registry-approved global kernel parameter value."""
+    param = param_by_path(proc_path)
+    value = normalized_value(current_value)
+    path = Path(param.proc_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Kernel parameter not found: {path}")
+    path.write_text(f"{value}\n", encoding="utf-8")
+    if path.read_text(encoding="utf-8").strip() != value:
+        raise RuntimeError(f"Kernel parameter was not applied: {path}")

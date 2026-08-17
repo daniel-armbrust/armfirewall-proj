@@ -107,10 +107,11 @@ def queued_requests(conn: db.Connection) -> list[QueuedWorkRequest]:
 
 def command_for_request(request: QueuedWorkRequest) -> list[str]:
     """Build the action command for a work request."""
-    if request.category_name == "SERVICE_MANAGEMENT.NETWORK_KERNEL_PARAM_CONFIG":
-        command = [sys.executable, "-m", "daemons.collectord.kernel_params_apply"]
-    elif request.category_name == "SERVICE_MANAGEMENT.NETWORK_INTERFACE_CONFIG":
-        command = [sys.executable, "-m", "daemons.collectord.iface_apply"]
+    if request.category_name in {
+        "SERVICE_MANAGEMENT.NETWORK_KERNEL_PARAM_CONFIG",
+        "SERVICE_MANAGEMENT.NETWORK_INTERFACE_CONFIG",
+    }:
+        command = [sys.executable, "-m", "daemons.ifacemgmtd.ifacemgmtd"]
     elif request.category_name == "SERVICE_MANAGEMENT.DNSMASQ_CONFIG":
         command = [sys.executable, "-m", "daemons.dnsmasq.dnsmasq"]
     elif request.category_name == "SERVICE_MANAGEMENT.BIRD_CONFIG":
