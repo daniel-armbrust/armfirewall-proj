@@ -264,10 +264,65 @@ record_router_forward_rules() {
     record_router_forward_rule "$IPV6_FILTER_RULES_DB" "::/0" "$WAN_IFACE" "$LAN_IFACE" 0 1 1
 }
 
-# Record successful system apply state for router-mode rules created during install.
-record_router_apply_state() {
-    record_install_apply_work_request "FIREWALL_RULES.IPV4.filter_forward_rules" "routermode.sh"
-    record_install_apply_work_request "FIREWALL_RULES.IPV6.filter_forward_rules" "routermode.sh"
+# Queue a full FORWARD chain reapply after router-mode rules are persisted.
+#
+# fwrules.sh queues its initial chain apply before routermode.sh inserts the
+# LAN-to-WAN rules. Its payload therefore does not include those new rule IDs.
+# This request is queued afterwards so the one-shot firewall executor flushes
+# and rebuilds the chain with the complete persisted rule set.
+queue_router_forward_apply() {
+    local family="$1"
+    local db_path="$2"
+    local family_upper
+    local category_name
+    local rule_ids
+    local policy
+    local request_uid
+    local payload
+
+    family_upper="${family^^}"
+    category_name="FIREWALL_RULES.${family_upper}.filter_forward_rules"
+    rule_ids="$(sqlite_query "$db_path" "
+        SELECT '[' || COALESCE(group_concat(id), '') || ']'
+        FROM (
+            SELECT id
+            FROM filter_forward_rules
+            WHERE enabled = 1 AND COALESCE(pending_delete, 0) = 0
+            ORDER BY rule_order, id
+        );")"
+    policy="$(sqlite_query "$db_path" "SELECT policy FROM filter_chain_policies WHERE chain_name = 'FORWARD' LIMIT 1;")"
+    policy="${policy:-DROP}"
+    request_uid="$(cat /proc/sys/kernel/random/uuid)"
+    payload="{\"family\":\"${family_upper}\",\"chain\":\"FORWARD\",\"table\":\"filter_forward_rules\",\"policy\":\"${policy}\",\"rule_ids\":${rule_ids:-[]},\"delete_rule_ids\":[]}"
+
+    sqlite_exec "$WORK_REQUEST_DB" "
+        INSERT INTO work_requests (
+            request_uid, source, category_name, action_name,
+            target_rule_id, priority, status, payload_json
+        ) VALUES (
+            $(sql_quote "$request_uid"),
+            'system',
+            $(sql_quote "$category_name"),
+            'apply',
+            NULL,
+            90,
+            'queue',
+            $(sql_quote "$payload")
+        );
+
+        INSERT INTO work_request_events (work_request_id, event_type, message)
+        VALUES (
+            last_insert_rowid(),
+            'queue',
+            $(sql_quote "Queued router-mode FORWARD apply for ${family_upper}.")
+        );
+    "
+}
+
+# Queue the router-mode reapply requests after the initial direct system apply.
+queue_router_apply_state() {
+    queue_router_forward_apply ipv4 "$IPV4_FILTER_RULES_DB"
+    queue_router_forward_apply ipv6 "$IPV6_FILTER_RULES_DB"
     record_install_apply_work_request "NAT_RULES.IPV4.nat_postrouting_rules" "routermode.sh"
 }
 
@@ -288,7 +343,7 @@ configure_router_mode() {
     apply_masquerade_rule
     record_router_forward_rules
     apply_router_forward_rules
-    record_router_apply_state
+    queue_router_apply_state
 }
 
 # Persist WAN interface and optionally enable router mode.
