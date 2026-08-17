@@ -1701,6 +1701,20 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     gap: 10px;
 }
 
+.work-requests-pagination-actions {
+    align-items: center;
+    padding-bottom: 12px;
+    padding-right: 12px;
+}
+
+.proc-value-current-field {
+    margin-top: 12px;
+}
+
+.interface-edit-actions {
+    justify-content: flex-start;
+}
+
 .users-inventory-actions {
     margin: 14px 0 0;
     display: flex;

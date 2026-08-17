@@ -9,8 +9,14 @@ from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from core.constants import (
+    KERNEL_PARAMS_WORK_REQUEST_ACTION,
+    KERNEL_PARAMS_WORK_REQUEST_CATEGORY,
+    KERNEL_PARAMS_WORK_REQUEST_PRIORITY,
+)
 from web.constants import TEMPLATE_DIR
 from web.context import menu_context
+from web.workrequests.api import queue_work_request
 
 
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
@@ -414,7 +420,7 @@ def get_kernel_params() -> dict[str, Any]:
 
 
 def update_kernel_param_current_value(payload: dict[str, Any]) -> dict[str, Any]:
-    """Write one allowed global kernel parameter runtime value."""
+    """Queue one allowed global kernel parameter runtime value."""
     proc_path = str(payload.get("proc_path", "")).strip()
     current_value = str(payload.get("current_value", "")).strip()
 
@@ -424,12 +430,13 @@ def update_kernel_param_current_value(payload: dict[str, Any]) -> dict[str, Any]
         raise HTTPException(status_code=400, detail="current_value is required.")
 
     param = param_by_path(proc_path)
-    path = Path(param.proc_path)
-    try:
-        path.write_text(f"{current_value}\n", encoding="utf-8")
-    except PermissionError as exc:
-        raise HTTPException(status_code=403, detail="Permission denied writing kernel parameter.") from exc
-    except OSError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return {"param": kernel_param_row(param)}
+    work_request = queue_work_request(
+        action=KERNEL_PARAMS_WORK_REQUEST_ACTION,
+        category_name=KERNEL_PARAMS_WORK_REQUEST_CATEGORY,
+        payload={"proc_path": param.proc_path, "current_value": current_value},
+        priority=KERNEL_PARAMS_WORK_REQUEST_PRIORITY,
+        allowed_actions=(KERNEL_PARAMS_WORK_REQUEST_ACTION,),
+        allowed_categories=(KERNEL_PARAMS_WORK_REQUEST_CATEGORY,),
+        event_message=f"Queued global kernel parameter update: {param.proc_path}",
+    )
+    return {"param": kernel_param_row(param), "work_request": work_request}

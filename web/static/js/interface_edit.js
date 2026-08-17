@@ -1,6 +1,7 @@
 (function () {
     const stateLabel = document.querySelector("#refresh-state");
     const interfaceEditPanel = document.querySelector("[data-interface-edit]");
+    const interfaceEditForm = document.querySelector("#interface-edit-form");
     const interfaceEditAddresses = document.querySelector("#interface-edit-addresses");
     const interfaceEditProc = document.querySelector("#interface-edit-proc");
     const procValueModal = document.querySelector("#proc-value-modal");
@@ -8,6 +9,8 @@
     const procValuePath = document.querySelector("#proc-value-path");
     const procValueCurrent = document.querySelector("#proc-value-current");
     const procValueStatus = document.querySelector("#proc-value-status");
+    const procWorkRequestModal = document.querySelector("#proc-work-request-modal");
+    const procWorkRequestId = document.querySelector("#proc-work-request-id");
 
     function setValue(selector, value) {
         const field = document.querySelector(selector);
@@ -140,6 +143,22 @@
         procValueCurrent.focus();
     }
 
+    function openProcWorkRequestModal(workRequestId) {
+        if (!procWorkRequestModal) {
+            return;
+        }
+        if (procWorkRequestId) {
+            procWorkRequestId.textContent = `#${HF.text(workRequestId)}`;
+        }
+        procWorkRequestModal.hidden = false;
+    }
+
+    function closeProcWorkRequestModal() {
+        if (procWorkRequestModal) {
+            procWorkRequestModal.hidden = true;
+        }
+    }
+
     function closeProcValueModal() {
         if (procValueModal) {
             procValueModal.hidden = true;
@@ -208,12 +227,18 @@
 
             if (event.target.id === "proc-value-close" || event.target.id === "proc-value-cancel" || event.target === procValueModal) {
                 closeProcValueModal();
+                return;
+            }
+
+            if (event.target.id === "proc-work-request-close" || event.target.id === "proc-work-request-cancel" || event.target === procWorkRequestModal) {
+                closeProcWorkRequestModal();
             }
         });
 
         window.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
                 closeProcValueModal();
+                closeProcWorkRequestModal();
             }
         });
 
@@ -229,7 +254,7 @@
             }
 
             try {
-                await HF.fetchJson("/api/proc/desired-value", {
+                const result = await HF.fetchJson("/api/proc/desired-value", {
                     method: "PUT",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({
@@ -239,6 +264,7 @@
                     }),
                 });
                 closeProcValueModal();
+                openProcWorkRequestModal(result.work_request);
                 await loadInterfaceEditProc();
             } catch (error) {
                 if (procValueStatus) {
@@ -248,8 +274,40 @@
         });
     }
 
+    function initializeInterfaceEditor() {
+        if (!interfaceEditPanel || !interfaceEditForm) {
+            return;
+        }
+
+        interfaceEditForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const ifaceName = interfaceEditPanel.dataset.interfaceEdit;
+            const formData = new FormData(interfaceEditForm);
+            try {
+                const result = await HF.fetchJson(`/api/interfaces/${encodeURIComponent(ifaceName)}`, {
+                    method: "PUT",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        role: formData.get("role"),
+                        protected: document.querySelector("#iface-edit-protected")?.value,
+                        mtu: formData.get("mtu"),
+                        description: formData.get("description"),
+                    }),
+                });
+                openProcWorkRequestModal(result.work_request);
+                if (stateLabel) {
+                    stateLabel.textContent = "Work Request queued";
+                }
+            } catch (error) {
+                if (stateLabel) {
+                    stateLabel.textContent = error.message;
+                }
+            }
+        });
+    }
+
     initializeProcValueEditor();
+    initializeInterfaceEditor();
     pollInterfaceProperties();
     loadInterfaceEditProc();
-    setInterval(pollInterfaceProperties, 5000);
 }());

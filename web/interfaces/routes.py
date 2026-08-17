@@ -32,7 +32,7 @@ def api_proc() -> dict[str, Any]:
 
 @router.put("/api/proc/desired-value")
 async def api_update_proc_desired_value(request: Request) -> dict[str, Any]:
-    """Persist the user-defined proc value for an interface."""
+    """Persist a requested proc value and queue its application."""
     payload = await request.json()
     iface_name = str(payload.get("iface_name", "")).strip()
     proc_path = str(payload.get("proc_path", "")).strip()
@@ -42,6 +42,12 @@ async def api_update_proc_desired_value(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="iface_name and proc_path are required.")
 
     return interfaces_api.update_proc_desired_value(iface_name, proc_path, desired_value)
+
+
+@router.put("/api/interfaces/{iface_name}")
+async def api_update_interface(iface_name: str, request: Request) -> dict[str, Any]:
+    """Queue one network interface configuration update."""
+    return interfaces_api.queue_interface_update(iface_name, await request.json())
 
 
 @router.get("/network/interfaces", response_class=HTMLResponse)

@@ -2,17 +2,27 @@ from __future__ import annotations
 
 from typing import Annotated, Any, List, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 
+from core.constants import WORK_REQUESTS_DEFAULT_PAGE_SIZE, WORK_REQUESTS_MAX_PAGE_SIZE
 from web.workrequests import api as workrequests_api
+from web.workrequests import views as workrequests_views
 
 
 router = APIRouter()
 
 
+@router.get("/armfirewall/work-requests", response_class=HTMLResponse)
+def work_requests_page(request: Request) -> HTMLResponse:
+    """Render the global ArmFirewall Work Requests page."""
+    return workrequests_views.render_work_requests(request)
+
+
 @router.get("/api/work-requests")
 def api_work_requests(
-    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+    limit: Annotated[int, Query(ge=1, le=WORK_REQUESTS_MAX_PAGE_SIZE)] = WORK_REQUESTS_DEFAULT_PAGE_SIZE,
+    page: Annotated[int, Query(ge=1)] = 1,
     category: Annotated[Optional[List[str]], Query()] = None,
     category_like: Optional[str] = None,
     service_name: Optional[str] = None,
@@ -21,6 +31,7 @@ def api_work_requests(
     """Return ArmFirewall work requests using shared filters."""
     return workrequests_api.get_work_requests(
         limit=limit,
+        page=page,
         categories=tuple(category or ()),
         category_like=category_like,
         service_name=service_name,

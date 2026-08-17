@@ -7,6 +7,8 @@
     const pathField = document.querySelector("#kernel-param-path");
     const valueField = document.querySelector("#kernel-param-value");
     const statusLabel = document.querySelector("#kernel-param-status");
+    const workRequestModal = document.querySelector("#kernel-param-work-request-modal");
+    const workRequestId = document.querySelector("#kernel-param-work-request-id");
     const POLL_MS = 10000;
 
     function setState(state, updated = "") {
@@ -134,6 +136,22 @@
         }
     }
 
+    function openWorkRequestModal(id) {
+        if (!workRequestModal) {
+            return;
+        }
+        if (workRequestId) {
+            workRequestId.textContent = `#${HF.text(id)}`;
+        }
+        workRequestModal.hidden = false;
+    }
+
+    function closeWorkRequestModal() {
+        if (workRequestModal) {
+            workRequestModal.hidden = true;
+        }
+    }
+
     document.addEventListener("click", (event) => {
         const editButton = event.target.closest("[data-kernel-param-edit]");
         if (editButton) {
@@ -142,12 +160,17 @@
         }
         if (event.target.id === "kernel-param-close" || event.target.id === "kernel-param-cancel" || event.target === modal) {
             closeModal();
+            return;
+        }
+        if (event.target.id === "kernel-param-work-request-close" || event.target.id === "kernel-param-work-request-cancel" || event.target === workRequestModal) {
+            closeWorkRequestModal();
         }
     });
 
     window.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
             closeModal();
+            closeWorkRequestModal();
         }
     });
 
@@ -161,7 +184,7 @@
                 statusLabel.textContent = "saving";
             }
             try {
-                await HF.fetchJson("/api/network/kernel-params/current-value", {
+                const result = await HF.fetchJson("/api/network/kernel-params/current-value", {
                     method: "PUT",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({
@@ -170,6 +193,7 @@
                     }),
                 });
                 closeModal();
+                openWorkRequestModal(result.work_request);
                 await loadKernelParams();
             } catch (error) {
                 if (statusLabel) {

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">armfirewall/work-requests</p>
+        <h1>Work Requests</h1>
+    </div>
+    <div class="refresh-state" id="work-requests-state">Loading</div>
+</section>
+
+<section class="summary-grid compact" aria-label="Work request summary">
+    <div class="metric"><span class="metric-label">Total</span><strong id="work-requests-total">-</strong></div>
+    <div class="metric"><span class="metric-label">Queued</span><strong id="work-requests-queued">-</strong></div>
+    <div class="metric"><span class="metric-label">Running</span><strong id="work-requests-running">-</strong></div>
+    <div class="metric"><span class="metric-label">Failed</span><strong id="work-requests-failed">-</strong></div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>All Work Requests</h2>
+        <span id="work-requests-count">requests=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Category</th>
+                    <th>Action</th>
+                    <th>Source</th>
+                    <th>Priority</th>
+                    <th>Updated</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="work-requests-body">
+                <tr><td colspan="8"><div class="terminal-empty"><span class="prompt">$</span><span>loading work requests</span></div></td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="table-pagination" aria-label="Work request pagination">
+        <div class="table-pagination-nav">
+            <button class="text-button compact table-page-button" id="work-requests-previous" type="button" aria-label="Previous page">&lt;</button>
+            <button class="text-button compact table-page-button" id="work-requests-next" type="button" aria-label="Next page">&gt;</button>
+            <span class="table-page-status" id="work-requests-pagination">Page 1 of 1 (0 - 0 of 0 total items)</span>
+        </div>
+        <label class="table-page-size" for="work-requests-page-size">
+            <span>Items per page</span>
+            <select id="work-requests-page-size" aria-label="Work Requests items per page">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </label>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/workrequests.js') }}?v=20260818-work-requests-pagination-scroll" defer></script>
+{% endblock %}

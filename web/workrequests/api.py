@@ -6,14 +6,15 @@ from collections.abc import Sequence
 from typing import Any
 
 from core import db
-from core.constants import WORK_REQUEST_DB_PATH
+from core.constants import WORK_REQUEST_DB_PATH, WORK_REQUESTS_DEFAULT_PAGE_SIZE, WORK_REQUESTS_MAX_PAGE_SIZE
 from web.utils import safe_decode_payload, summarize_statuses
 from web.workrequests.constants import SERVICE_WORK_REQUEST_ACTIONS, SERVICE_WORK_REQUEST_CATEGORIES, WORK_REQUEST_COLUMNS
 
 
 def list_work_requests(
     *,
-    limit: int = 50,
+    limit: int = WORK_REQUESTS_DEFAULT_PAGE_SIZE,
+    page: int = 1,
     category_names: Sequence[str] | None = None,
     category_like: str | None = None,
     service_name: str | None = None,
@@ -22,7 +23,10 @@ def list_work_requests(
     include_payload_service_fields: bool = False,
 ) -> dict[str, Any]:
     """Return work requests filtered by category and optional payload service name."""
-    normalized_limit = max(1, min(int(limit), 500))
+    max_limit = WORK_REQUESTS_MAX_PAGE_SIZE if service_name is None else 500
+    normalized_limit = max(1, min(int(limit), max_limit))
+    normalized_page = max(1, int(page))
+    offset = (normalized_page - 1) * normalized_limit
     where: list[str] = []
     params: list[Any] = []
 
@@ -42,16 +46,18 @@ def list_work_requests(
         FROM work_requests
         {where_sql}
         ORDER BY id DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
     """
 
-    params.append(normalized_limit if service_name is None else 500)
+    params.extend((normalized_limit if service_name is None else 500, offset if service_name is None else 0))
 
     try:
         with db.connection(WORK_REQUEST_DB_PATH) as conn:
             raw_rows = db.fetch_all_on(conn, query, params)
+            total_row = db.fetch_one_on(conn, f"SELECT COUNT(*) AS total FROM work_requests {where_sql}", params[:-2])
     except FileNotFoundError:
         raw_rows = []
+        total_row = {"total": 0}
 
     service_filter_categories = set(service_name_categories or ())
     rows: list[dict[str, Any]] = []
@@ -83,12 +89,23 @@ def list_work_requests(
         if len(rows) >= normalized_limit:
             break
 
-    return {"summary": summarize_statuses(rows, ("queue", "running", "success", "failed")), "requests": rows}
+    total = int(total_row["total"] if total_row else 0)
+    return {
+        "summary": summarize_statuses(rows, ("queue", "running", "success", "failed")),
+        "requests": rows,
+        "pagination": {
+            "page": normalized_page,
+            "page_size": normalized_limit,
+            "total": total,
+            "pages": max(1, (total + normalized_limit - 1) // normalized_limit),
+        },
+    }
 
 
 def get_work_requests(
     *,
-    limit: int = 50,
+    limit: int = WORK_REQUESTS_DEFAULT_PAGE_SIZE,
+    page: int = 1,
     categories: Sequence[str] | None = None,
     category_like: str | None = None,
     service_name: str | None = None,
@@ -97,6 +114,7 @@ def get_work_requests(
     """Return ArmFirewall work requests for Web API consumers."""
     return list_work_requests(
         limit=limit,
+        page=page,
         category_names=tuple(categories or ()),
         category_like=category_like,
         service_name=service_name,

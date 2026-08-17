@@ -28,6 +28,6 @@ def render_work_requests(request: Request) -> HTMLResponse:
     """Render the generic Work Requests page."""
     return templates.TemplateResponse(
         request,
-        "common/page.html",
+        "workrequests/index.html",
         context=page_context(request, "Work Requests") | {"section": "workrequests"},
     )

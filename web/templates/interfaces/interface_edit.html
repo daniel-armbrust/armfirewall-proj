@@ -63,9 +63,8 @@
                 <input id="iface-edit-description" name="description" type="text">
             </label>
         </div>
-        <div class="form-actions">
-            <a class="text-button" href="/network/interfaces">Back</a>
-            <button class="text-button primary" type="button" disabled title="Save API not implemented yet">Save</button>
+        <div class="form-actions interface-edit-actions">
+            <button class="text-button primary" type="submit">Save</button>
         </div>
     </form>
 </section>
@@ -118,7 +117,7 @@
                 <span>PATH</span>
                 <input id="proc-value-path" name="proc_path" type="text" readonly>
             </label>
-            <label class="field">
+            <label class="field proc-value-current-field">
                 <span>Current value</span>
                 <input id="proc-value-current" name="desired_value" type="text">
             </label>
@@ -130,8 +129,22 @@
         </form>
     </section>
 </div>
+
+<div class="modal-backdrop" id="proc-work-request-modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="proc-work-request-title">
+        <div class="panel-head">
+            <h2 id="proc-work-request-title">Work Request queued</h2>
+            <button class="icon-button" type="button" id="proc-work-request-close" aria-label="Close popup">x</button>
+        </div>
+        <p class="modal-copy">Work Request <strong id="proc-work-request-id">-</strong> was generated to apply the requested change.</p>
+        <div class="form-actions">
+            <button class="text-button" type="button" id="proc-work-request-cancel">Close</button>
+            <a class="text-button primary" href="/armfirewall/work-requests">View Work Requests</a>
+        </div>
+    </section>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/interface_edit.js') }}" defer></script>
+<script src="{{ url_for('static', path='/js/interface_edit.js') }}?v=20260818-interface-save-work-request" defer></script>
 {% endblock %}

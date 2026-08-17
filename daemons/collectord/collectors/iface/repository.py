@@ -83,6 +83,6 @@ def upsert_proc_values(conn: db.Connection, iface_id: int, iface_name: str) -> N
             INSERT INTO proc (iface_id, addr_family, proc_path, description, default_value, desired_value, collected_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT(iface_id, addr_family, proc_path) DO UPDATE SET description=excluded.description,
-                default_value=excluded.default_value, desired_value=COALESCE(proc.desired_value, excluded.desired_value),
+                desired_value=COALESCE(proc.desired_value, excluded.desired_value),
                 collected_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
             """, (iface_id, family, str(proc_path), description, value, value))

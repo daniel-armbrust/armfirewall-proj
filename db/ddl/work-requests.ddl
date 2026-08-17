@@ -50,6 +50,8 @@ INSERT OR IGNORE INTO work_request_categories (name, category, family, target_na
      ('SERVICE_MANAGEMENT.BIRD_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'bird_config', 'BIRD routing daemon configuration changes.'),
      ('SERVICE_MANAGEMENT.DNSMASQ_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'dnsmasq_config', 'Dnsmasq DNS and DHCP configuration changes.'),
      ('SERVICE_MANAGEMENT.LIBRESWAN_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'libreswan_config', 'Libreswan IPsec tunnel configuration changes.'),
+     ('SERVICE_MANAGEMENT.NETWORK_INTERFACE_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'network_interface_config', 'Network interface kernel proc configuration changes.'),
+     ('SERVICE_MANAGEMENT.NETWORK_KERNEL_PARAM_CONFIG', 'SERVICE_MANAGEMENT', NULL, 'network_kernel_param_config', 'Global network kernel parameter configuration changes.'),
      ('ADAM.MODEL_TRAINING', 'ADAM', NULL, 'model_training', 'ADAM intent classifier model training.');
 
 -- Stores daemon handlers used to execute each work request category.
