@@ -242,7 +242,7 @@ record_dns_over_tls_block_rule() {
         )
         SELECT
             $(sql_quote "$iface"), 'ANY', 0, 0, 0, 0, 0,
-            $(sql_quote "$any_addr"), NULL, $(sql_quote "$any_addr"), 853,
+            $(sql_quote "$any_addr"), 0, $(sql_quote "$any_addr"), 853,
             'tcp', NULL, NULL, 'REJECT',
             1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         WHERE NOT EXISTS (
