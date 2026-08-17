@@ -15,6 +15,7 @@ SERVICE_RUNTIME_COLUMNS = {
     "runtime_uptime": "TEXT NOT NULL DEFAULT '-'",
     "runtime_details": "TEXT NOT NULL DEFAULT 'Not synchronized yet'",
     "runtime_updated_at": "TEXT",
+    "autostart_enabled": "INTEGER NOT NULL DEFAULT 1 CHECK(autostart_enabled IN (0, 1))",
 }
 
 
@@ -42,6 +43,19 @@ def service_exists(name: str) -> bool:
         db_path=SERVICES_DB_PATH,
     )
     return row is not None
+
+
+def set_service_autostart_enabled(name: str, enabled: bool) -> None:
+    """Persist whether a managed service should start with supervisord."""
+    ensure_service_runtime_columns()
+    with db.transaction(SERVICES_DB_PATH) as conn:
+        cursor = db.execute_on(
+            conn,
+            "UPDATE services SET autostart_enabled = ? WHERE name = ?",
+            (1 if enabled else 0, name),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError(f"Managed service was not found: {name}")
 
 
 def optional_service_for_daemon(name: str) -> dict[str, Any] | None:

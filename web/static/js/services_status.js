@@ -150,7 +150,7 @@
         if (!services.length) {
             servicesBody.innerHTML = `
                 <tr>
-                    <td colspan="7"><div class="terminal-empty"><span class="prompt">$</span><span>no ArmFirewall services</span></div></td>
+                    <td colspan="4"><div class="terminal-empty"><span class="prompt">$</span><span>no ArmFirewall services</span></div></td>
                 </tr>
             `;
             return;
@@ -161,14 +161,12 @@
                 return `
                     <tr>
                         <td><strong>${HF.escapeHtml(service.name)}</strong></td>
-                        <td>${HF.escapeHtml(service.kind)}</td>
                         <td><span class="status ${statusClass(service.state)}">${HF.escapeHtml(service.state)}</span></td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td>${HF.escapeHtml(service.description)}</td>
+                        <td><span class="service-description" title="${HF.escapeHtml(service.description)}">${HF.escapeHtml(service.description)}</span></td>
                         <td>
-                            <button class="text-button compact primary" type="button" data-service-action="enable" data-service-name="${HF.escapeHtml(service.name)}" ${enabled ? "disabled" : ""}>Enable</button>
-                            <button class="text-button compact danger" type="button" data-service-action="disable" data-service-name="${HF.escapeHtml(service.name)}" ${enabled ? "" : "disabled"}>Disable</button>
+                            ${enabled
+                                ? `<button class="text-button compact danger" type="button" data-service-action="disable" data-service-name="${HF.escapeHtml(service.name)}">Disable</button>`
+                                : `<button class="text-button compact primary" type="button" data-service-action="enable" data-service-name="${HF.escapeHtml(service.name)}">Enable</button>`}
                         </td>
                     </tr>
                 `;
@@ -177,23 +175,30 @@
             const restartAllowed = Boolean(service.restart_allowed);
             const running = String(service.state || "").toUpperCase() === "RUNNING";
             const installed = Boolean(service.installed);
+            const autostartEnabled = Boolean(service.autostart_enabled);
             const protectedBadge = protectedService ? '<span class="status protected">PROTECTED</span>' : "";
-            const startDisabled = protectedService || !installed || running ? "disabled" : "";
-            const stopDisabled = protectedService || !installed || !running ? "disabled" : "";
-            const restartDisabled = (protectedService && !restartAllowed) || !installed || !running ? "disabled" : "";
+            let controls = "";
+
+            if (protectedService) {
+                controls = restartAllowed
+                    ? `<button class="text-button compact" type="button" data-service-action="restart" data-service-name="${HF.escapeHtml(service.name)}" ${installed ? "" : "disabled"}>Restart</button>`
+                    : '<span class="muted">-</span>';
+            } else if (!autostartEnabled) {
+                controls = `<button class="text-button compact primary" type="button" data-service-action="enable" data-service-name="${HF.escapeHtml(service.name)}">Enable</button>`;
+            } else {
+                controls = `
+                    <button class="text-button compact" type="button" data-service-action="start" data-service-name="${HF.escapeHtml(service.name)}" ${!installed || running ? "disabled" : ""}>Start</button>
+                    <button class="text-button compact" type="button" data-service-action="restart" data-service-name="${HF.escapeHtml(service.name)}" ${!installed ? "disabled" : ""}>Restart</button>
+                    <button class="text-button compact danger" type="button" data-service-action="stop" data-service-name="${HF.escapeHtml(service.name)}" ${!installed || !running ? "disabled" : ""}>Stop</button>
+                    <button class="text-button compact danger" type="button" data-service-action="disable" data-service-name="${HF.escapeHtml(service.name)}">Disable</button>
+                `;
+            }
             return `
                 <tr>
                     <td><strong>${HF.escapeHtml(service.name)}</strong> ${protectedBadge}</td>
-                    <td>${HF.escapeHtml(service.kind)}</td>
                     <td><span class="status ${statusClass(service.state)}">${HF.escapeHtml(service.state)}</span></td>
-                    <td>${HF.escapeHtml(service.pid)}</td>
-                    <td>${HF.escapeHtml(service.uptime)}</td>
-                    <td>${HF.escapeHtml(service.description)}</td>
-                    <td>
-                        <button class="text-button compact" type="button" data-service-action="start" data-service-name="${HF.escapeHtml(service.name)}" ${startDisabled}>Start</button>
-                        <button class="text-button compact" type="button" data-service-action="restart" data-service-name="${HF.escapeHtml(service.name)}" ${restartDisabled}>Restart</button>
-                        <button class="text-button compact danger" type="button" data-service-action="stop" data-service-name="${HF.escapeHtml(service.name)}" ${stopDisabled}>Stop</button>
-                    </td>
+                    <td><span class="service-description" title="${HF.escapeHtml(service.description)}">${HF.escapeHtml(service.description)}</span></td>
+                    <td>${controls}</td>
                 </tr>
             `;
         }).join("");
@@ -222,7 +227,7 @@
                 <tr>
                     <td><strong>${HF.escapeHtml(service.display_name)}</strong><br><span class="muted">${HF.escapeHtml(service.name)}</span></td>
                     <td><span class="status ${statusClass(service.state)}">${HF.escapeHtml(service.state)}</span></td>
-                    <td>${HF.escapeHtml(service.description)}</td>
+                    <td><span class="service-description" title="${HF.escapeHtml(service.description)}">${HF.escapeHtml(service.description)}</span></td>
                     <td>
                         <button class="text-button compact primary" type="button" data-optional-service-action="install" data-optional-service-name="${HF.escapeHtml(service.name)}" ${installDisabled}>Install</button>
                         <button class="text-button compact" type="button" data-service-action="start" data-service-name="${HF.escapeHtml(service.name)}" ${startDisabled}>Start</button>

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS services (
     runtime_uptime TEXT NOT NULL DEFAULT '-',
     runtime_details TEXT NOT NULL DEFAULT 'Not synchronized yet',
     runtime_updated_at TEXT,
+    autostart_enabled INTEGER NOT NULL DEFAULT 1 CHECK(autostart_enabled IN (0, 1)),
     enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
     sort_order INTEGER NOT NULL DEFAULT 100,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -36,14 +37,14 @@ INSERT OR IGNORE INTO services (
 ) VALUES
     ('armfirewall-api', 'armfirewall-api', 'web', 'ArmFirewall HTTPS API and web GUI.', 'main', 1, 1, 10),
     ('armfirewall-monitord', 'armfirewall-monitord', 'daemon', 'RRD monitoring collector and graph generator.', 'main', 0, 0, 30),
-    ('armfirewall-collectord', 'armfirewall-collectord', 'daemon', 'Operating-system state collector for web GUI snapshots.', 'main', 1, 0, 35),
+    ('armfirewall-collectord', 'armfirewall-collectord', 'daemon', 'Operating-system state collector for web GUI snapshots.', 'main', 1, 1, 35),
     ('armfirewall-workreqd', 'armfirewall-workreqd', 'daemon', 'Work request executor for operating system changes.', 'main', 1, 0, 40),
     ('armfirewall-adam', 'armfirewall-adam', 'ai', 'ADAM AI menu and copilot feature.', 'main', 0, 0, 45),
     ('armfirewall-linkfailover', 'armfirewall-linkfailover', 'daemon', 'Ping-based default route failover daemon.', 'main', 0, 0, 50);
 
 INSERT OR IGNORE INTO services (
     name, display_name, kind, description, service_group,
-    protected, restart_allowed, package_name, binary_path, supervisor_program,
+    protected, restart_allowed, autostart_enabled, package_name, binary_path, supervisor_program,
     sort_order
 ) VALUES
     (
@@ -52,6 +53,7 @@ INSERT OR IGNORE INTO services (
         'dns-dhcp',
         'DNS/DHCP service.',
         'optional',
+        0,
         0,
         0,
         'dnsmasq',
@@ -82,6 +84,7 @@ stderr_logfile_backups=5
         'optional',
         0,
         0,
+        0,
         'squid',
         '/usr/sbin/squid',
         '[program:squid]
@@ -108,6 +111,7 @@ stderr_logfile_backups=5
         'routing',
         'Dynamic routing service.',
         'optional',
+        0,
         0,
         0,
         'bird',
@@ -139,6 +143,7 @@ stderr_logfile_backups=5
         'optional',
         0,
         0,
+        0,
         'adguardhome',
         '{root}/daemons/adguardhome/AdGuardHome',
         '[program:adguardhome]
@@ -165,6 +170,7 @@ stderr_logfile_backups=5
         'vpn',
         'IPsec VPN service.',
         'optional',
+        0,
         0,
         0,
         'libreswan',

@@ -44,17 +44,14 @@
             <thead>
                 <tr>
                     <th>Service</th>
-                    <th>Kind</th>
                     <th>State</th>
-                    <th>PID</th>
-                    <th>Uptime</th>
                     <th>Description</th>
-                    <th>Ops</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="armfirewall-services-body">
                 <tr>
-                    <td colspan="7">
+                    <td colspan="4">
                         <div class="terminal-empty"><span class="prompt">$</span><span>loading ArmFirewall services</span></div>
                     </td>
                 </tr>
@@ -75,7 +72,7 @@
                     <th>Service</th>
                     <th>State</th>
                     <th>Description</th>
-                    <th>Ops</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="optional-services-body">
@@ -149,5 +146,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_status.js') }}?v=20260728-adam-feature-toggle" defer></script>
+<script src="{{ url_for('static', path='/js/services_status.js') }}?v=20260819-adam-description-column" defer></script>
 {% endblock %}

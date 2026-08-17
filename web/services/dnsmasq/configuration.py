@@ -17,7 +17,7 @@ def default_config() -> dict[str, Any]:
         "upstream_dns_servers": ["1.1.1.1", "8.8.8.8"],
         "domain_upstreams": [],
         "interface_configs": [],
-        "pihole_upstream_enabled": False,
+        "adguardhome_upstream_enabled": False,
         "dhcp_range_start": "",
         "dhcp_range_end": "",
         "lease_time": "12h",
@@ -42,7 +42,7 @@ def default_interface_config(iface_name: str) -> dict[str, Any]:
         "local_domain": "armfirewall.local",
         "upstream_dns_servers": ["1.1.1.1", "8.8.8.8"],
         "domain_upstreams": [],
-        "pihole_upstream_enabled": False,
+        "adguardhome_upstream_enabled": False,
         "cache_size": 1000,
         "expand_hosts": DNSMASQ_BOOL_DEFAULTS["expand_hosts"],
         "domain_needed": DNSMASQ_BOOL_DEFAULTS["domain_needed"],
@@ -125,8 +125,8 @@ def parse_dnsmasq_config(lines: list[str]) -> dict[str, Any]:
                 interfaces = [DNSMASQ_ALL_INTERFACES_TOKEN]
             known.add(index)
             continue
-        if line.startswith("# armfirewall-pihole-upstream="):
-            config["pihole_upstream_enabled"] = line.split("=", 1)[1].strip() == "1"
+        if line.startswith("# armfirewall-adguardhome-upstream="):
+            config["adguardhome_upstream_enabled"] = line.split("=", 1)[1].strip() == "1"
             known.add(index)
             continue
         if not line or line.startswith("#"):
@@ -262,7 +262,7 @@ def render_config(config: dict[str, Any]) -> str:
         ):
             if enabled:
                 lines.append(directive)
-        if not config["pihole_upstream_enabled"]:
+        if not config["adguardhome_upstream_enabled"]:
             for server in config["upstream_dns_servers"]:
                 lines.append(f"server={server}")
             for domain_item in config["domain_upstreams"]:

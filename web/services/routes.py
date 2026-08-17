@@ -112,6 +112,12 @@ async def api_dnsmasq_add_static_lease(request: Request) -> dict[str, Any]:
     return services_dnsmasq_api.add_static_lease(await request.json())
 
 
+@router.delete("/api/services/dnsmasq/static-leases")
+async def api_dnsmasq_remove_static_lease(request: Request) -> dict[str, Any]:
+    """Queue removal of a persistent DHCP reservation and DNSMasq restart."""
+    return services_dnsmasq_api.remove_static_lease(await request.json())
+
+
 @router.get("/api/services/adguardhome")
 def api_adguardhome_config() -> dict[str, Any]:
     """Return AdGuard Home configuration and service status."""

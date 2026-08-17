@@ -29,7 +29,7 @@ def ensure_dnsmasq_schema(conn: db.Connection) -> None:
         "dns_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (dns_enabled IN (0, 1))",
         "local_domain": "TEXT NOT NULL DEFAULT 'armfirewall.local'",
         "upstream_dns_servers_json": "TEXT NOT NULL DEFAULT '[\"1.1.1.1\",\"8.8.8.8\"]'",
-        "pihole_upstream_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (pihole_upstream_enabled IN (0, 1))",
+        "adguardhome_upstream_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (adguardhome_upstream_enabled IN (0, 1))",
         "cache_size": "INTEGER NOT NULL DEFAULT 1000 CHECK (cache_size BETWEEN 0 AND 1000000)",
         "expand_hosts": "INTEGER NOT NULL DEFAULT 1 CHECK (expand_hosts IN (0, 1))",
         "domain_needed": "INTEGER NOT NULL DEFAULT 1 CHECK (domain_needed IN (0, 1))",
@@ -99,7 +99,7 @@ def load_config_from_db() -> dict[str, Any] | None:
             conn,
             """
             SELECT dns_enabled, local_domain, upstream_dns_servers_json,
-                   pihole_upstream_enabled, cache_size, expand_hosts,
+                   adguardhome_upstream_enabled, cache_size, expand_hosts,
                    domain_needed, bogus_priv, extra_options
             FROM dnsmasq_settings
             WHERE id = 1
@@ -117,7 +117,7 @@ def load_config_from_db() -> dict[str, Any] | None:
             conn,
             """
             SELECT id, iface, dns_enabled, local_domain, upstream_dns_servers_json,
-                   pihole_upstream_enabled, cache_size, expand_hosts, domain_needed,
+                   adguardhome_upstream_enabled, cache_size, expand_hosts, domain_needed,
                    bogus_priv, dhcp_enabled, dhcp_range_start, dhcp_range_end,
                    lease_time, dhcp_authoritative, ipv6_ra_enabled,
                    ipv6_ra_names, ipv6_ra_lifetime
@@ -163,7 +163,7 @@ def load_config_from_db() -> dict[str, Any] | None:
                         }
                         for upstream in upstream_rows
                     ],
-                    "pihole_upstream_enabled": bool_from_db(row["pihole_upstream_enabled"]),
+                    "adguardhome_upstream_enabled": bool_from_db(row["adguardhome_upstream_enabled"]),
                     "cache_size": int(row["cache_size"]),
                     "expand_hosts": bool_from_db(row["expand_hosts"]),
                     "domain_needed": bool_from_db(row["domain_needed"]),
@@ -197,7 +197,7 @@ def load_config_from_db() -> dict[str, Any] | None:
                     }
                     for row in global_upstream_rows
                 ],
-                "pihole_upstream_enabled": bool_from_db(settings["pihole_upstream_enabled"]),
+                "adguardhome_upstream_enabled": bool_from_db(settings["adguardhome_upstream_enabled"]),
                 "cache_size": int(settings["cache_size"]),
                 "expand_hosts": bool_from_db(settings["expand_hosts"]),
                 "domain_needed": bool_from_db(settings["domain_needed"]),
@@ -213,7 +213,7 @@ def load_config_from_db() -> dict[str, Any] | None:
                 "local_domain": legacy_dns["local_domain"],
                 "upstream_dns_servers": legacy_dns["upstream_dns_servers"],
                 "domain_upstreams": legacy_dns["domain_upstreams"],
-                "pihole_upstream_enabled": legacy_dns["pihole_upstream_enabled"],
+                "adguardhome_upstream_enabled": legacy_dns["adguardhome_upstream_enabled"],
                 "cache_size": legacy_dns["cache_size"],
                 "expand_hosts": legacy_dns["expand_hosts"],
                 "domain_needed": legacy_dns["domain_needed"],
@@ -245,7 +245,7 @@ def save_config_to_db(config: dict[str, Any]) -> int:
             """
             INSERT INTO dnsmasq_settings (
                 id, dns_enabled, local_domain, upstream_dns_servers_json,
-                pihole_upstream_enabled, cache_size, expand_hosts, domain_needed,
+                adguardhome_upstream_enabled, cache_size, expand_hosts, domain_needed,
                 bogus_priv, extra_options, pending_apply, updated_at
             )
             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
@@ -253,7 +253,7 @@ def save_config_to_db(config: dict[str, Any]) -> int:
                 dns_enabled = excluded.dns_enabled,
                 local_domain = excluded.local_domain,
                 upstream_dns_servers_json = excluded.upstream_dns_servers_json,
-                pihole_upstream_enabled = excluded.pihole_upstream_enabled,
+                adguardhome_upstream_enabled = excluded.adguardhome_upstream_enabled,
                 cache_size = excluded.cache_size,
                 expand_hosts = excluded.expand_hosts,
                 domain_needed = excluded.domain_needed,
@@ -266,7 +266,7 @@ def save_config_to_db(config: dict[str, Any]) -> int:
                 int(config["dns_enabled"]),
                 config["local_domain"],
                 json.dumps(config["upstream_dns_servers"], sort_keys=True),
-                int(config["pihole_upstream_enabled"]),
+                int(config["adguardhome_upstream_enabled"]),
                 int(config["cache_size"]),
                 int(config["expand_hosts"]),
                 int(config["domain_needed"]),
@@ -292,7 +292,7 @@ def save_config_to_db(config: dict[str, Any]) -> int:
                 """
                 INSERT INTO dnsmasq_interface_configs (
                     iface, dns_enabled, local_domain, upstream_dns_servers_json,
-                    pihole_upstream_enabled, cache_size, expand_hosts, domain_needed,
+                    adguardhome_upstream_enabled, cache_size, expand_hosts, domain_needed,
                     bogus_priv, dhcp_enabled, dhcp_range_start, dhcp_range_end,
                     lease_time, dhcp_authoritative, ipv6_ra_enabled,
                     ipv6_ra_names, ipv6_ra_lifetime, enabled
@@ -304,7 +304,7 @@ def save_config_to_db(config: dict[str, Any]) -> int:
                     int(item["dns_enabled"]),
                     item["local_domain"],
                     json.dumps(item["upstream_dns_servers"], sort_keys=True),
-                    int(item["pihole_upstream_enabled"]),
+                    int(item["adguardhome_upstream_enabled"]),
                     int(item["cache_size"]),
                     int(item["expand_hosts"]),
                     int(item["domain_needed"]),
@@ -370,4 +370,3 @@ def save_config_to_db(config: dict[str, Any]) -> int:
         )
 
     return work_request_id
-

@@ -7,6 +7,7 @@ from .service import (
     get_dhcp_leases,
     get_dnsmasq_config,
     get_dnsmasq_work_requests,
+    remove_static_lease,
     save_dnsmasq_config,
     test_dnsmasq_config,
 )
@@ -14,5 +15,5 @@ from .service import (
 __all__ = [
     "add_static_lease", "get_dhcp_leases", "get_dnsmasq_config",
     "get_dnsmasq_work_requests", "load_config_from_db", "render_config",
-    "save_dnsmasq_config", "test_dnsmasq_config", "validate_dnsmasq_syntax",
+    "remove_static_lease", "save_dnsmasq_config", "test_dnsmasq_config", "validate_dnsmasq_syntax",
 ]

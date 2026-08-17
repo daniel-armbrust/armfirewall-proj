@@ -12,13 +12,21 @@ def service_status_payload(service: dict[str, Any], *, optional: bool = False) -
     feature_toggle = service["name"] == "armfirewall-adam"
     enabled = bool(service.get("enabled"))
     installed = enabled if feature_toggle else bool(service.get("runtime_installed"))
+    autostart_enabled = bool(service.get("autostart_enabled"))
+    state = (
+        "ENABLED" if feature_toggle and enabled
+        else "DISABLED" if feature_toggle
+        else "DISABLED" if not optional and not autostart_enabled
+        else service.get("runtime_state") if installed
+        else "NOT INSTALLED"
+    )
 
     payload = {
         "name": service["name"],
         "kind": service["kind"],
         "description": service["description"],
         "installed": installed,
-        "state": "ENABLED" if feature_toggle and enabled else "DISABLED" if feature_toggle else service.get("runtime_state") if installed else "NOT INSTALLED",
+        "state": state,
         "pid": "-" if feature_toggle else service.get("runtime_pid") if installed else "-",
         "uptime": "-" if feature_toggle else service.get("runtime_uptime") if installed else "-",
         "details": "ADAM menu and copilot are enabled." if feature_toggle and enabled else "ADAM menu and copilot are disabled." if feature_toggle else service.get("runtime_details") if installed else "Missing from supervisord.conf",
@@ -33,6 +41,7 @@ def service_status_payload(service: dict[str, Any], *, optional: bool = False) -
     else:
         payload["protected"] = bool(service["protected"])
         payload["restart_allowed"] = bool(service.get("restart_allowed"))
+        payload["autostart_enabled"] = autostart_enabled
 
     return payload
 
@@ -100,6 +109,12 @@ def service_enabled(name: str) -> bool:
     return bool(service and service.get("enabled"))
 
 
+def service_autostart_enabled(name: str) -> bool:
+    """Return whether a main service is enabled to start with supervisord."""
+    service = service_by_name(name)
+    return bool(service and service.get("autostart_enabled"))
+
+
 def get_expected_service(name: str) -> dict[str, Any]:
     """Return expected service metadata by name."""
     service = service_by_name(name)
@@ -144,6 +159,13 @@ def control_service(name: str, action: str) -> dict[str, Any]:
     if service.get("service_group") == "main":
         if service["protected"] and not (action == "restart" and service.get("restart_allowed")):
             raise ValueError("Protected services cannot be controlled from the GUI.")
+
+        if not service["protected"]:
+            autostart_enabled = bool(service.get("autostart_enabled"))
+            if not autostart_enabled and action != "enable":
+                raise ValueError("Enable the service before controlling it.")
+            if autostart_enabled and action == "enable":
+                raise ValueError("Service is already enabled.")
         
         payload = {
             "service_name": service["name"],

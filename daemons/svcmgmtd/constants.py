@@ -14,4 +14,5 @@ PROTECTED_SERVICES = {
 
 RESTARTABLE_PROTECTED_SERVICES = {
     "armfirewall-api",
+    "armfirewall-collectord",
 }

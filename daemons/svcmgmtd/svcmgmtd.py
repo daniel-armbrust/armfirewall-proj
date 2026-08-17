@@ -49,8 +49,12 @@ def main() -> int:
         service = validate_control_service(payload, args.action_name)
         control_service(service, args.action_name)
     elif args.action_name in {"enable", "disable"}:
-        service_name = validate_feature_toggle(payload)
-        set_feature_enabled(service_name, enabled=args.action_name == "enable")
+        if str(payload.get("service_name") or "").strip() == "armfirewall-adam":
+            service_name = validate_feature_toggle(payload)
+            set_feature_enabled(service_name, enabled=args.action_name == "enable")
+        else:
+            service = validate_control_service(payload, args.action_name)
+            control_service(service, args.action_name)
     else:
         raise RuntimeError(f"Unsupported service management action: {args.action_name}")
     

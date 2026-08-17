@@ -24,7 +24,7 @@ from web.services import routes as service_routes
 from web.settings import routes as settings_routes
 from web.tools import routes as tools_routes
 from web.workrequests import routes as workrequest_routes
-from web.services.api import service_installed
+from web.services.api import service_autostart_enabled, service_installed
 
 
 app = FastAPI(title="ArmFirewall")
@@ -36,6 +36,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/rrd-img", StaticFiles(directory=RRD_IMG_DIR), name="rrd_img")
 
 app.state.service_installed = service_installed
+app.state.service_autostart_enabled = service_autostart_enabled
 
 app.include_router(login_routes.router)
 app.include_router(dashboard_routes.router)

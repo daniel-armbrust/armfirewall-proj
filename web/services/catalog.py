@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from core import db
-from core.constants import SERVICES_DB_PATH
+from core.constants import SERVICES_DB_PATH, SUPERVISOR_CONF
 
 
 PUBLIC_SERVICE_COLUMNS = """
@@ -27,12 +27,54 @@ RUNTIME_SERVICE_COLUMNS = """
     runtime_pid,
     runtime_uptime,
     runtime_details,
-    runtime_updated_at
+    runtime_updated_at,
+    autostart_enabled
 """
+
+
+def ensure_service_control_columns() -> None:
+    """Ensure the persisted Supervisor enablement state is available."""
+    with db.transaction(SERVICES_DB_PATH) as conn:
+        columns = {str(row["name"]) for row in db.fetch_all_on(conn, "PRAGMA table_info(services)")}
+        if "autostart_enabled" not in columns:
+            db.execute_on(
+                conn,
+                "ALTER TABLE services ADD COLUMN autostart_enabled INTEGER NOT NULL DEFAULT 1 CHECK(autostart_enabled IN (0, 1))",
+            )
+            for service_name, enabled in configured_supervisor_autostarts().items():
+                db.execute_on(
+                    conn,
+                    "UPDATE services SET autostart_enabled = ? WHERE name = ?",
+                    (1 if enabled else 0, service_name),
+                )
+
+        db.execute_on(
+            conn,
+            "UPDATE services SET restart_allowed = 1 WHERE name = 'armfirewall-collectord'",
+        )
+
+
+def configured_supervisor_autostarts() -> dict[str, bool]:
+    """Read managed program autostart values from supervisord.conf."""
+    if not SUPERVISOR_CONF.exists():
+        return {}
+
+    values: dict[str, bool] = {}
+    service_name: str | None = None
+    for raw_line in SUPERVISOR_CONF.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("[program:") and line.endswith("]"):
+            service_name = line[len("[program:"):-1]
+        elif line.startswith("["):
+            service_name = None
+        elif service_name and line.startswith("autostart="):
+            values[service_name] = line.partition("=")[2].strip().lower() == "true"
+    return values
 
 
 def services_table_columns() -> set[str]:
     """Return the current services table columns."""
+    ensure_service_control_columns()
     with db.connection(SERVICES_DB_PATH) as conn:
         return {str(row["name"]) for row in db.fetch_all_on(conn, "PRAGMA table_info(services)")}
 
@@ -47,6 +89,7 @@ def service_runtime_columns_available() -> bool:
         "runtime_uptime",
         "runtime_details",
         "runtime_updated_at",
+        "autostart_enabled",
     }.issubset(columns)
 
 

@@ -15,6 +15,7 @@ from core.constants import (
 )
 
 from .constants import LOG_SOURCE
+from .catalog import set_service_autostart_enabled
 from .models import ControllableService, OptionalService
 from .commons import run_bounded_command
 from .packages import (
@@ -99,7 +100,7 @@ def uninstall_service(service: OptionalService) -> None:
 
 
 def control_service(service: ControllableService, action: str) -> None:
-    """Start, stop, or restart one ArmFirewall supervisord service."""
+    """Apply one allowed runtime or enablement action to a managed service."""
     service_name = service.name
 
     ensure_dnsmasq_lease_directory(service_name)
@@ -109,29 +110,30 @@ def control_service(service: ControllableService, action: str) -> None:
     
     if action == "start":
         if state == "RUNNING":
-            set_supervisor_program_autostart(service_name, True)
             logger.log(f"Service {service_name} is already running.", source=LOG_SOURCE)
             return
         supervisor_command("start", service_name, timeout=60)
-        set_supervisor_program_autostart(service_name, True)
     elif action == "stop":
         if state != "RUNNING":
-            set_supervisor_program_autostart(service_name, False)
             logger.log(f"Service {service_name} is already stopped.", source=LOG_SOURCE)
             return
         supervisor_command("stop", service_name, timeout=60)
-        set_supervisor_program_autostart(service_name, False)
     elif action == "restart":
         if service_name == "armfirewall-api":
             validate_api_restart_readiness(state)
             restart_service(service_name)
-            set_supervisor_program_autostart(service_name, True)
         elif state == "RUNNING":
             restart_service(service_name)
-            set_supervisor_program_autostart(service_name, True)
         else:
             supervisor_command("start", service_name, timeout=60)
-            set_supervisor_program_autostart(service_name, True)
+    elif action == "enable":
+        set_supervisor_program_autostart(service_name, True)
+        set_service_autostart_enabled(service_name, True)
+    elif action == "disable":
+        if state == "RUNNING":
+            supervisor_command("stop", service_name, timeout=60)
+        set_supervisor_program_autostart(service_name, False)
+        set_service_autostart_enabled(service_name, False)
     else:
         raise RuntimeError(f"Unsupported service control action: {action}")
 

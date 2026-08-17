@@ -37,6 +37,7 @@
     const staticLeaseApply = document.querySelector("#dnsmasq-static-lease-apply");
     const WORK_REQUESTS_POLL_MS = 5000;
     const DHCP_LEASES_POLL_MS = 5000;
+    const DHCP_LEASE_SEARCH_INVALID_CHARS_RE = /[^a-zA-Z0-9.:-]/g;
     const ALL_INTERFACES = "__all__";
     const ALL_INTERFACES_LABEL = "Global configuration applied to all interfaces";
     const DNS_DOMAIN_LABEL_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
@@ -125,9 +126,9 @@
         return element ? element.checked : false;
     }
 
-    function syncPiholeUpstreamState() {
+    function syncAdGuardHomeUpstreamState() {
         const upstream = document.querySelector("#dnsmasq-upstream-dns");
-        const enabled = checkedValue("#dnsmasq-pihole-upstream");
+        const enabled = checkedValue("#dnsmasq-adguardhome-upstream");
         if (upstream) {
             upstream.disabled = enabled;
             upstream.classList.toggle("is-disabled", enabled);
@@ -305,7 +306,7 @@
             upstream_dns_servers: [],
             domain_upstreams: [],
             forwarded_domains_enabled: false,
-            pihole_upstream_enabled: false,
+            adguardhome_upstream_enabled: false,
             cache_size: 1000,
             expand_hosts: true,
             domain_needed: true,
@@ -339,7 +340,7 @@
             upstream_dns_servers: [...(currentConfig.upstream_dns_servers || ["1.1.1.1", "8.8.8.8"])],
             domain_upstreams: (currentConfig.domain_upstreams || []).map((item) => ({domain: item.domain, upstreams: [...(item.upstreams || [])]})),
             forwarded_domains_enabled: Boolean(currentConfig.forwarded_domains_enabled || (currentConfig.domain_upstreams || []).length),
-            pihole_upstream_enabled: Boolean(currentConfig.pihole_upstream_enabled),
+            adguardhome_upstream_enabled: Boolean(currentConfig.adguardhome_upstream_enabled),
             cache_size: currentConfig.cache_size || 1000,
             expand_hosts: currentConfig.expand_hosts !== false,
             domain_needed: currentConfig.domain_needed !== false,
@@ -349,7 +350,7 @@
 
     function updateGlobalDnsConfig(field, value) {
         currentConfig[field] = value;
-        if (field === "pihole_upstream_enabled" && value) {
+        if (field === "adguardhome_upstream_enabled" && value) {
             currentConfig.domain_upstreams = [];
             currentConfig.forwarded_domains_enabled = false;
         }
@@ -359,7 +360,7 @@
     function updateInterfaceConfig(name, field, value) {
         const config = configForInterface(name);
         config[field] = value;
-        if (field === "pihole_upstream_enabled" && value) {
+        if (field === "adguardhome_upstream_enabled" && value) {
             config.domain_upstreams = [];
         }
         interfaceConfigs = interfaceConfigs.filter((item) => item.iface !== name).concat(config);
@@ -415,7 +416,7 @@
             return;
         }
         const config = globalDnsConfig();
-        const forwardedEnabled = !config.pihole_upstream_enabled && (Boolean(config.forwarded_domains_enabled) || (config.domain_upstreams || []).length > 0);
+        const forwardedEnabled = !config.adguardhome_upstream_enabled && (Boolean(config.forwarded_domains_enabled) || (config.domain_upstreams || []).length > 0);
         dnsScopeList.innerHTML = `
             <section class="dnsmasq-scope-card" data-dnsmasq-scope="dns-global">
                 <div class="dnsmasq-scope-head">
@@ -461,14 +462,14 @@
                     </label>
                     <label class="field wide">
                         <span>Default upstream DNS servers</span>
-                        <textarea data-global-dns-field="upstream_dns_servers" rows="3" spellcheck="false"${config.pihole_upstream_enabled ? " disabled" : ""}>${fieldValue((config.upstream_dns_servers || []).join("\n"))}</textarea>
+                        <textarea data-global-dns-field="upstream_dns_servers" rows="3" spellcheck="false"${config.adguardhome_upstream_enabled ? " disabled" : ""}>${fieldValue((config.upstream_dns_servers || []).join("\n"))}</textarea>
                     </label>
                     <label class="check-line wide">
-                        <input data-global-dns-field="pihole_upstream_enabled" type="checkbox"${checkedAttr(config.pihole_upstream_enabled)}>
+                        <input data-global-dns-field="adguardhome_upstream_enabled" type="checkbox"${checkedAttr(config.adguardhome_upstream_enabled)}>
                         <span>Enable DNS Filtering Upstream?</span>
                     </label>
                     <label class="check-line wide">
-                        <input data-global-dns-field="forwarded_domains_enabled" type="checkbox"${checkedAttr(forwardedEnabled)}${config.pihole_upstream_enabled ? " disabled" : ""}>
+                        <input data-global-dns-field="forwarded_domains_enabled" type="checkbox"${checkedAttr(forwardedEnabled)}${config.adguardhome_upstream_enabled ? " disabled" : ""}>
                         <span>Enable forwarded domains?</span>
                     </label>
                     <label class="field dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
@@ -912,8 +913,8 @@
         setValue("#dnsmasq-cache-size", config.cache_size);
         setValue("#dnsmasq-upstream-dns", (config.upstream_dns_servers || []).join("\n"));
         renderDomainUpstreams(config.domain_upstreams || []);
-        setChecked("#dnsmasq-pihole-upstream", config.pihole_upstream_enabled);
-        syncPiholeUpstreamState();
+        setChecked("#dnsmasq-adguardhome-upstream", config.adguardhome_upstream_enabled);
+        syncAdGuardHomeUpstreamState();
         setValue("#dnsmasq-dhcp-start", config.dhcp_range_start);
         setValue("#dnsmasq-dhcp-end", config.dhcp_range_end);
         setValue("#dnsmasq-lease-time", config.lease_time);
@@ -1035,7 +1036,9 @@
                 <td>${HF.escapeHtml(lease.hostname)}</td>
                 <td>${HF.escapeHtml(lease.client_id)}</td>
                 <td>${HF.escapeHtml(lease.expires_at)}</td>
-                <td><button class="text-button compact" type="button" data-dnsmasq-make-static-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-make-static-ip="${HF.escapeHtml(lease.ip_address)}" ${lease.is_static ? "disabled" : ""}>${lease.is_static ? "Static" : "Make Static"}</button></td>
+                <td>${lease.is_static
+                    ? `<button class="text-button compact danger" type="button" data-dnsmasq-remove-static-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-remove-static-ip="${HF.escapeHtml(lease.ip_address)}">Remove Static</button>`
+                    : `<button class="text-button compact" type="button" data-dnsmasq-make-static-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-make-static-ip="${HF.escapeHtml(lease.ip_address)}">Make Static</button>`}</td>
             </tr>
         `).join("");
     }
@@ -1091,6 +1094,17 @@
     async function queueStaticLease(macAddress, ipAddress) {
         await HF.fetchJson("/api/services/dnsmasq/static-leases", {
             method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({mac_address: macAddress, ip_address: ipAddress}),
+        });
+        showWorkRequests();
+        await loadWorkRequests();
+        await loadDnsmasq();
+    }
+
+    async function removeStaticLease(macAddress, ipAddress) {
+        await HF.fetchJson("/api/services/dnsmasq/static-leases", {
+            method: "DELETE",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({mac_address: macAddress, ip_address: ipAddress}),
         });
@@ -1167,7 +1181,7 @@
             local_domain: dnsConfig.local_domain || "",
             upstream_dns_servers: dnsConfig.upstream_dns_servers || [],
             domain_upstreams: dnsConfig.domain_upstreams || [],
-            pihole_upstream_enabled: Boolean(dnsConfig.pihole_upstream_enabled),
+            adguardhome_upstream_enabled: Boolean(dnsConfig.adguardhome_upstream_enabled),
             dhcp_range_start: "",
             dhcp_range_end: "",
             lease_time: "",
@@ -1249,7 +1263,7 @@
             renderScopeCards();
             return true;
         }
-        if (field === "pihole_upstream_enabled") {
+        if (field === "adguardhome_upstream_enabled") {
             if (scopeFieldValue(element, field)) {
                 updateInterfaceConfig(iface, "forwarded_domains_enabled", false);
             }
@@ -1274,7 +1288,7 @@
         }
         updateGlobalDnsConfig(field, scopeFieldValue(element, field));
         setDirty(true);
-        if (field === "pihole_upstream_enabled") {
+        if (field === "adguardhome_upstream_enabled") {
             renderScopeCards();
         }
         return true;
@@ -1392,7 +1406,7 @@
                 return;
             }
             setDirty(true);
-            syncPiholeUpstreamState();
+            syncAdGuardHomeUpstreamState();
             syncCurrentConfigFromForm();
             renderScopeCards();
         });
@@ -1420,6 +1434,14 @@
             const macAddress = makeStaticButton.dataset.dnsmasqMakeStaticMac;
             const ipAddress = makeStaticButton.dataset.dnsmasqMakeStaticIp;
             openActionModal("make-static", "Make this DHCP lease static", () => queueStaticLease(macAddress, ipAddress));
+            return;
+        }
+
+        const removeStaticButton = event.target.closest("[data-dnsmasq-remove-static-mac]");
+        if (removeStaticButton) {
+            const macAddress = removeStaticButton.dataset.dnsmasqRemoveStaticMac;
+            const ipAddress = removeStaticButton.dataset.dnsmasqRemoveStaticIp;
+            openActionModal("remove-static", "Remove this static DHCP address", () => removeStaticLease(macAddress, ipAddress));
             return;
         }
 
@@ -1501,7 +1523,12 @@
     }
 
     if (dhcpLeasesSearch) {
-        dhcpLeasesSearch.addEventListener("input", () => renderDhcpLeases({leases: dhcpLeases, dhcp_active: true}));
+        dhcpLeasesSearch.addEventListener("input", () => {
+            dhcpLeasesSearch.value = dhcpLeasesSearch.value
+                .replace(DHCP_LEASE_SEARCH_INVALID_CHARS_RE, "")
+                .slice(0, 255);
+            renderDhcpLeases({leases: dhcpLeases, dhcp_active: true});
+        });
     }
 
     if (interfacePicker && interfaceAddButton) {
