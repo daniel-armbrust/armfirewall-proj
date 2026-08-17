@@ -196,26 +196,20 @@ record_masquerade_rule() {
             );"
 }
 
-# Apply IPv4 FORWARD rules required for LAN to WAN routing.
+# Apply the IPv4 FORWARD rule required for new LAN to WAN connections.
 apply_ipv4_router_forward_rules() {
-    log "Applying IPv4 router mode FORWARD rules from ${LAN_IFACE} to ${WAN_IFACE}."
+    log "Applying IPv4 router mode FORWARD rule from ${LAN_IFACE} to ${WAN_IFACE}."
 
     iptables -t filter -C FORWARD -i "$LAN_IFACE" -o "$WAN_IFACE" -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null || \
     iptables -t filter -A FORWARD -i "$LAN_IFACE" -o "$WAN_IFACE" -m conntrack --ctstate NEW -j ACCEPT
-
-    iptables -t filter -C FORWARD -i "$WAN_IFACE" -o "$LAN_IFACE" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-    iptables -t filter -A FORWARD -i "$WAN_IFACE" -o "$LAN_IFACE" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 }
 
-# Apply IPv6 FORWARD rules required for LAN to WAN routing.
+# Apply the IPv6 FORWARD rule required for new LAN to WAN connections.
 apply_ipv6_router_forward_rules() {
-    log "Applying IPv6 router mode FORWARD rules from ${LAN_IFACE} to ${WAN_IFACE}."
+    log "Applying IPv6 router mode FORWARD rule from ${LAN_IFACE} to ${WAN_IFACE}."
 
     ip6tables -t filter -C FORWARD -i "$LAN_IFACE" -o "$WAN_IFACE" -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null || \
     ip6tables -t filter -A FORWARD -i "$LAN_IFACE" -o "$WAN_IFACE" -m conntrack --ctstate NEW -j ACCEPT
-
-    ip6tables -t filter -C FORWARD -i "$WAN_IFACE" -o "$LAN_IFACE" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-    ip6tables -t filter -A FORWARD -i "$WAN_IFACE" -o "$LAN_IFACE" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 }
 
 # Register one router mode FORWARD rule in SQLite.
@@ -259,9 +253,7 @@ record_router_forward_rule() {
 # Register the router mode FORWARD rules in SQLite.
 record_router_forward_rules() {
     record_router_forward_rule "$IPV4_FILTER_RULES_DB" "0.0.0.0/0" "$LAN_IFACE" "$WAN_IFACE" 1 0 0
-    record_router_forward_rule "$IPV4_FILTER_RULES_DB" "0.0.0.0/0" "$WAN_IFACE" "$LAN_IFACE" 0 1 1
     record_router_forward_rule "$IPV6_FILTER_RULES_DB" "::/0" "$LAN_IFACE" "$WAN_IFACE" 1 0 0
-    record_router_forward_rule "$IPV6_FILTER_RULES_DB" "::/0" "$WAN_IFACE" "$LAN_IFACE" 0 1 1
 }
 
 # Queue a full FORWARD chain reapply after router-mode rules are persisted.
