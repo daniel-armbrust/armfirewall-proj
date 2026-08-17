@@ -336,7 +336,7 @@ def create_routing_table(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def create_route(payload: dict[str, Any]) -> dict[str, Any]:
-    """Create a route entry without applying it to the operating system."""
+    """Create a route entry and queue its operating system application."""
     ensure_policy_db()
     item = sanitize_route_payload(payload)
     with db.transaction(POLICY_DB_PATH) as conn:
@@ -356,11 +356,21 @@ def create_route(payload: dict[str, Any]) -> dict[str, Any]:
                 item["protocol"], item["onlink"], item["protected"], item["enabled"],
             ),
         )
-    return {"route_id": int(cursor.lastrowid), "status": "saved"}
+    route_id = int(cursor.lastrowid)
+    work_request_id = enqueue_policy_work_request(
+        item["addr_family"],
+        policy_work_request_payload(
+            item["addr_family"],
+            table_ids=pending_table_ids(item["table_id"]),
+            route_ids=[route_id] if item["enabled"] == 1 else [],
+            disable_route_ids=[route_id] if item["enabled"] == 0 else [],
+        ),
+    )
+    return {"route_id": route_id, "work_request_id": work_request_id, "status": "queued"}
 
 
 def create_rule(payload: dict[str, Any]) -> dict[str, Any]:
-    """Create a routing rule entry without applying it to the operating system."""
+    """Create a routing rule entry and queue its operating system application."""
     ensure_policy_db()
     item = sanitize_rule_payload(payload)
     with db.transaction(POLICY_DB_PATH) as conn:
@@ -382,7 +392,18 @@ def create_rule(payload: dict[str, Any]) -> dict[str, Any]:
                 item["table_id"], item["protected"], item["enabled"],
             ),
         )
-    return {"rule_id": int(cursor.lastrowid), "status": "saved"}
+    rule_id = int(cursor.lastrowid)
+    table_ids = pending_table_ids(item["table_id"]) if item["action"] == "lookup" and item["table_id"] is not None else []
+    work_request_id = enqueue_policy_work_request(
+        item["addr_family"],
+        policy_work_request_payload(
+            item["addr_family"],
+            table_ids=table_ids,
+            rule_ids=[rule_id] if item["enabled"] == 1 else [],
+            disable_rule_ids=[rule_id] if item["enabled"] == 0 else [],
+        ),
+    )
+    return {"rule_id": rule_id, "work_request_id": work_request_id, "status": "queued"}
 
 
 def mark_pending_delete(table: str, item_id: int) -> dict[str, Any]:
@@ -461,6 +482,43 @@ def enqueue_policy_work_request(family: str, payload: dict[str, Any]) -> int:
             (request_id, f"Queued apply for {category_name}."),
         )
     return request_id
+
+
+def policy_work_request_payload(family: str, **items: list[int]) -> dict[str, Any]:
+    """Build a complete Policy Routing apply payload for one address family."""
+    payload: dict[str, Any] = {
+        "family": family,
+        "table_ids": [],
+        "disable_table_ids": [],
+        "delete_table_ids": [],
+        "route_ids": [],
+        "rule_ids": [],
+        "disable_route_ids": [],
+        "disable_rule_ids": [],
+        "delete_route_ids": [],
+        "delete_rule_ids": [],
+    }
+    payload.update(items)
+    return payload
+
+
+def pending_table_ids(table_id: int) -> list[int]:
+    """Return an unapplied routing table row that must precede a route or rule."""
+    with db.connection(POLICY_DB_PATH) as conn:
+        row = db.fetch_one_on(
+            conn,
+            """
+            SELECT id, enabled, applied, pending_delete
+            FROM routing_tables
+            WHERE table_id = ?
+            """,
+            (table_id,),
+        )
+    if row is None:
+        raise HTTPException(status_code=400, detail="The selected routing table does not exist.")
+    if int(row["enabled"]) != 1 or int(row["pending_delete"]) == 1:
+        raise HTTPException(status_code=400, detail="The selected routing table is not enabled.")
+    return [int(row["id"])] if int(row["applied"]) == 0 else []
 
 
 def apply_policy_routing() -> dict[str, Any]:
