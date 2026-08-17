@@ -12,16 +12,22 @@
     const workRequestsBody = document.querySelector("#policy-work-requests-body");
     const workRequestsCount = document.querySelector("#policy-work-requests-count");
     const applyModal = document.querySelector("#policy-apply-modal");
+    const createModal = document.querySelector("#policy-create-modal");
     const deleteModal = document.querySelector("#policy-delete-modal");
+    const createItemLabel = document.querySelector("#policy-create-item");
+    const createMessage = document.querySelector("#policy-create-message");
+    const createTitle = document.querySelector("#policy-create-title");
     const deleteItemLabel = document.querySelector("#policy-delete-item");
     const deleteMessage = document.querySelector("#policy-delete-message");
     const applyConfirmButton = document.querySelector("[data-apply-confirm]");
+    const createConfirmButton = document.querySelector("[data-create-confirm]");
     const deleteConfirmButton = document.querySelector("[data-delete-confirm]");
     const routeTableSelect = document.querySelector("#policy-route-table");
     const ruleTableSelect = document.querySelector("#policy-rule-table");
     const ruleActionSelect = document.querySelector("#policy-rule-action");
     const routeFamilySelect = document.querySelector("#policy-route-family");
     const ruleFamilySelect = document.querySelector("#policy-rule-family");
+    const rulePriorityInput = ruleForm?.querySelector("[name='priority']");
     const routeDevSelect = document.querySelector("#policy-route-dev");
     const ruleIifSelect = document.querySelector("#policy-rule-iif");
     const ruleOifSelect = document.querySelector("#policy-rule-oif");
@@ -53,6 +59,7 @@
     const createButtons = Array.from(document.querySelectorAll("[data-policy-create-for]"));
     let currentData = {tables: [], routes: [], rules: []};
     let pendingDelete = null;
+    let pendingCreate = null;
     let workRequestsPoller = null;
     let workRequestsLoading = false;
     let interfaceDescriptions = new Map();
@@ -304,6 +311,26 @@
         setSelectValue(ruleFamilySelect, activeRuleFamily);
     }
 
+    function suggestedRulePriority(family) {
+        const priorities = (currentData.rules || [])
+            .filter((rule) => String(rule.addr_family || "ipv4").toLowerCase() === family)
+            .map((rule) => Number(rule.priority))
+            .filter((priority) => Number.isInteger(priority) && priority >= 0);
+        return priorities.length ? Math.max(...priorities) + 1 : 0;
+    }
+
+    function setSuggestedRulePriority(force = false) {
+        if (!rulePriorityInput) {
+            return;
+        }
+        const suggested = String(suggestedRulePriority(activeRuleFamily));
+        const previousSuggestion = rulePriorityInput.dataset.policySuggestedPriority;
+        if (force || !rulePriorityInput.value || rulePriorityInput.value === previousSuggestion) {
+            rulePriorityInput.value = suggested;
+            rulePriorityInput.dataset.policySuggestedPriority = suggested;
+        }
+    }
+
     function setActiveFamily(family) {
         activeFamily = String(family || "ipv4").toLowerCase() === "ipv6" ? "ipv6" : "ipv4";
         viewPagination.routes.page = 1;
@@ -326,6 +353,7 @@
             ruleFamilyFilterSelect.value = activeRuleFamily;
         }
         setSelectValue(ruleFamilySelect, activeRuleFamily);
+        setSuggestedRulePriority(true);
         if (currentData.summary) {
             renderData(currentData);
         }
@@ -514,6 +542,9 @@
         rulesBody.innerHTML = rules.length ? pagedRules.map(ruleRow).join("") : emptyRow(7, `no ${familyLabel(activeRuleFamily)} policy rules`);
         tablesBody.innerHTML = data.tables.length ? pagedTables.map(tableRow).join("") : emptyRow(5, "no routing tables");
         setPolicyFormFamily();
+        if (!document.querySelector("[data-policy-view='new-rule']")?.hidden) {
+            setSuggestedRulePriority();
+        }
     }
 
     function emptyRow(colspan, message) {
@@ -603,6 +634,9 @@
         createButtons.forEach((button) => {
             button.hidden = button.dataset.policyCreateFor !== createContext;
         });
+        if (tabName === "new-rule") {
+            setSuggestedRulePriority();
+        }
         if (tabName !== "work-requests") {
             stopWorkRequestsPolling();
         }
@@ -620,22 +654,52 @@
         return Object.fromEntries(new FormData(form).entries());
     }
 
-    async function submitForm(event, form, url, statusElement) {
+    function createKindForUrl(url) {
+        return url.includes("routes") ? "Route" : url.includes("rules") ? "Rule" : "Table";
+    }
+
+    function openCreateModal(form, url, statusElement) {
+        const kind = createKindForUrl(url);
+        pendingCreate = {form, url, statusElement, payload: payloadFromForm(form), kind};
+        createTitle.textContent = `Add ${kind}`;
+        createItemLabel.textContent = `item=${kind.toLowerCase()}`;
+        createMessage.textContent = `Are you sure you want to add this ${kind.toLowerCase()}?`;
+        createModal.hidden = false;
+    }
+
+    function closeCreateModal() {
+        pendingCreate = null;
+        createModal.hidden = true;
+    }
+
+    function submitForm(event, form, url, statusElement) {
         event.preventDefault();
+        openCreateModal(form, url, statusElement);
+    }
+
+    async function createItem() {
+        if (!pendingCreate) {
+            return;
+        }
+        const {form, url, statusElement, payload} = pendingCreate;
         try {
             setStatus(statusElement, "queue=writing");
+            createConfirmButton.disabled = true;
             const result = await HF.fetchJson(url, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payloadFromForm(form)),
+                body: JSON.stringify(payload),
             });
             setStatus(statusElement, `saved=${result.route_id || result.rule_id || result.table_row_id}`);
             form.reset();
             updateRuleFormShape();
             setPolicyFormFamily();
-            setActiveTab(url.includes("routes") ? "routes" : url.includes("rules") ? "rules" : "tables", true);
+            closeCreateModal();
+            setActiveTab("work-requests", true);
         } catch (error) {
             setStatus(statusElement, `error=${error.message}`);
+        } finally {
+            createConfirmButton.disabled = false;
         }
     }
 
@@ -762,10 +826,14 @@
     document.querySelectorAll("[data-apply-cancel]").forEach((button) => {
         button.addEventListener("click", closeApplyModal);
     });
+    document.querySelectorAll("[data-create-cancel]").forEach((button) => {
+        button.addEventListener("click", closeCreateModal);
+    });
     document.querySelectorAll("[data-delete-cancel]").forEach((button) => {
         button.addEventListener("click", closeDeleteModal);
     });
     applyConfirmButton.addEventListener("click", applyPolicyRouting);
+    createConfirmButton.addEventListener("click", createItem);
     deleteConfirmButton.addEventListener("click", deleteItem);
     ruleActionSelect.addEventListener("change", updateRuleFormShape);
     routeFamilySelect.addEventListener("change", () => setActiveFamily(routeFamilySelect.value));

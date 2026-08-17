@@ -28,7 +28,11 @@
     const dhcpLeasesSummary = document.querySelector("#dnsmasq-dhcp-leases-summary");
     const dhcpLeasesSearch = document.querySelector("#dnsmasq-dhcp-leases-search");
     const addStaticAddressButton = document.querySelector("#dnsmasq-add-static-address");
+    const staticAddressesPanel = document.querySelector("#dnsmasq-static-addresses-panel");
+    const staticAddressesBody = document.querySelector("#dnsmasq-static-addresses-body");
+    const staticAddressesSummary = document.querySelector("#dnsmasq-static-addresses-summary");
     const staticLeaseModal = document.querySelector("#dnsmasq-static-lease-modal");
+    const staticLeaseTitle = document.querySelector("#dnsmasq-static-lease-title");
     const staticLeaseMac = document.querySelector("#dnsmasq-static-lease-mac");
     const staticLeaseIp = document.querySelector("#dnsmasq-static-lease-ip");
     const staticLeaseStatus = document.querySelector("#dnsmasq-static-lease-status");
@@ -47,6 +51,7 @@
     let dhcpLeasesLoading = false;
     let dhcpLeasesPollTimer = null;
     let dhcpLeases = [];
+    let editingStaticLease = null;
     let dirty = false;
     let pendingAction = null;
     let actionModalInformational = false;
@@ -1078,9 +1083,49 @@
         dhcpLeasesPollTimer = null;
     }
 
-    function openStaticLeaseModal(macAddress = "", ipAddress = "") {
+    function renderStaticAddresses(data) {
+        const leases = data.leases || [];
+        if (staticAddressesSummary) {
+            staticAddressesSummary.textContent = `addresses=${leases.length}`;
+        }
+        if (!staticAddressesBody) {
+            return;
+        }
+        if (!leases.length) {
+            staticAddressesBody.innerHTML = `<tr><td colspan="3"><div class="terminal-empty"><span class="prompt">$</span><span>no static DHCP addresses configured</span></div></td></tr>`;
+            return;
+        }
+        staticAddressesBody.innerHTML = leases.map((lease) => `
+            <tr>
+                <td>${HF.escapeHtml(lease.ip_address)}</td>
+                <td>${HF.escapeHtml(lease.mac_address)}</td>
+                <td>
+                    <button class="text-button compact" type="button" data-dnsmasq-static-edit-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-static-edit-ip="${HF.escapeHtml(lease.ip_address)}">Edit</button>
+                    <button class="text-button compact danger" type="button" data-dnsmasq-remove-static-mac="${HF.escapeHtml(lease.mac_address)}" data-dnsmasq-remove-static-ip="${HF.escapeHtml(lease.ip_address)}">Remove</button>
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadStaticAddresses() {
+        if (!staticAddressesPanel || staticAddressesPanel.hidden) {
+            return;
+        }
+        try {
+            renderStaticAddresses(await HF.fetchJson("/api/services/dnsmasq/static-leases"));
+        } catch (error) {
+            if (staticAddressesBody) {
+                staticAddressesBody.innerHTML = `<tr><td colspan="3"><div class="terminal-empty"><span class="prompt">$</span><span>${HF.escapeHtml(error.message)}</span></div></td></tr>`;
+            }
+        }
+    }
+
+    function openStaticLeaseModal(macAddress = "", ipAddress = "", previousLease = null) {
+        editingStaticLease = previousLease;
         if (staticLeaseMac) staticLeaseMac.value = macAddress;
         if (staticLeaseIp) staticLeaseIp.value = ipAddress;
+        if (staticLeaseTitle) staticLeaseTitle.textContent = previousLease ? "Edit Static Address" : "Add Static Address";
+        if (staticLeaseApply) staticLeaseApply.textContent = previousLease ? "Save" : "Apply";
         if (staticLeaseStatus) {
             staticLeaseStatus.hidden = true;
             staticLeaseStatus.textContent = "";
@@ -1091,6 +1136,7 @@
 
     function closeStaticLeaseModal() {
         if (staticLeaseModal) staticLeaseModal.hidden = true;
+        editingStaticLease = null;
     }
 
     async function queueStaticLease(macAddress, ipAddress) {
@@ -1115,11 +1161,31 @@
         await loadDnsmasq();
     }
 
+    async function updateStaticLease(previousLease, macAddress, ipAddress) {
+        await HF.fetchJson("/api/services/dnsmasq/static-leases", {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                previous_mac_address: previousLease.mac_address,
+                previous_ip_address: previousLease.ip_address,
+                mac_address: macAddress,
+                ip_address: ipAddress,
+            }),
+        });
+        showWorkRequests();
+        await loadWorkRequests();
+        await loadDnsmasq();
+    }
+
     async function applyStaticLease() {
         if (!staticLeaseApply) return;
         staticLeaseApply.disabled = true;
         try {
-            await queueStaticLease(staticLeaseMac?.value || "", staticLeaseIp?.value || "");
+            if (editingStaticLease) {
+                await updateStaticLease(editingStaticLease, staticLeaseMac?.value || "", staticLeaseIp?.value || "");
+            } else {
+                await queueStaticLease(staticLeaseMac?.value || "", staticLeaseIp?.value || "");
+            }
             closeStaticLeaseModal();
         } catch (error) {
             if (staticLeaseStatus) {
@@ -1136,11 +1202,15 @@
         const isConfiguration = viewName === "dns" || viewName === "dhcp";
         const isWorkRequests = viewName === "work-requests";
         const isDhcpLeases = viewName === "dhcp-leases";
+        const isStaticAddresses = viewName === "static-addresses";
         if (workRequestsPanel) {
             workRequestsPanel.hidden = !isWorkRequests;
         }
         if (dhcpLeasesPanel) {
             dhcpLeasesPanel.hidden = !isDhcpLeases;
+        }
+        if (staticAddressesPanel) {
+            staticAddressesPanel.hidden = !isStaticAddresses;
         }
         if (form) {
             form.hidden = !isConfiguration;
@@ -1157,6 +1227,9 @@
             loadDhcpLeases();
         } else {
             stopDhcpLeasesPolling();
+        }
+        if (isStaticAddresses) {
+            loadStaticAddresses();
         }
         if (isConfiguration) {
             showTab(viewName);
@@ -1467,6 +1540,19 @@
             const macAddress = removeStaticButton.dataset.dnsmasqRemoveStaticMac;
             const ipAddress = removeStaticButton.dataset.dnsmasqRemoveStaticIp;
             openActionModal("remove-static", "Remove this static DHCP address", () => removeStaticLease(macAddress, ipAddress));
+            return;
+        }
+
+        const editStaticButton = event.target.closest("[data-dnsmasq-static-edit-mac]");
+        if (editStaticButton) {
+            openStaticLeaseModal(
+                editStaticButton.dataset.dnsmasqStaticEditMac,
+                editStaticButton.dataset.dnsmasqStaticEditIp,
+                {
+                    mac_address: editStaticButton.dataset.dnsmasqStaticEditMac,
+                    ip_address: editStaticButton.dataset.dnsmasqStaticEditIp,
+                },
+            );
             return;
         }
 

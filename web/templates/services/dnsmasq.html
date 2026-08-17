@@ -44,6 +44,7 @@
     <button class="local-tab active" type="button" data-dnsmasq-view="dns">DNS</button>
     <button class="local-tab" type="button" data-dnsmasq-view="dhcp">DHCP</button>
     <button class="local-tab" type="button" data-dnsmasq-view="dhcp-leases">DHCP Leases</button>
+    <button class="local-tab" type="button" data-dnsmasq-view="static-addresses">Static Addr</button>
     <button class="local-tab firewall-work-tab" type="button" data-dnsmasq-view="work-requests">WORK REQUESTS</button>
 </nav>
 
@@ -78,6 +79,27 @@
     </div>
     <div class="form-actions dnsmasq-leases-actions">
         <button class="text-button primary" type="button" id="dnsmasq-add-static-address" disabled>Add Static Address</button>
+    </div>
+</section>
+
+<section class="panel" id="dnsmasq-static-addresses-panel" hidden>
+    <div class="panel-head">
+        <h2>Static Addresses</h2>
+        <span id="dnsmasq-static-addresses-summary">addresses=0</span>
+    </div>
+    <div class="table-wrap wide">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>MAC Address</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="dnsmasq-static-addresses-body">
+                <tr><td colspan="3"><div class="terminal-empty"><span class="prompt">$</span><span>loading static addresses</span></div></td></tr>
+            </tbody>
+        </table>
     </div>
 </section>
 
@@ -292,5 +314,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260819-dhcp-lease-columns" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260820-static-addresses" defer></script>
 {% endblock %}

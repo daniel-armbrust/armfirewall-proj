@@ -188,7 +188,7 @@
             </div>
         </section>
         <div class="form-actions policy-route-actions">
-            <button class="text-button primary policy-apply-button" type="submit">Apply</button>
+            <button class="text-button primary policy-apply-button" type="submit">Add</button>
         </div>
     </form>
 </section>
@@ -323,7 +323,7 @@
             </div>
         </section>
         <div class="form-actions policy-route-actions">
-            <button class="text-button primary policy-apply-button" type="submit">Apply</button>
+            <button class="text-button primary policy-apply-button" type="submit">Add</button>
         </div>
     </form>
 </section>
@@ -399,7 +399,7 @@
             </div>
         </section>
         <div class="form-actions policy-route-actions">
-            <button class="text-button primary policy-apply-button" type="submit">Apply</button>
+            <button class="text-button primary policy-apply-button" type="submit">Add</button>
         </div>
     </form>
 </section>
@@ -449,6 +449,23 @@
     </div>
 </div>
 
+<div class="modal-backdrop" id="policy-create-modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="policy-create-title">
+        <div class="panel-head">
+            <h2 id="policy-create-title">Add Item</h2>
+            <span id="policy-create-item">item=-</span>
+        </div>
+        <div class="terminal-empty">
+            <span class="prompt">$</span>
+            <span id="policy-create-message">Confirm add.</span>
+        </div>
+        <div class="form-actions">
+            <button class="text-button" type="button" data-create-cancel>Cancel</button>
+            <button class="text-button primary" type="button" data-create-confirm>Add</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-backdrop" id="policy-delete-modal" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="policy-delete-title">
         <div class="panel-head">
@@ -468,5 +485,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/policy_routing.js') }}?v=20260609-policy-create-visible" defer></script>
+<script src="{{ url_for('static', path='/js/policy_routing.js') }}?v=20260820-policy-rule-priority" defer></script>
 {% endblock %}

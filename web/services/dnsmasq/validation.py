@@ -108,28 +108,6 @@ def normalize_interface_config(item: dict[str, Any]) -> dict[str, Any]:
     config["ipv6_ra_names"] = bool(item.get("ipv6_ra_names", True))
     config["ipv6_ra_lifetime"] = validate_lease_time(item.get("ipv6_ra_lifetime") or "4h")
 
-    if config["ipv6_ra_enabled"]:
-        if iface_name == DNSMASQ_ALL_INTERFACES_TOKEN:
-            raise HTTPException(status_code=400, detail="IPv6 Router Advertisements require a specific interface.")
-        interface = next(
-            (item for item in list_interfaces() if item.get("name") == iface_name),
-            None,
-        )
-        has_routable_ipv6 = interface and any(
-            str(address.get("addr_family")) == "ipv6"
-            and not str(address.get("addr", "")).lower().startswith("fe80:")
-            and str(address.get("addr")) != "::1"
-            for address in interface.get("addresses", [])
-        )
-        if not has_routable_ipv6:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "IPv6 Router Advertisements require an interface with a "
-                    f"routable IPv6 prefix: {iface_name}."
-                ),
-            )
-
     if config["dhcp_enabled"] and (not config["dhcp_range_start"] or not config["dhcp_range_end"]):
         raise HTTPException(status_code=400, detail=f"DHCP range start and end are required for {iface_name}.")
     if config["dhcp_enabled"]:

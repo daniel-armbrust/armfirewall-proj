@@ -106,10 +106,22 @@ def api_dnsmasq_leases() -> dict[str, Any]:
     return services_dnsmasq_api.get_dhcp_leases()
 
 
+@router.get("/api/services/dnsmasq/static-leases")
+def api_dnsmasq_static_leases() -> dict[str, Any]:
+    """Return configured static DHCP addresses."""
+    return services_dnsmasq_api.get_static_leases()
+
+
 @router.post("/api/services/dnsmasq/static-leases")
 async def api_dnsmasq_add_static_lease(request: Request) -> dict[str, Any]:
     """Queue a persistent DHCP reservation and DNSMasq restart."""
     return services_dnsmasq_api.add_static_lease(await request.json())
+
+
+@router.put("/api/services/dnsmasq/static-leases")
+async def api_dnsmasq_update_static_lease(request: Request) -> dict[str, Any]:
+    """Queue a static DHCP address update and DNSMasq restart."""
+    return services_dnsmasq_api.update_static_lease(await request.json())
 
 
 @router.delete("/api/services/dnsmasq/static-leases")

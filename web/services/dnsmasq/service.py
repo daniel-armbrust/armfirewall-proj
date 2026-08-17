@@ -133,6 +133,15 @@ def get_dhcp_leases() -> dict[str, Any]:
     }
 
 
+def get_static_leases() -> dict[str, Any]:
+    """Return DHCP reservations configured independently of active leases."""
+    config = load_config_from_db()
+    if config is None:
+        config = parse_dnsmasq_config(read_config_lines())
+    leases = config.get("static_leases", [])
+    return {"leases": leases, "count": len(leases)}
+
+
 def normalize_mac_address(value: Any) -> str:
     """Validate and normalize one Ethernet MAC address."""
     mac_address = str(value or "").strip().lower()
@@ -263,6 +272,78 @@ def remove_static_lease(payload: dict[str, Any]) -> dict[str, Any]:
         )
         restart_work_request_id = int(restart_cursor.lastrowid)
         db.execute_on(conn, "INSERT INTO work_request_events (work_request_id, event_type, message) VALUES (?, 'queue', 'Queued DNSMasq restart after static DHCP lease removal.')", (restart_work_request_id,))
+
+    return {"queued": True, "apply_work_request_id": apply_work_request_id, "restart_work_request_id": restart_work_request_id}
+
+
+def update_static_lease(payload: dict[str, Any]) -> dict[str, Any]:
+    """Update a DHCP reservation and queue configuration apply plus restart."""
+    previous_mac_address = normalize_mac_address(payload.get("previous_mac_address"))
+    previous_ip_address = validate_optional_ipv4(payload.get("previous_ip_address"), "Previous IP address")
+    mac_address = normalize_mac_address(payload.get("mac_address"))
+    ip_address = validate_optional_ipv4(payload.get("ip_address"), "IP address")
+    if not previous_ip_address or not ip_address:
+        raise HTTPException(status_code=400, detail="IP address is required.")
+
+    config = load_config_from_db()
+    if config is None:
+        config = parse_dnsmasq_config(read_config_lines())
+    proposed_leases = []
+    found = False
+    for lease in config.get("static_leases", []):
+        if lease["mac_address"].lower() == previous_mac_address and lease["ip_address"] == previous_ip_address:
+            proposed_leases.append({"mac_address": mac_address, "ip_address": ip_address})
+            found = True
+        else:
+            proposed_leases.append(lease)
+    if not found:
+        raise HTTPException(status_code=404, detail="Static DHCP address was not found.")
+
+    proposed_config = dict(config)
+    proposed_config["static_leases"] = proposed_leases
+    ok, message = validate_dnsmasq_syntax(render_config(proposed_config))
+    if not ok:
+        raise HTTPException(status_code=400, detail=message)
+
+    with db.transaction(DNSMASQ_DB_PATH) as conn:
+        ensure_dnsmasq_schema(conn)
+        try:
+            cursor = db.execute_on(
+                conn,
+                """
+                UPDATE dnsmasq_static_leases
+                SET mac_address = ?, ip_address = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE mac_address = ? AND ip_address = ?
+                """,
+                (mac_address, ip_address, previous_mac_address, previous_ip_address),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=400, detail="MAC address or IP address already has a static lease.") from exc
+        if cursor.rowcount != 1:
+            raise HTTPException(status_code=404, detail="Static DHCP address was not found.")
+
+    with db.transaction(WORK_REQUEST_DB_PATH) as conn:
+        payload_json = json.dumps({"config_db": str(DNSMASQ_DB_PATH), "config_path": str(DNSMASQ_CONF_PATH)}, sort_keys=True)
+        apply_cursor = db.execute_on(
+            conn,
+            """
+            INSERT INTO work_requests (request_uid, source, category_name, action_name, target_rule_id, priority, status, payload_json)
+            VALUES (?, 'gui', 'SERVICE_MANAGEMENT.DNSMASQ_CONFIG', 'apply', NULL, 70, 'queue', ?)
+            """,
+            (str(uuid.uuid4()), payload_json),
+        )
+        apply_work_request_id = int(apply_cursor.lastrowid)
+        db.execute_on(conn, "INSERT INTO work_request_events (work_request_id, event_type, message) VALUES (?, 'queue', 'Queued static DHCP address update.')", (apply_work_request_id,))
+        restart_cursor = db.execute_on(
+            conn,
+            """
+            INSERT INTO work_requests (request_uid, source, category_name, action_name, target_rule_id, priority, status, payload_json)
+            VALUES (?, 'gui', 'SERVICE_MANAGEMENT.SERVICE_CONTROL', 'restart', NULL, 71, 'queue', ?)
+            """,
+            (str(uuid.uuid4()), json.dumps({"service_name": "dnsmasq", "display_name": "DNSMasq", "kind": "dns-dhcp"}, sort_keys=True)),
+        )
+        restart_work_request_id = int(restart_cursor.lastrowid)
+        db.execute_on(conn, "INSERT INTO work_request_events (work_request_id, event_type, message) VALUES (?, 'queue', 'Queued DNSMasq restart after static DHCP address update.')", (restart_work_request_id,))
 
     return {"queued": True, "apply_work_request_id": apply_work_request_id, "restart_work_request_id": restart_work_request_id}
 
