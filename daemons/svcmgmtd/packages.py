@@ -7,6 +7,8 @@ import shutil
 import tarfile
 import tempfile
 from pathlib import Path
+from time import sleep
+from urllib.error import URLError
 from urllib.request import urlretrieve
 
 from core.constants import (
@@ -64,6 +66,21 @@ def uninstall_package(package: str) -> None:
         run_bounded_command(package_manager_command("uninstall", package), timeout=600)
 
 
+def download_adguard_home_archive(destination: Path) -> None:
+    """Download the AdGuard Home archive, retrying transient network failures."""
+    attempts = 3
+    for attempt in range(1, attempts + 1):
+        try:
+            urlretrieve(ADGUARD_HOME_ARCHIVE_URL, destination)
+            return
+        except URLError as error:
+            if attempt == attempts:
+                raise RuntimeError(
+                    f"Could not download AdGuard Home from {ADGUARD_HOME_ARCHIVE_URL}: {error.reason}"
+                ) from error
+            sleep(attempt)
+
+
 def install_adguard_home() -> None:
     """Install the official ARM64 AdGuard Home runtime with executable permissions."""
     if ADGUARD_HOME_BINARY.is_file():
@@ -78,7 +95,7 @@ def install_adguard_home() -> None:
         temp_path = Path(temp_dir)
         archive_path = temp_path / "adguardhome.tar.gz"
         extract_path = temp_path / "extract"
-        urlretrieve(ADGUARD_HOME_ARCHIVE_URL, archive_path)
+        download_adguard_home_archive(archive_path)
 
         with tarfile.open(archive_path, "r:gz") as archive:
             destination = extract_path.resolve()
@@ -86,7 +103,9 @@ def install_adguard_home() -> None:
                 member_path = (extract_path / member.name).resolve()
                 if destination not in member_path.parents and member_path != destination:
                     raise RuntimeError("Unsafe path in AdGuard Home archive.")
-            archive.extractall(extract_path, filter="data")
+            # The member paths above are validated before extraction. Do not use
+            # TarFile.extractall(filter=...), unavailable in Python 3.11 on Debian 12.
+            archive.extractall(extract_path)
 
         source_binary = extract_path / "AdGuardHome" / "AdGuardHome"
         if not source_binary.is_file():

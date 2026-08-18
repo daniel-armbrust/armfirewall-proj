@@ -483,6 +483,62 @@ allow_required_icmpv6() {
     done
 }
 
+# Record and apply DHCP client reply rules required on the WAN interface.
+record_wan_dhcp_input_rule() {
+    local family="$1"
+    local protocol="$2"
+    local iface="$3"
+    local source_port="$4"
+    local destination_port="$5"
+    local db_path any_addr
+
+    db_path="$(filter_rules_db "$family")"
+    any_addr="$(filter_any_addr "$family")"
+    sqlite_exec "$db_path" "
+        INSERT INTO filter_input_rules (
+            iface_in, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at)
+        SELECT
+            $(sql_quote "$iface"), (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
+            1, 0, 0, 0, $(sql_quote "$any_addr"), ${source_port},
+            $(sql_quote "$any_addr"), ${destination_port},
+            $(sql_quote "$protocol"), NULL, NULL, 'ACCEPT',
+            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        WHERE NOT EXISTS (
+            SELECT 1 FROM filter_input_rules
+            WHERE iface_in = $(sql_quote "$iface")
+              AND src_port = ${source_port}
+              AND dst_port = ${destination_port}
+              AND protocol_name = $(sql_quote "$protocol")
+              AND action = 'ACCEPT'
+              AND protected = 1
+        );"
+}
+
+apply_wan_dhcp_input_rule() {
+    local binary="$1"
+    local protocol="$2"
+    local iface="$3"
+    local source_port="$4"
+    local destination_port="$5"
+
+    "$binary" -t filter -C INPUT -i "$iface" -p "$protocol" --sport "$source_port" --dport "$destination_port" -j ACCEPT 2>/dev/null || \
+    "$binary" -t filter -I INPUT 1 -i "$iface" -p "$protocol" --sport "$source_port" --dport "$destination_port" -j ACCEPT
+}
+
+allow_wan_dhcp_client() {
+    local wan_iface="$1"
+
+    [[ -n "$wan_iface" ]] || return 0
+    log "Allowing DHCP client replies on WAN interface ${wan_iface}."
+    record_wan_dhcp_input_rule ipv4 udp "$wan_iface" 67 68
+    apply_wan_dhcp_input_rule iptables udp "$wan_iface" 67 68
+    record_wan_dhcp_input_rule ipv6 udp "$wan_iface" 547 546
+    apply_wan_dhcp_input_rule ip6tables udp "$wan_iface" 547 546
+}
+
 # Record one filter chain policy in the selected database.
 record_filter_policy() {
     local family="$1"
@@ -658,6 +714,7 @@ main() {
     [[ -n "${LAN_IFACE:-}" ]] || fatal "LAN_IFACE is not set."
 
     allow_lan_services "$LAN_IFACE"
+    allow_wan_dhcp_client "${WAN_IFACE:-}"
     record_conntrack_base_rules
     apply_conntrack_base_rules
     record_loopback_rules
