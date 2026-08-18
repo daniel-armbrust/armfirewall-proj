@@ -502,7 +502,7 @@ record_wan_dhcp_input_rule() {
             protected, enabled, created_at, updated_at)
         SELECT
             $(sql_quote "$iface"), (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
-            1, 0, 0, 0, $(sql_quote "$any_addr"), ${source_port},
+            0, 0, 0, 0, $(sql_quote "$any_addr"), ${source_port},
             $(sql_quote "$any_addr"), ${destination_port},
             $(sql_quote "$protocol"), NULL, NULL, 'ACCEPT',
             1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -514,7 +514,20 @@ record_wan_dhcp_input_rule() {
               AND protocol_name = $(sql_quote "$protocol")
               AND action = 'ACCEPT'
               AND protected = 1
-        );"
+        );
+
+        UPDATE filter_input_rules
+        SET ct_new = 0,
+            ct_established = 0,
+            ct_related = 0,
+            ct_invalid = 0,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE iface_in = $(sql_quote "$iface")
+          AND src_port = ${source_port}
+          AND dst_port = ${destination_port}
+          AND protocol_name = $(sql_quote "$protocol")
+          AND action = 'ACCEPT'
+          AND protected = 1;"
 }
 
 apply_wan_dhcp_input_rule() {
