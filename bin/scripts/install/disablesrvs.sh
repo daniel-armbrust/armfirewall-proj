@@ -45,6 +45,18 @@ systemd_unit_known() {
     [[ -n "$load_state" && "$load_state" != "not-found" ]]
 }
 
+# Return success only when a systemd unit is actively enabled for startup.
+systemd_unit_enabled() {
+    case "$(systemctl is-enabled "$1" 2>/dev/null || true)" in
+        enabled|enabled-runtime|linked|linked-runtime)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # Stop and disable one systemd unit when it exists.
 stop_disable_systemd_unit() {
     local unit="$1"
@@ -63,13 +75,13 @@ stop_disable_systemd_unit() {
         fatal "OS service is still active after stop attempt: ${unit}."
     fi
 
-    if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+    if systemd_unit_enabled "$unit"; then
         log "Disabling OS service: ${unit}."
         systemctl disable "$unit" >/dev/null 2>&1 || \
             fatal "Could not disable OS service: ${unit}."
     fi
 
-    if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+    if systemd_unit_enabled "$unit"; then
         fatal "OS service is still enabled after disable attempt: ${unit}."
     fi
 }
