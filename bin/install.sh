@@ -90,6 +90,11 @@ parse_args() {
 }
 
 main() {
+    [[ $# -gt 0 ]] || {
+        usage
+        return 0
+    }
+
     # Print installer banner
     print_banner "installer"
 
