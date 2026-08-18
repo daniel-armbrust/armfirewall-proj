@@ -60,7 +60,7 @@ write_interface_stanza() {
     local address prefix netmask
 
     [[ -n "$iface" && -n "$address_spec" ]] || return 0
-    printf 'auto %s\n' "$iface"
+    printf 'allow-hotplug %s\n' "$iface"
     if ipv4_uses_dhcp "$address_spec"; then
         printf 'iface %s inet dhcp\n\n' "$iface"
         return 0

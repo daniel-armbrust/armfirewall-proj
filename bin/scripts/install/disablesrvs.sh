@@ -115,7 +115,7 @@ disable_ufw() {
 disable_unneeded_services() {
     local service
 
-    for service in gdm gdm3 display-manager cups cups-browsed avahi-daemon ModemManager bluetooth wpa_supplicant; do
+    for service in gdm gdm3 display-manager cups cups-browsed avahi-daemon ModemManager bluetooth wpa_supplicant samba-ad-dc; do
         stop_disable_systemd_service "$service"
     done
     stop_disable_systemd_socket avahi-daemon
