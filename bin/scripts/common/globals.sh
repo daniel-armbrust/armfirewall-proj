@@ -57,8 +57,9 @@ print_banner() {
  | | | || |   | | | | | | | |   | | | |  __/\\ V  V / (_| | | |
  \\_| |_/\\_|   |_| |_| |_| \\_|   |_|_|  \\___| \\_/\\_/ \\__,_|_|_|
 
-        ./ ArmFirewall ${mode}
+        ./ArmFirewall ${mode}
         secure edge routing / firewall / monitoring
+        
 BANNER
 }
 

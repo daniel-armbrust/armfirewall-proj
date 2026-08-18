@@ -4,6 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SET_HOSTNAME=""
+LAN_IPV4_ADDR=""
+WAN_IPV4_ADDR=""
 
 # shellcheck source=scripts/common/globals.sh
 . "$ROOT_DIR/bin/scripts/common/globals.sh"
@@ -12,13 +14,20 @@ SET_HOSTNAME=""
 usage() {
     cat <<USAGE
     
-Usage: $0 --lan-iface <iface> [--wan-iface <iface>] [--router-mode]
+Usage: $0 --lan-iface <iface> --lan-ipv4-addr <IPv4/CIDR|dhcp>
+          --wan-iface <iface> --wan-ipv4-addr <IPv4/CIDR|dhcp>
+          [--router-mode] [--set-hostname <name>]
 
 Options:
   --lan-iface <iface>     LAN network interface to persist in iface.db
+  --lan-ipv4-addr <addr>  Set LAN IPv4 address/mask, or dhcp.
+
   --wan-iface <iface>     WAN network interface to persist in iface.db
+  --wan-ipv4-addr <addr>  Set WAN IPv4 address/mask, or dhcp.
+
   --router-mode           Enable routing, forwarding, and NAT. Requires --wan-iface
   --set-hostname <name>   Set the system hostname (a hostname or FQDN).
+  
   -h, --help              Show this help message
 
 USAGE
@@ -51,6 +60,18 @@ parse_args() {
                 shift 2
                 ;;
 
+            --lan-ipv4-addr)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv4-addr requires an IPv4 address/mask or dhcp."
+                LAN_IPV4_ADDR="$2"
+                shift 2
+                ;;
+
+            --wan-ipv4-addr)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-ipv4-addr requires an IPv4 address/mask or dhcp."
+                WAN_IPV4_ADDR="$2"
+                shift 2
+                ;;
+
             -h|--help)
                 usage
                 exit 0
@@ -63,7 +84,9 @@ parse_args() {
     done
 
     [[ -n "$LAN_IFACE" ]] || fatal "Missing required option: --lan-iface <iface>."
-    [[ "$ROUTER_MODE" -eq 0 || -n "$WAN_IFACE" ]] || fatal "--router-mode requires --wan-iface <iface>."
+    [[ -n "$LAN_IPV4_ADDR" ]] || fatal "Missing required option: --lan-ipv4-addr <IPv4/CIDR|dhcp>."
+    [[ -n "$WAN_IFACE" ]] || fatal "Missing required option: --wan-iface <iface>."
+    [[ -n "$WAN_IPV4_ADDR" ]] || fatal "Missing required option: --wan-ipv4-addr <IPv4/CIDR|dhcp>."
 }
 
 main() {
@@ -115,6 +138,10 @@ main() {
 
     # Creates supervisord and systemd service manager files
     "$ROOT_DIR/bin/scripts/install/supervisord.sh"
+
+    # Configures requested IPv4 interfaces using the platform network backend.
+    "$ROOT_DIR/bin/scripts/install/networking.sh" "$LAN_IFACE" "$LAN_IPV4_ADDR" "$WAN_IFACE" "$WAN_IPV4_ADDR"
+
 }
 
 main "$@"

@@ -236,7 +236,7 @@ install_system_deps() {
             run_apt_transaction_without_service_start upgrade
             run_apt_transaction_without_service_start install ethtool net-tools iproute2 iptables \
                                                   supervisor sqlite3 tar perl curl openssl libnss3-tools \
-                                                  rrdtool traceroute mtr tcpdump dnsmasq
+                                                  rrdtool traceroute mtr tcpdump dnsmasq ifupdown
             disable_packaged_armfirewall_services
             install_python_runtime
             ;;
