@@ -1,5 +1,5 @@
 ---
---- Tabela para armazenar as interfaces de rede disponíveis no sistema operacional.
+--- Table for storing network interfaces available in the operating system.
 ---
 CREATE TABLE IF NOT EXISTS ifaces (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS ifaces (
 );
 
 ---
---- Tabela para armazenar endereços IPv4 e IPv6 de uma interface de rede.
+--- Table for storing IPv4 and IPv6 addresses for a network interface.
 ---
 CREATE TABLE IF NOT EXISTS addresses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS addresses (
 );
 
 ---
---- Tabela para armazenar as estatísticas das interfaces de rede disponíveis no sistema operacional.
+--- Table for storing statistics for network interfaces available in the operating system.
 ---
 CREATE TABLE IF NOT EXISTS stats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS stats (
 );
 
 ---
---- Tabela para armazenar os valores que serão aplicados no /proc de uma interface de rede.
+--- Table for storing values to be applied under /proc for a network interface.
 --- 
 CREATE TABLE IF NOT EXISTS proc (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
