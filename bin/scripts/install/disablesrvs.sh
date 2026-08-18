@@ -35,46 +35,53 @@ is_debian_like() {
     [[ "$OS_ID" =~ ^(debian|ubuntu)$ ]] || [[ " ${OS_ID_LIKE} " == *" debian "* ]]
 }
 
-# Return success when systemd knows about one service.
-systemd_service_known() {
-    local service="$1"
+# Return success when systemd knows about one unit.
+systemd_unit_known() {
+    local unit="$1"
+    local load_state
 
     command -v systemctl >/dev/null 2>&1 || return 1
-    systemctl list-unit-files "${service}.service" >/dev/null 2>&1 && return 0
-    systemctl status "${service}.service" >/dev/null 2>&1 && return 0
+    load_state="$(systemctl show --property=LoadState --value "$unit" 2>/dev/null || true)"
+    [[ -n "$load_state" && "$load_state" != "not-found" ]]
+}
 
-    return 1
+# Stop and disable one systemd unit when it exists.
+stop_disable_systemd_unit() {
+    local unit="$1"
+
+    systemd_unit_known "$unit" || {
+        log "OS service is not installed: ${unit}."
+        return 0
+    }
+
+    if systemctl is-active --quiet "$unit"; then
+        log "Stopping OS service: ${unit}."
+        systemctl stop "$unit" || fatal "Could not stop OS service: ${unit}."
+    fi
+
+    if systemctl is-active --quiet "$unit"; then
+        fatal "OS service is still active after stop attempt: ${unit}."
+    fi
+
+    if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+        log "Disabling OS service: ${unit}."
+        systemctl disable "$unit" >/dev/null 2>&1 || \
+            fatal "Could not disable OS service: ${unit}."
+    fi
+
+    if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+        fatal "OS service is still enabled after disable attempt: ${unit}."
+    fi
 }
 
 # Stop and disable one systemd service when it exists.
 stop_disable_systemd_service() {
-    local service="$1"
+    stop_disable_systemd_unit "${1%.service}.service"
+}
 
-    systemd_service_known "$service" || {
-        log "OS firewall service is not installed: ${service}."
-        return 0
-    }
-
-    if systemctl is-active --quiet "$service"; then
-        log "Stopping OS firewall service: ${service}."
-        systemctl stop "$service" || fatal "Could not stop OS firewall service: ${service}."
-    fi
-
-    if systemctl is-active --quiet "$service"; then
-        fatal "OS firewall service is still active after stop attempt: ${service}."
-    fi
-
-    if systemctl is-enabled --quiet "$service" 2>/dev/null; then
-        log "Disabling OS firewall service: ${service}."
-        systemctl disable "$service" >/dev/null 2>&1 || \
-            fatal "Could not disable OS firewall service: ${service}."
-    fi
-
-    if systemctl is-enabled --quiet "$service" 2>/dev/null; then
-        fatal "OS firewall service is still enabled after disable attempt: ${service}."
-    fi
-
-    return 0
+# Stop and disable one systemd socket when it exists.
+stop_disable_systemd_socket() {
+    stop_disable_systemd_unit "${1%.socket}.socket"
 }
 
 # Disable firewalld on Oracle Linux and Red Hat-like systems.
@@ -90,6 +97,16 @@ disable_ufw() {
     fi
 
     stop_disable_systemd_service ufw
+}
+
+# Disable optional desktop, discovery, modem, Bluetooth, and Wi-Fi services.
+disable_unneeded_services() {
+    local service
+
+    for service in gdm gdm3 display-manager cups cups-browsed avahi-daemon ModemManager bluetooth wpa_supplicant; do
+        stop_disable_systemd_service "$service"
+    done
+    stop_disable_systemd_socket avahi-daemon
 }
 
 # Disable the native operating system firewall service for this distribution.
@@ -117,6 +134,7 @@ disable_os_firewall_services() {
 main() {
     need_root
     disable_os_firewall_services
+    disable_unneeded_services
 }
 
 main "$@"
