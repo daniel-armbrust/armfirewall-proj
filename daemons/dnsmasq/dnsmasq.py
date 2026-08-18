@@ -14,6 +14,7 @@ from core import log as logger
 from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_LEASES_PATH
 from core.payload import decode_json_payload
 from web.services.dnsmasq import api as dnsmasq_config
+from .dns_filtering import sync_dns_filtering_redirect
 
 
 def request_from_args(args: argparse.Namespace) -> DnsmasqWorkRequest:
@@ -73,8 +74,12 @@ def apply_config() -> None:
         raise RuntimeError(message)
 
     write_dnsmasq_conf(config_text)
+    filtering_active = sync_dns_filtering_redirect()
     clear_pending_apply()
-    logger.log("Dnsmasq configuration file was rendered from SQLite.", source=LOG_SOURCE)
+    logger.log(
+        f"Dnsmasq configuration file was rendered from SQLite; DNS filtering active={filtering_active}.",
+        source=LOG_SOURCE,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

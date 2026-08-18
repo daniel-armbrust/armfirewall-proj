@@ -6,8 +6,6 @@ import shutil
 import subprocess
 from typing import Any
 from core.constants import (
-    ADGUARD_HOME_DNS_HOST,
-    ADGUARD_HOME_DNS_PORT,
     DNSMASQ_ALL_INTERFACES_TOKEN,
     DNSMASQ_BOOL_DEFAULTS,
     DNSMASQ_CONF_PATH,
@@ -234,6 +232,7 @@ def render_config(config: dict[str, Any]) -> str:
     lines = [
         "# ArmFirewall managed dnsmasq configuration.",
         "# Generated from Services / Dnsmasq.",
+        f"# armfirewall-adguardhome-upstream={1 if config['adguardhome_upstream_enabled'] else 0}",
         f"port={DNSMASQ_DNS_PORT if dns_enabled else 0}",
         "bind-interfaces",
     ]
@@ -271,16 +270,11 @@ def render_config(config: dict[str, Any]) -> str:
         ):
             if enabled:
                 lines.append(directive)
-        if config["adguardhome_upstream_enabled"]:
-            # Resolve exclusively through the local AdGuard Home listener.
-            lines.append("no-resolv")
-            lines.append(f"server={ADGUARD_HOME_DNS_HOST}#{ADGUARD_HOME_DNS_PORT}")
-        else:
-            for server in config["upstream_dns_servers"]:
-                lines.append(f"server={server}")
-            for domain_item in config["domain_upstreams"]:
-                for server in domain_item["upstreams"]:
-                    lines.append(f"server=/{domain_item['domain']}/{server}")
+        for server in config["upstream_dns_servers"]:
+            lines.append(f"server={server}")
+        for domain_item in config["domain_upstreams"]:
+            for server in domain_item["upstreams"]:
+                lines.append(f"server=/{domain_item['domain']}/{server}")
 
     for item in interface_configs:
         if item["dhcp_enabled"]:

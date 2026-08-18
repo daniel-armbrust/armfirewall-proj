@@ -148,16 +148,9 @@
 
     function syncAdGuardHomeUpstreamState() {
         const upstream = document.querySelector("#dnsmasq-upstream-dns");
-        const enabled = checkedValue("#dnsmasq-adguardhome-upstream");
         if (upstream) {
-            upstream.disabled = enabled;
-            upstream.classList.toggle("is-disabled", enabled);
-        }
-        if (forwardedDomainsEnabled) {
-            forwardedDomainsEnabled.disabled = enabled;
-            if (enabled) {
-                forwardedDomainsEnabled.checked = false;
-            }
+            upstream.disabled = false;
+            upstream.classList.remove("is-disabled");
         }
         syncForwardedDomainState();
     }
@@ -353,19 +346,12 @@
 
     function updateGlobalDnsConfig(field, value) {
         currentConfig[field] = value;
-        if (field === "adguardhome_upstream_enabled" && value) {
-            currentConfig.domain_upstreams = [];
-            currentConfig.forwarded_domains_enabled = false;
-        }
         domainUpstreams = currentConfig.domain_upstreams || [];
     }
 
     function updateInterfaceConfig(name, field, value) {
         const config = configForInterface(name);
         config[field] = value;
-        if (field === "adguardhome_upstream_enabled" && value) {
-            config.domain_upstreams = [];
-        }
         interfaceConfigs = interfaceConfigs.filter((item) => item.iface !== name).concat(config);
         domainUpstreams = config.domain_upstreams || [];
     }
@@ -419,7 +405,7 @@
             return;
         }
         const config = globalDnsConfig();
-        const forwardedEnabled = !config.adguardhome_upstream_enabled && (Boolean(config.forwarded_domains_enabled) || (config.domain_upstreams || []).length > 0);
+        const forwardedEnabled = Boolean(config.forwarded_domains_enabled) || (config.domain_upstreams || []).length > 0;
         dnsScopeList.innerHTML = `
             <section class="dnsmasq-scope-card" data-dnsmasq-scope="dns-global">
                 <div class="dnsmasq-scope-head">
@@ -465,14 +451,14 @@
                     </label>
                     <label class="field wide">
                         <span>Default upstream DNS servers</span>
-                        <textarea data-global-dns-field="upstream_dns_servers" rows="3" spellcheck="false"${config.adguardhome_upstream_enabled ? " disabled" : ""}>${fieldValue((config.upstream_dns_servers || []).join("\n"))}</textarea>
+                        <textarea data-global-dns-field="upstream_dns_servers" rows="3" spellcheck="false">${fieldValue((config.upstream_dns_servers || []).join("\n"))}</textarea>
                     </label>
                     <label class="check-line wide">
                         <input data-global-dns-field="adguardhome_upstream_enabled" type="checkbox"${checkedAttr(config.adguardhome_upstream_enabled)}>
                         <span>Enable DNS Filtering Upstream?</span>
                     </label>
                     <label class="check-line wide">
-                        <input data-global-dns-field="forwarded_domains_enabled" type="checkbox"${checkedAttr(forwardedEnabled)}${config.adguardhome_upstream_enabled ? " disabled" : ""}>
+                        <input data-global-dns-field="forwarded_domains_enabled" type="checkbox"${checkedAttr(forwardedEnabled)}>
                         <span>Enable forwarded domains?</span>
                     </label>
                     <label class="field dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
@@ -1332,9 +1318,6 @@
         updateInterfaceConfig(iface, field, value);
         setDirty(true);
         if (field === "adguardhome_upstream_enabled") {
-            if (scopeFieldValue(element, field)) {
-                updateInterfaceConfig(iface, "forwarded_domains_enabled", false);
-            }
             renderScopeCards();
         }
         return true;

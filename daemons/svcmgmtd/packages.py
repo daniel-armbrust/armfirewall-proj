@@ -13,7 +13,7 @@ from core.constants import (
     ADGUARD_HOME_ARCHIVE_URL,
     ADGUARD_HOME_BINARY,
     ADGUARD_HOME_CONFIG_PATH,
-    ADGUARD_HOME_DNS_HOST,
+    ADGUARD_HOME_DNS_BIND_HOSTS,
     ADGUARD_HOME_DNS_PORT,
     ADGUARD_HOME_DIR,
     ADGUARD_HOME_WORK_DIR,
@@ -98,12 +98,7 @@ def install_adguard_home() -> None:
 
 
 def configure_adguard_home_dns_listener() -> bool:
-    """Bind AdGuard Home DNS locally on its dedicated upstream port.
-
-    DNSMasq owns port 53 for LAN clients and forwards filtered queries to this
-    listener.  Returning ``False`` is expected before AdGuard's initial setup
-    has created its configuration file.
-    """
+    """Bind AdGuard Home on its dedicated LAN DNS redirect port."""
     if not ADGUARD_HOME_CONFIG_PATH.is_file():
         return False
 
@@ -113,7 +108,9 @@ def configure_adguard_home_dns_listener() -> bool:
         raise RuntimeError("AdGuard Home configuration does not contain a DNS section.")
 
     body = dns_section.group("body")
-    bind_hosts = f"  bind_hosts:\n    - {ADGUARD_HOME_DNS_HOST}\n"
+    bind_hosts = "  bind_hosts:\n" + "".join(
+        f'    - "{host}"\n' for host in ADGUARD_HOME_DNS_BIND_HOSTS
+    )
     if re.search(r"(?m)^  bind_hosts:\n(?:^    - .*\n)*", body):
         body = re.sub(r"(?m)^  bind_hosts:\n(?:^    - .*\n)*", bind_hosts, body, count=1)
     else:
