@@ -148,7 +148,7 @@ stderr_logfile_backups=5
         '{root}/daemons/adguardhome/AdGuardHome',
         '[program:adguardhome]
 directory={root}
-command={root}/daemons/adguardhome/AdGuardHome --no-check-update --web-addr 127.0.0.1:3001 --work-dir {root}/data/adguardhome
+command={root}/daemons/adguardhome/AdGuardHome --no-check-update --web-addr 127.0.0.1:3001 --work-dir {root}/daemons/adguardhome/data
 autostart=false
 autorestart=true
 startsecs=3
@@ -193,3 +193,13 @@ stderr_logfile_backups=5
 ',
         130
     );
+
+-- Migrate installations created before AdGuard Home data was colocated with its daemon.
+UPDATE services
+SET supervisor_program = REPLACE(
+    supervisor_program,
+    '--work-dir {root}/data/adguardhome',
+    '--work-dir {root}/daemons/adguardhome/data'
+)
+WHERE name = 'adguardhome'
+  AND supervisor_program LIKE '%--work-dir {root}/data/adguardhome%';
