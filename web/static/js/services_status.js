@@ -218,23 +218,33 @@
         }
         optionalBody.innerHTML = services.map((service) => {
             const installed = Boolean(service.installed);
-            const installDisabled = service.can_install ? "" : "disabled";
+            const autostartEnabled = Boolean(service.autostart_enabled);
             const startDisabled = installed && String(service.state || "").toUpperCase() !== "RUNNING" ? "" : "disabled";
             const restartDisabled = installed && String(service.state || "").toUpperCase() === "RUNNING" ? "" : "disabled";
             const stopDisabled = installed && String(service.state || "").toUpperCase() === "RUNNING" ? "" : "disabled";
-            const uninstallDisabled = installed ? "" : "disabled";
+            let controls;
+            if (!installed) {
+                controls = `<button class="text-button compact primary" type="button" data-optional-service-action="install" data-optional-service-name="${HF.escapeHtml(service.name)}" ${service.can_install ? "" : "disabled"}>Install</button>`;
+            } else if (!autostartEnabled) {
+                controls = `
+                    <button class="text-button compact primary" type="button" data-service-action="enable" data-service-name="${HF.escapeHtml(service.name)}">Enable</button>
+                    <button class="text-button compact danger" type="button" data-optional-service-action="uninstall" data-optional-service-name="${HF.escapeHtml(service.name)}">Uninstall</button>
+                `;
+            } else {
+                controls = `
+                    <button class="text-button compact" type="button" data-service-action="start" data-service-name="${HF.escapeHtml(service.name)}" ${startDisabled}>Start</button>
+                    <button class="text-button compact" type="button" data-service-action="restart" data-service-name="${HF.escapeHtml(service.name)}" ${restartDisabled}>Restart</button>
+                    <button class="text-button compact danger" type="button" data-service-action="stop" data-service-name="${HF.escapeHtml(service.name)}" ${stopDisabled}>Stop</button>
+                    <button class="text-button compact danger" type="button" data-service-action="disable" data-service-name="${HF.escapeHtml(service.name)}">Disable</button>
+                    <button class="text-button compact danger" type="button" data-optional-service-action="uninstall" data-optional-service-name="${HF.escapeHtml(service.name)}">Uninstall</button>
+                `;
+            }
             return `
                 <tr>
                     <td><strong>${HF.escapeHtml(service.display_name)}</strong><br><span class="muted">${HF.escapeHtml(service.name)}</span></td>
                     <td><span class="status ${statusClass(service.state)}">${HF.escapeHtml(service.state)}</span></td>
                     <td><span class="service-description" title="${HF.escapeHtml(service.description)}">${HF.escapeHtml(service.description)}</span></td>
-                    <td>
-                        <button class="text-button compact primary" type="button" data-optional-service-action="install" data-optional-service-name="${HF.escapeHtml(service.name)}" ${installDisabled}>Install</button>
-                        <button class="text-button compact" type="button" data-service-action="start" data-service-name="${HF.escapeHtml(service.name)}" ${startDisabled}>Start</button>
-                        <button class="text-button compact" type="button" data-service-action="restart" data-service-name="${HF.escapeHtml(service.name)}" ${restartDisabled}>Restart</button>
-                        <button class="text-button compact danger" type="button" data-service-action="stop" data-service-name="${HF.escapeHtml(service.name)}" ${stopDisabled}>Stop</button>
-                        <button class="text-button compact danger" type="button" data-optional-service-action="uninstall" data-optional-service-name="${HF.escapeHtml(service.name)}" ${uninstallDisabled}>Uninstall</button>
-                    </td>
+                    <td>${controls}</td>
                 </tr>
             `;
         }).join("");

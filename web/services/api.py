@@ -16,7 +16,7 @@ def service_status_payload(service: dict[str, Any], *, optional: bool = False) -
     state = (
         "ENABLED" if feature_toggle and enabled
         else "DISABLED" if feature_toggle
-        else "DISABLED" if not optional and not autostart_enabled
+        else "DISABLED" if installed and not autostart_enabled
         else service.get("runtime_state") if installed
         else "NOT INSTALLED"
     )
@@ -33,6 +33,7 @@ def service_status_payload(service: dict[str, Any], *, optional: bool = False) -
         "runtime_updated_at": service.get("runtime_updated_at"),
         "enabled": enabled,
         "feature_toggle": feature_toggle,
+        "autostart_enabled": autostart_enabled,
     }
 
     if optional:
@@ -41,7 +42,6 @@ def service_status_payload(service: dict[str, Any], *, optional: bool = False) -
     else:
         payload["protected"] = bool(service["protected"])
         payload["restart_allowed"] = bool(service.get("restart_allowed"))
-        payload["autostart_enabled"] = autostart_enabled
 
     return payload
 

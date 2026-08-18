@@ -73,12 +73,14 @@ def ensure_dnsmasq_lease_directory(service_name: str) -> None:
 
 
 def install_service(service: OptionalService) -> None:
-    """Install a package and register its supervisor program."""
+    """Install a package with autostart disabled until the user enables it."""
     if service.name == ADGUARD_HOME_SERVICE_NAME:
         install_adguard_home()
     else:
         install_package(service.package)
     register_supervisor_program(service)
+    set_supervisor_program_autostart(service.name, False)
+    set_service_autostart_enabled(service.name, False)
     reread_and_update()
     sync_supervisor_statuses()
     logger.log(f"Installed optional service {service.name}.", source=LOG_SOURCE)
@@ -95,6 +97,7 @@ def uninstall_service(service: OptionalService) -> None:
         uninstall_adguard_home()
     else:
         uninstall_package(service.package)
+    set_service_autostart_enabled(service.name, False)
     sync_supervisor_statuses()
     
     logger.log(f"Uninstalled optional service {service.name}.", source=LOG_SOURCE)
@@ -140,6 +143,8 @@ def control_service(service: ControllableService, action: str) -> None:
     else:
         raise RuntimeError(f"Unsupported service control action: {action}")
 
+    if action in {"enable", "disable"}:
+        reread_and_update()
     sync_supervisor_statuses()
     logger.log(f"Service {service_name} {action} completed.", source=LOG_SOURCE)
 
