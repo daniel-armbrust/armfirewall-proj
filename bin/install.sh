@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SET_HOSTNAME=""
 
 # shellcheck source=scripts/common/globals.sh
 . "$ROOT_DIR/bin/scripts/common/globals.sh"
@@ -10,13 +11,15 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Print command install.sh usage
 usage() {
     cat <<USAGE
+    
 Usage: $0 --lan-iface <iface> [--wan-iface <iface>] [--router-mode]
 
 Options:
-  --lan-iface <iface>  LAN network interface to persist in iface.db
-  --wan-iface <iface>  WAN network interface to persist in iface.db
-  --router-mode        Enable routing, forwarding, and NAT. Requires --wan-iface
-  -h, --help           Show this help message
+  --lan-iface <iface>     LAN network interface to persist in iface.db
+  --wan-iface <iface>     WAN network interface to persist in iface.db
+  --router-mode           Enable routing, forwarding, and NAT. Requires --wan-iface
+  --set-hostname <name>   Set the system hostname (a hostname or FQDN).
+  -h, --help              Show this help message
 
 USAGE
 }
@@ -40,6 +43,12 @@ parse_args() {
             --router-mode)
                 ROUTER_MODE=1
                 shift
+                ;;
+
+            --set-hostname)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--set-hostname requires a hostname."
+                SET_HOSTNAME="$2"
+                shift 2
                 ;;
 
             -h|--help)
@@ -66,6 +75,9 @@ main() {
 
     # Ensure the script is running with root privileges
     need_root
+
+    # Set the system hostname when explicitly requested.
+    "$ROOT_DIR/bin/scripts/install/hostname.sh" "$SET_HOSTNAME"
 
     # Configures the operating system package repositories used by ArmFirewall
     "$ROOT_DIR/bin/scripts/install/addpkgmirrors.sh"
