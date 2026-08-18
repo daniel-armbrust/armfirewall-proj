@@ -56,6 +56,20 @@ GLOBAL_KERNEL_PARAMS = [
         description="Controls reverse path filtering inherited by new IPv4 interfaces.",
     ),
     KernelParam(
+        name="net.ipv4.conf.all.log_martians",
+        proc_path="/proc/sys/net/ipv4/conf/all/log_martians",
+        category="IPv4",
+        default_value="0",
+        description="Controls logging of IPv4 packets with impossible or suspicious source addresses globally.",
+    ),
+    KernelParam(
+        name="net.ipv4.conf.default.log_martians",
+        proc_path="/proc/sys/net/ipv4/conf/default/log_martians",
+        category="IPv4",
+        default_value="0",
+        description="Controls logging of IPv4 packets with impossible or suspicious source addresses on new interfaces.",
+    ),
+    KernelParam(
         name="net.ipv4.conf.all.accept_redirects",
         proc_path="/proc/sys/net/ipv4/conf/all/accept_redirects",
         category="IPv4",
