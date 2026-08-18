@@ -100,7 +100,7 @@ def latency_targets() -> list[LatencyTarget]:
         iface = str(row.get("iface") or "").strip()
         address = str(row.get("target") or "").strip()
 
-        if not iface or not address:
+        if not address:
             continue
 
         key = (address, iface)
@@ -114,7 +114,11 @@ def latency_targets() -> list[LatencyTarget]:
                 name=configured_target_name(iface, address),
                 address=address,
                 iface=iface,
-                description=f"Configured latency target {address} via {iface}",
+                description=(
+                    f"Configured latency target {address} via {iface}"
+                    if iface
+                    else f"Configured latency target {address} via the default route"
+                ),
                 packet_count=positive_int(row.get("count"), 3),
                 timeout_seconds=positive_int(row.get("timeout"), 3),
             )

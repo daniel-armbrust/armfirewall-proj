@@ -170,9 +170,8 @@
         if (!editModal || !editForm) {
             return;
         }
-        const defaultIface = lastLatencyTargets[0] ? lastLatencyTargets[0].iface : "";
         editForm.elements.id.value = "";
-        editForm.elements.iface.value = defaultIface || "";
+        editForm.elements.iface.value = "";
         editForm.elements.target.value = "";
         editForm.elements.count.value = 3;
         editForm.elements.timeout.value = 3;

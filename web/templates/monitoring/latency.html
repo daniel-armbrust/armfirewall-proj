@@ -136,7 +136,12 @@
             <div class="form-grid">
                 <label class="field">
                     <span>Interface</span>
-                    <input id="latency-edit-iface" name="iface" type="text" required>
+                    <select id="latency-edit-iface" name="iface">
+                        <option value="">No interface (default route)</option>
+                        {% for iface in latency_interfaces %}
+                        <option value="{{ iface }}">{{ iface }}</option>
+                        {% endfor %}
+                    </select>
                 </label>
                 <label class="field">
                     <span>Target</span>
@@ -180,5 +185,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/monitoring_latency.js') }}?v=20260510-monitoring-refresh" defer></script>
+<script src="{{ url_for('static', path='/js/monitoring_latency.js') }}?v=20260820-latency-interface-select" defer></script>
 {% endblock %}

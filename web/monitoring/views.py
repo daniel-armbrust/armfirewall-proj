@@ -435,7 +435,8 @@ def latency_label_from_safe_name(safe_name: str) -> str:
 
 def latency_safe_name(iface: str, target: str) -> str:
     """Return the graph-safe name for one configured latency target."""
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{iface}-{target}".strip())
+    name = f"{iface}-{target}" if iface else target
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name.strip())
     return safe_name.strip("_") or "target"
 
 
@@ -496,6 +497,27 @@ def read_interface_tooltips() -> dict[str, str]:
     return tooltips
 
 
+def read_latency_interfaces() -> list[str]:
+    """Return selectable non-loopback interfaces for latency probes."""
+    if not IFACE_DB_PATH.exists():
+        return []
+
+    try:
+        rows = db.fetch_all(
+            """
+            SELECT name
+            FROM ifaces
+            WHERE name IS NOT NULL AND name <> '' AND name <> 'lo'
+            ORDER BY name
+            """,
+            db_path=IFACE_DB_PATH,
+        )
+    except db.DatabaseError:
+        return []
+
+    return [str(row.get("name") or "").strip() for row in rows if str(row.get("name") or "").strip()]
+
+
 def latency_target_payload(row: dict[str, Any], interface_tooltips: dict[str, str] | None = None) -> dict[str, Any]:
     """Return frontend metadata for one configured latency target."""
     iface = str(row.get("iface") or "")
@@ -506,9 +528,9 @@ def latency_target_payload(row: dict[str, Any], interface_tooltips: dict[str, st
         **row,
         "safe_name": safe_name,
         "name": safe_name,
-        "label": f"{target} ({iface})",
+        "label": f"{target} ({iface})" if iface else f"{target} (default route)",
         "rrd": f"latency-{safe_name}.rrd",
-        "interface_tooltip": interface_tooltips.get(iface, f"Interface: {iface}\nDetails unavailable"),
+        "interface_tooltip": interface_tooltips.get(iface, "No interface selected; the system routing table is used."),
     }
 
 
@@ -559,13 +581,16 @@ def latency_positive_int(value: Any, default: int) -> int:
 def latency_payload_values(payload: dict[str, Any], current: dict[str, Any] | None = None) -> tuple[str, str, int, int]:
     """Normalize latency target values from request payload."""
     current = current or {}
-    iface = str(payload.get("iface") or current.get("iface") or "").strip()
+    iface_value = payload["iface"] if "iface" in payload else current.get("iface")
+    iface = str(iface_value or "").strip()
     target = str(payload.get("target") or current.get("target") or "").strip()
     count = latency_positive_int(payload.get("count", current.get("count", 3)), int(current.get("count", 3)))
     timeout = latency_positive_int(payload.get("timeout", current.get("timeout", 3)), int(current.get("timeout", 3)))
 
-    if not iface or not target:
-        raise ValueError("Interface and target are required.")
+    if iface and iface not in read_latency_interfaces():
+        raise ValueError("Select a valid network interface.")
+    if not target:
+        raise ValueError("Target is required.")
 
     return iface, target, count, timeout
 
@@ -689,6 +714,7 @@ def get_latency_graphs() -> dict[str, Any]:
         "graphs": graphs,
         "targets": targets,
         "latency_targets": targets,
+        "latency_interfaces": read_latency_interfaces(),
         "periods": GRAPH_PERIODS,
     }
 
