@@ -65,12 +65,15 @@ def uninstall_package(package: str) -> None:
 
 
 def install_adguard_home() -> None:
-    """Download the official ARM64 AdGuard Home release when it is missing."""
-    if ADGUARD_HOME_BINARY.exists():
+    """Install the official ARM64 AdGuard Home runtime with executable permissions."""
+    if ADGUARD_HOME_BINARY.is_file():
+        ADGUARD_HOME_BINARY.chmod(0o755)
+        ADGUARD_HOME_WORK_DIR.mkdir(parents=True, exist_ok=True)
         return
+    if ADGUARD_HOME_BINARY.exists():
+        raise RuntimeError(f"AdGuard Home binary path is not a file: {ADGUARD_HOME_BINARY}")
 
     ADGUARD_HOME_DIR.parent.mkdir(parents=True, exist_ok=True)
-    ADGUARD_HOME_WORK_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="adguardhome-", dir=ADGUARD_HOME_DIR.parent) as temp_dir:
         temp_path = Path(temp_dir)
         archive_path = temp_path / "adguardhome.tar.gz"
@@ -85,12 +88,13 @@ def install_adguard_home() -> None:
                     raise RuntimeError("Unsafe path in AdGuard Home archive.")
             archive.extractall(extract_path, filter="data")
 
-        source_dir = extract_path / "AdGuardHome"
-        source_binary = source_dir / "AdGuardHome"
+        source_binary = extract_path / "AdGuardHome" / "AdGuardHome"
         if not source_binary.is_file():
             raise RuntimeError("AdGuard Home archive does not contain the expected binary.")
-        source_binary.chmod(0o755)
-        shutil.move(str(source_dir), str(ADGUARD_HOME_DIR))
+        ADGUARD_HOME_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_binary, ADGUARD_HOME_BINARY)
+        ADGUARD_HOME_BINARY.chmod(0o755)
+        ADGUARD_HOME_WORK_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def configure_adguard_home_dns_listener() -> bool:
