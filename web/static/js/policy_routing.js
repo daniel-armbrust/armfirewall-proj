@@ -742,9 +742,9 @@
             const result = await HF.fetchJson(`/api/network/policy-routing/${button.dataset.kind}/${button.dataset.id}`, {
                 method: "DELETE",
             });
-            setState(`saved=${result.item_id}`);
+            setState(`queued=${result.work_request_id}`);
             closeDeleteModal();
-            await loadData();
+            setActiveTab("work-requests", true);
         } catch (error) {
             setState(`error=${error.message}`);
         } finally {

@@ -54,6 +54,24 @@ def remove_table_dependencies(conn: db.Connection, table: RoutingTableRow) -> in
     return removed
 
 
+def discard_failed_routes(payload: Payload) -> int:
+    """Remove routes that could not be applied and undo any partial OS changes."""
+    route_ids = normalized_ids(payload, "route_ids")
+    if not route_ids:
+        return 0
+
+    with db.transaction(POLICY_DB_PATH) as conn:
+        routes = []
+        for route_id in route_ids:
+            try:
+                routes.append(fetch_route(conn, route_id))
+            except RuntimeError:
+                continue
+        for route in routes:
+            remove_route(route)
+        return purge_routes(conn, [int(route["id"]) for route in routes])
+
+
 def execute_work_request(payload: Payload) -> tuple[int, int]:
     """Apply queued policy routing changes and return applied and removed counts."""
     applied = 0

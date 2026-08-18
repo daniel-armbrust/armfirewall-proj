@@ -10,7 +10,7 @@ from core import log as logger
 from core.payload import decode_json_payload
 
 from .constants import LOG_SOURCE, POLICY_DB_PATH
-from .executor import execute_work_request
+from .executor import discard_failed_routes, execute_work_request
 
 
 def verify_policy_database() -> None:
@@ -36,6 +36,7 @@ def run_action(args: argparse.Namespace) -> int:
         source=LOG_SOURCE,
     )
 
+    payload = {}
     try:
         if args.action_name != "apply":
             raise RuntimeError(f"Unsupported policy routing action: {args.action_name}")
@@ -43,6 +44,12 @@ def run_action(args: argparse.Namespace) -> int:
         payload = decode_json_payload(args.payload_json)
         applied, removed = execute_work_request(payload)
     except Exception as exc:  # noqa: BLE001 - message is returned to workreqd.
+        try:
+            discarded = discard_failed_routes(payload)
+            if discarded:
+                logger.log(f"Discarded {discarded} route(s) after a failed apply.", source=LOG_SOURCE)
+        except Exception as cleanup_exc:  # noqa: BLE001 - preserve the original execution failure.
+            logger.error(f"Could not discard failed routes: {cleanup_exc}", source=LOG_SOURCE)
         logger.error(f"Policy routing execution failed: {exc}", source=LOG_SOURCE)
         return 1
 

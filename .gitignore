@@ -62,7 +62,7 @@ daemons/adamd/.delete-staging/
 
 # AdGuard Home downloaded runtime and generated state
 daemons/adguardhome/
-data/adguardhome/
+daemons/adguardhome/data/
 
 # Temporary, backup, and editor files
 tmp/

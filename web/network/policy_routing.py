@@ -407,15 +407,34 @@ def create_rule(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def mark_pending_delete(table: str, item_id: int) -> dict[str, Any]:
-    """Mark a policy routing item for deletion on the next apply."""
+    """Queue one policy routing item for deletion from the operating system."""
     ensure_policy_db()
     if table not in {"routes", "routing_rules", "routing_tables"}:
         raise HTTPException(status_code=400, detail="Unsupported policy routing table.")
     with db.transaction(POLICY_DB_PATH) as conn:
         if policy_item_is_immutable(conn, table, item_id):
             raise HTTPException(status_code=403, detail="Protected policy routing items cannot be deleted.")
+        if table == "routes":
+            current = db.fetch_one_on(conn, "SELECT addr_family FROM routes WHERE id = ?", (item_id,))
+        elif table == "routing_rules":
+            current = db.fetch_one_on(conn, "SELECT addr_family FROM routing_rules WHERE id = ?", (item_id,))
+        else:
+            current = db.fetch_one_on(conn, "SELECT id FROM routing_tables WHERE id = ?", (item_id,))
+        if current is None:
+            raise HTTPException(status_code=404, detail="Policy routing item not found.")
         db.execute_on(conn, f"UPDATE {table} SET pending_delete = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (item_id,))
-    return {"item_id": item_id, "status": "saved"}
+
+    family = str(current["addr_family"]) if table != "routing_tables" else "ipv4"
+    payload_key = {
+        "routes": "delete_route_ids",
+        "routing_rules": "delete_rule_ids",
+        "routing_tables": "delete_table_ids",
+    }[table]
+    work_request_id = enqueue_policy_work_request(
+        family,
+        policy_work_request_payload(family, **{payload_key: [item_id]}),
+    )
+    return {"item_id": item_id, "work_request_id": work_request_id, "status": "queued"}
 
 
 def set_enabled(table: str, item_id: int, payload: dict[str, Any]) -> dict[str, Any]:
