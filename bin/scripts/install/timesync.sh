@@ -9,6 +9,24 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 TIME_SYNC_SERVICE=""
 
+# Validate and apply an optional IANA timezone name.
+set_system_timezone() {
+    local timezone="${1:-}"
+    local zoneinfo_path
+
+    [[ -n "$timezone" ]] || return 0
+    [[ "$timezone" != /* && "$timezone" != *".."* ]] || fatal "Invalid timezone: ${timezone}."
+    zoneinfo_path="/usr/share/zoneinfo/${timezone}"
+    [[ -f "$zoneinfo_path" ]] || fatal "Timezone was not found: ${timezone}."
+
+    if has_cmd timedatectl; then
+        timedatectl set-timezone "$timezone" || fatal "Could not set timezone: ${timezone}."
+    else
+        ln -sfn "$zoneinfo_path" /etc/localtime || fatal "Could not set timezone: ${timezone}."
+    fi
+    log "Set system timezone to ${timezone}."
+}
+
 # Start the first available systemd time synchronization service.
 enable_systemd_time_service() {
     local service
@@ -62,6 +80,7 @@ configure_time_synchronization() {
 }
 
 main() {
+    set_system_timezone "${1:-}"
     configure_time_synchronization
 }
 

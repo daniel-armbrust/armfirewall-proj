@@ -7,7 +7,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # shellcheck source=../common/globals.sh
 . "$ROOT_DIR/bin/scripts/common/globals.sh"
 
-# Update static hostname mappings in /etc/hosts for a static LAN IPv4 address.
+# Update hostname mappings in /etc/hosts for loopback and a static LAN IPv4 address.
 update_hosts_file() {
     local requested_hostname="$1"
     local lan_ipv4_addr="$2"
@@ -21,8 +21,14 @@ update_hosts_file() {
     lan_ipv4="${lan_ipv4_addr%/*}"
     tmp_file="$(mktemp)"
     awk -v hostname="$requested_hostname" -v lan_ipv4="$lan_ipv4" '
-        $1 == "127.0.1.1" {
-            print "127.0.1.1\t" hostname
+        # Do not use the Debian 127.0.1.1 hostname convention.
+        $1 == "127.0.1.1" { next }
+        $1 == "127.0.0.1" {
+            printf "127.0.0.1"
+            for (field = 2; field <= NF; field++) {
+                if ($field != hostname) printf "\t%s", $field
+            }
+            printf "\t%s\n", hostname
             loopback_found = 1
             next
         }
@@ -33,7 +39,7 @@ update_hosts_file() {
         }
         { print }
         END {
-            if (!loopback_found) print "127.0.1.1\t" hostname
+            if (!loopback_found) print "127.0.0.1\tlocalhost\t" hostname
             if (!lan_found) print lan_ipv4 "\t" hostname
         }
     ' /etc/hosts > "$tmp_file"

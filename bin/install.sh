@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SET_HOSTNAME=""
+TIMEZONE=""
 LAN_IPV4_ADDR=""
 WAN_IPV4_ADDR=""
 LAN_IPV6_ADDR=""
@@ -19,21 +20,22 @@ usage() {
 Usage: $0 --lan-iface <iface> --lan-ipv4-addr <IPv4/CIDR|dhcp>
           --wan-iface <iface> --wan-ipv4-addr <IPv4/CIDR|dhcp>
           [--lan-ipv6-addr <IPv6/CIDR|dhcp|auto>] [--wan-ipv6-addr <IPv6/CIDR|dhcp|auto>]
-          [--router-mode] [--set-hostname <name>]
+          [--router-mode] [--set-hostname <name>] [--timezone <Region/City>]
 
 Options:
-  --lan-iface <iface>     LAN network interface to persist in iface.db
-  --lan-ipv4-addr <addr>  Set LAN IPv4 address/mask, or dhcp.
-  --lan-ipv6-addr <addr>  Optionally set LAN IPv6 address/prefix, dhcp, or auto.
+  --lan-iface <iface>       LAN network interface to persist in iface.db
+  --lan-ipv4-addr <addr>    Set LAN IPv4 address/mask, or dhcp.
+  --lan-ipv6-addr <addr>    Optionally set LAN IPv6 address/prefix, dhcp, or auto.
 
-  --wan-iface <iface>     WAN network interface to persist in iface.db
-  --wan-ipv4-addr <addr>  Set WAN IPv4 address/mask, or dhcp.
-  --wan-ipv6-addr <addr>  Optionally set WAN IPv6 address/prefix, dhcp, or auto.
+  --wan-iface <iface>       WAN network interface to persist in iface.db
+  --wan-ipv4-addr <addr>    Set WAN IPv4 address/mask, or dhcp.
+  --wan-ipv6-addr <addr>    Optionally set WAN IPv6 address/prefix, dhcp, or auto.
 
-  --router-mode           Enable routing, forwarding, and NAT. Requires --wan-iface
-  --set-hostname <name>   Set the system hostname (a hostname or FQDN).
+  --router-mode             Enable routing, forwarding, and NAT. Requires --wan-iface
+  --set-hostname <name>     Set the system hostname (a hostname or FQDN).
+  --timezone <Region/City>  Set the system timezone, e.g. America/Sao_Paulo.
   
-  -h, --help              Show this help message
+  -h, --help                Show this help message
 
 USAGE
 }
@@ -62,6 +64,12 @@ parse_args() {
             --set-hostname)
                 [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--set-hostname requires a hostname."
                 SET_HOSTNAME="$2"
+                shift 2
+                ;;
+
+            --timezone)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--timezone requires a timezone, e.g. America/Sao_Paulo."
+                TIMEZONE="$2"
                 shift 2
                 ;;
 
@@ -125,7 +133,7 @@ main() {
     "$ROOT_DIR/bin/scripts/install/hostname.sh" "$SET_HOSTNAME" "$LAN_IPV4_ADDR"
 
     # Enables automatic NTP synchronization.
-    "$ROOT_DIR/bin/scripts/install/timesync.sh"
+    "$ROOT_DIR/bin/scripts/install/timesync.sh" "$TIMEZONE"
 
     # Configures the operating system package repositories used by ArmFirewall
     "$ROOT_DIR/bin/scripts/install/addpkgmirrors.sh"
