@@ -62,7 +62,7 @@ def sanitize_target_name(name: str) -> str:
 
 def configured_target_name(iface: str, address: str) -> str:
     """Return the graph-safe target name used by the web GUI."""
-    return sanitize_target_name(f"{iface}-{address}")
+    return sanitize_target_name(f"{iface}-{address}" if iface else address)
 
 
 def safe_rrd_value(value: float | None) -> str:
