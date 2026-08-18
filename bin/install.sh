@@ -124,6 +124,9 @@ main() {
     # Set the system hostname when explicitly requested.
     "$ROOT_DIR/bin/scripts/install/hostname.sh" "$SET_HOSTNAME" "$LAN_IPV4_ADDR"
 
+    # Enables automatic NTP synchronization.
+    "$ROOT_DIR/bin/scripts/install/timesync.sh"
+
     # Configures the operating system package repositories used by ArmFirewall
     "$ROOT_DIR/bin/scripts/install/addpkgmirrors.sh"
 
@@ -163,9 +166,6 @@ main() {
 
     # Configures requested IPv4 and optional IPv6 interfaces using the platform network backend.
     "$ROOT_DIR/bin/scripts/install/networking.sh" "$LAN_IFACE" "$LAN_IPV4_ADDR" "$WAN_IFACE" "$WAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR"
-
-    # Enables automatic NTP synchronization after the network is configured.
-    "$ROOT_DIR/bin/scripts/install/timesync.sh"
 
 }
 
