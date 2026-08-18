@@ -16,6 +16,11 @@ uses_dhcp() {
     [[ "${1:-}" == "dhcp" ]]
 }
 
+# Return success when an IPv6 address specification requests SLAAC.
+uses_ipv6_auto() {
+    [[ "${1:-}" == "auto" ]]
+}
+
 # Validate an IPv4 address with a CIDR prefix, such as 192.0.2.10/24.
 validate_ipv4_cidr() {
     local value="$1"
@@ -79,6 +84,10 @@ write_interface_stanza() {
     [[ -n "$ipv6_address_spec" ]] || return 0
     if uses_dhcp "$ipv6_address_spec"; then
         printf 'iface %s inet6 dhcp\n\n' "$iface"
+        return 0
+    fi
+    if uses_ipv6_auto "$ipv6_address_spec"; then
+        printf 'iface %s inet6 auto\n\n' "$iface"
         return 0
     fi
 
@@ -148,7 +157,7 @@ main() {
         uses_dhcp "$address_spec" || validate_ipv4_cidr "$address_spec" || fatal "Invalid IPv4 address/mask: ${address_spec}."
     done
     for address_spec in "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR"; do
-        [[ -z "$address_spec" ]] || uses_dhcp "$address_spec" || validate_ipv6_cidr "$address_spec" || fatal "Invalid IPv6 address/prefix: ${address_spec}."
+        [[ -z "$address_spec" ]] || uses_dhcp "$address_spec" || uses_ipv6_auto "$address_spec" || validate_ipv6_cidr "$address_spec" || fatal "Invalid IPv6 address/prefix: ${address_spec}."
     done
     is_debian_family || {
         log "Network reconfiguration is currently supported only on Debian-family systems; leaving the active network backend unchanged."

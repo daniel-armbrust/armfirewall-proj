@@ -18,17 +18,17 @@ usage() {
     
 Usage: $0 --lan-iface <iface> --lan-ipv4-addr <IPv4/CIDR|dhcp>
           --wan-iface <iface> --wan-ipv4-addr <IPv4/CIDR|dhcp>
-          [--lan-ipv6-addr <IPv6/CIDR|dhcp>] [--wan-ipv6-addr <IPv6/CIDR|dhcp>]
+          [--lan-ipv6-addr <IPv6/CIDR|dhcp|auto>] [--wan-ipv6-addr <IPv6/CIDR|dhcp|auto>]
           [--router-mode] [--set-hostname <name>]
 
 Options:
   --lan-iface <iface>     LAN network interface to persist in iface.db
   --lan-ipv4-addr <addr>  Set LAN IPv4 address/mask, or dhcp.
-  --lan-ipv6-addr <addr>  Optionally set LAN IPv6 address/prefix, or dhcp.
+  --lan-ipv6-addr <addr>  Optionally set LAN IPv6 address/prefix, dhcp, or auto.
 
   --wan-iface <iface>     WAN network interface to persist in iface.db
   --wan-ipv4-addr <addr>  Set WAN IPv4 address/mask, or dhcp.
-  --wan-ipv6-addr <addr>  Optionally set WAN IPv6 address/prefix, or dhcp.
+  --wan-ipv6-addr <addr>  Optionally set WAN IPv6 address/prefix, dhcp, or auto.
 
   --router-mode           Enable routing, forwarding, and NAT. Requires --wan-iface
   --set-hostname <name>   Set the system hostname (a hostname or FQDN).
@@ -78,13 +78,13 @@ parse_args() {
                 ;;
 
             --lan-ipv6-addr)
-                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv6-addr requires an IPv6 address/prefix or dhcp."
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv6-addr requires an IPv6 address/prefix, dhcp, or auto."
                 LAN_IPV6_ADDR="$2"
                 shift 2
                 ;;
 
             --wan-ipv6-addr)
-                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-ipv6-addr requires an IPv6 address/prefix or dhcp."
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-ipv6-addr requires an IPv6 address/prefix, dhcp, or auto."
                 WAN_IPV6_ADDR="$2"
                 shift 2
                 ;;
@@ -163,6 +163,9 @@ main() {
 
     # Configures requested IPv4 and optional IPv6 interfaces using the platform network backend.
     "$ROOT_DIR/bin/scripts/install/networking.sh" "$LAN_IFACE" "$LAN_IPV4_ADDR" "$WAN_IFACE" "$WAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR"
+
+    # Enables automatic NTP synchronization after the network is configured.
+    "$ROOT_DIR/bin/scripts/install/timesync.sh"
 
 }
 
