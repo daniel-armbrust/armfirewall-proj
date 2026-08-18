@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import ipaddress
 import uuid
 from typing import Any
 
@@ -87,6 +88,21 @@ def optional_text(value: Any) -> str | None:
     """Return a stripped optional string."""
     text = str(value or "").strip()
     return text or None
+
+
+def optional_ip_address(value: Any, family: str, field_name: str) -> str | None:
+    """Validate an optional IP address against its policy routing family."""
+    text = optional_text(value)
+    if text is None:
+        return None
+    try:
+        address = ipaddress.ip_address(text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"{field_name} must be a valid IP address.") from exc
+    expected_version = 6 if family == "ipv6" else 4
+    if address.version != expected_version:
+        raise HTTPException(status_code=400, detail=f"{field_name} must be an {family} address.")
+    return str(address)
 
 
 def next_order(conn: db.Connection, table: str, column: str) -> int:
@@ -253,7 +269,7 @@ def sanitize_route_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "destination": str(payload.get("destination") or "default").strip(),
         "gateway": optional_text(payload.get("gateway")),
         "dev": optional_text(payload.get("dev")),
-        "preferred_source": optional_text(payload.get("preferred_source")),
+        "preferred_source": optional_ip_address(payload.get("preferred_source"), family, "preferred_source"),
         "metric": optional_int(payload.get("metric")),
         "scope": optional_text(payload.get("scope")),
         "protocol": optional_text(payload.get("protocol")),

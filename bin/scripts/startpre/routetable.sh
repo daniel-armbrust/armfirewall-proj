@@ -51,7 +51,9 @@ apply_policy_route() {
     add_if_value command "scope" "$scope"
     add_if_value command "proto" "$protocol"
     [[ "$onlink" == "1" ]] && command+=("onlink")
-    "${command[@]}"
+    if ! "${command[@]}"; then
+        log "Skipping persisted route id=${id}: could not apply the saved route specification."
+    fi
 }
 
 # Build and execute one ip rule add command.
@@ -94,7 +96,9 @@ apply_policy_rule() {
     delete_command=("${command[@]}")
     delete_command[3]="del"
     while "${delete_command[@]}" >/dev/null 2>&1; do :; done
-    "${command[@]}"
+    if ! "${command[@]}"; then
+        log "Skipping persisted routing rule id=${id}: could not apply the saved rule specification."
+    fi
 }
 
 # Apply enabled policy routing tables, routes and rules stored in SQLite.
