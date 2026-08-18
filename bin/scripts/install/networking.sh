@@ -86,7 +86,7 @@ is_debian_family() {
 
 # Configure requested network interfaces through Debian's ifupdown backend.
 configure_debian_interfaces() {
-    local tmp_file
+    local tmp_file iface applied_iface=""
 
     mkdir -p "$NETWORK_INTERFACES_DIR"
     if [[ ! -f "$NETWORK_INTERFACES_FILE" ]]; then
@@ -107,7 +107,16 @@ configure_debian_interfaces() {
     systemctl disable --now NetworkManager.service >/dev/null 2>&1 || true
     systemctl disable --now NetworkManager-wait-online.service >/dev/null 2>&1 || true
     systemctl enable networking.service
+    log "Restarting networking.service."
     systemctl restart networking.service
+
+    for iface in "$LAN_IFACE" "$WAN_IFACE"; do
+        [[ -n "$iface" && "$iface" != "$applied_iface" ]] || continue
+        applied_iface="$iface"
+        log "Applying network configuration on ${iface}."
+        ifdown --force "$iface" >/dev/null 2>&1 || true
+        ifup "$iface" || fatal "Could not apply network configuration on ${iface}."
+    done
     log "Configured Debian interfaces in ${ARMFIREWALL_INTERFACES_FILE} and disabled NetworkManager."
 }
 

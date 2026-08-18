@@ -111,10 +111,18 @@ disable_ufw() {
     stop_disable_systemd_service ufw
 }
 
+# Configure console boot so a graphical desktop cannot start after reboot.
+disable_graphical_boot() {
+    command -v systemctl >/dev/null 2>&1 || return 0
+    log "Setting the default boot target to multi-user.target."
+    systemctl set-default multi-user.target || fatal "Could not set multi-user.target as the default boot target."
+}
+
 # Disable optional desktop, discovery, modem, Bluetooth, and Wi-Fi services.
 disable_unneeded_services() {
     local service
 
+    disable_graphical_boot
     for service in gdm gdm3 display-manager cups cups-browsed avahi-daemon ModemManager bluetooth wpa_supplicant samba-ad-dc; do
         stop_disable_systemd_service "$service"
     done
