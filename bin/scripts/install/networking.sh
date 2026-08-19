@@ -108,6 +108,113 @@ write_interface_stanza() {
     printf 'iface %s inet6 static\n    address %s\n    netmask %s\n\n' "$iface" "$address" "$prefix"
 }
 
+# Return success when NetworkManager can be configured through nmcli.
+networkmanager_available() {
+    command -v nmcli >/dev/null 2>&1
+}
+
+# Remove only network files and units created by the legacy ArmFirewall ifupdown backend.
+cleanup_legacy_ifupdown_backend() {
+    rm -f "$ARMFIREWALL_INTERFACES_FILE"
+
+    command -v systemctl >/dev/null 2>&1 || return 0
+    systemctl disable --now "$ARMFIREWALL_HOTPLUG_UNIT" >/dev/null 2>&1 || true
+    rm -f "$ARMFIREWALL_HOTPLUG_UNIT_FILE"
+    
+    systemctl daemon-reload
+    systemctl disable networking.service >/dev/null 2>&1 || true
+}
+
+# Return the active connection profile for an interface, creating one when needed.
+networkmanager_connection_for_interface() {
+    local iface="$1" connection
+
+    connection="$(nmcli -g GENERAL.CONNECTION device show "$iface" 2>/dev/null | head -n 1 || true)"
+    
+    if [[ -z "$connection" || "$connection" == "--" ]]; then
+        connection="armfirewall-${iface}"
+        nmcli connection add type ethernet ifname "$iface" con-name "$connection" autoconnect yes >/dev/null || \
+            fatal "Could not create the NetworkManager connection for ${iface}."
+    fi
+   
+    printf '%s\n' "$connection"
+}
+
+# Apply an IPv4 DHCP or static configuration to one NetworkManager connection.
+configure_networkmanager_ipv4() {
+    local connection="$1" address_spec="$2"
+
+    if uses_dhcp "$address_spec"; then
+        nmcli connection modify "$connection" \
+            ipv4.method auto ipv4.addresses "" ipv4.gateway "" ipv4.never-default no || \
+            fatal "Could not configure IPv4 DHCP for NetworkManager connection ${connection}."
+        return 0
+    fi
+
+    nmcli connection modify "$connection" \
+        ipv4.method manual ipv4.addresses "$address_spec" ipv4.gateway "" ipv4.never-default no || \
+        fatal "Could not configure static IPv4 for NetworkManager connection ${connection}."
+}
+
+# Apply optional IPv6 configuration to one NetworkManager connection.
+configure_networkmanager_ipv6() {
+    local connection="$1" address_spec="$2"
+
+    [[ -n "$address_spec" ]] || return 0
+    if uses_dhcp "$address_spec" || uses_ipv6_auto "$address_spec"; then
+        # NetworkManager's automatic method processes Router Advertisements and DHCPv6.
+        nmcli connection modify "$connection" \
+            ipv6.method auto ipv6.addresses "" ipv6.gateway "" ipv6.never-default no || \
+            fatal "Could not configure automatic IPv6 for NetworkManager connection ${connection}."
+        return 0
+    fi
+
+    nmcli connection modify "$connection" \
+        ipv6.method manual ipv6.addresses "$address_spec" ipv6.gateway "" ipv6.never-default no || \
+        fatal "Could not configure static IPv6 for NetworkManager connection ${connection}."
+}
+
+# Configure requested interfaces through the operating system's NetworkManager backend.
+configure_networkmanager_interfaces() {
+    local iface ipv4_address_spec ipv6_address_spec connection applied_iface=""
+    local -a ifaces=("$LAN_IFACE" "$WAN_IFACE")
+    local -a ipv4_addresses=("$LAN_IPV4_ADDR" "$WAN_IPV4_ADDR")
+    local -a ipv6_addresses=("$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR")
+    local index
+
+    cleanup_legacy_ifupdown_backend
+
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl enable --now NetworkManager.service || fatal "Could not enable NetworkManager."
+    fi
+
+    for index in "${!ifaces[@]}"; do
+        iface="${ifaces[$index]}"
+        ipv4_address_spec="${ipv4_addresses[$index]}"
+        ipv6_address_spec="${ipv6_addresses[$index]}"
+        [[ -n "$iface" && "$iface" != "$applied_iface" ]] || continue
+        applied_iface="$iface"
+
+        ip link show dev "$iface" >/dev/null 2>&1 || fatal "Network interface was not found: ${iface}."
+        nmcli device set "$iface" managed yes || fatal "Could not mark ${iface} as managed by NetworkManager."
+        
+        connection="$(networkmanager_connection_for_interface "$iface")"
+        
+        nmcli connection modify "$connection" connection.interface-name "$iface" connection.autoconnect yes || \
+            fatal "Could not prepare the NetworkManager connection for ${iface}."
+        
+        configure_networkmanager_ipv4 "$connection" "$ipv4_address_spec"
+        configure_networkmanager_ipv6 "$connection" "$ipv6_address_spec"
+
+        log "Applying NetworkManager configuration on ${iface}."
+       
+        nmcli connection up "$connection" ifname "$iface" >/dev/null || \
+            fatal "Could not activate the NetworkManager connection on ${iface}."
+    done
+
+    log "Configured network interfaces through NetworkManager."
+}
+
 # Identify Linux distributions that use ifupdown and /etc/network/interfaces.
 is_debian_family() {
     local distro_id distro_like
@@ -215,11 +322,17 @@ main() {
         [[ -z "$address_spec" ]] || uses_dhcp "$address_spec" || uses_ipv6_auto "$address_spec" || validate_ipv6_cidr "$address_spec" || fatal "Invalid IPv6 address/prefix: ${address_spec}."
     done
     
+    if networkmanager_available; then
+        configure_networkmanager_interfaces
+        return 0
+    fi
+
     is_debian_family || {
-        log "Network reconfiguration is currently supported only on Debian-family systems; leaving the active network backend unchanged."
+        log "NetworkManager is unavailable and network reconfiguration is currently supported only on Debian-family systems; leaving the active network backend unchanged."
         return 0
     }
-    
+
+    log "NetworkManager is unavailable; using the Debian ifupdown fallback."
     configure_debian_interfaces
 }
 
