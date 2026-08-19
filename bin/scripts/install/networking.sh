@@ -140,7 +140,7 @@ install_hotplug_activation_service() {
         '[Service]' \
         'Type=oneshot' \
         'TimeoutStartSec=75' \
-        "ExecStartPre=/bin/sh -ec 'for interface in ${LAN_IFACE} ${WAN_IFACE}; do attempts=0; until /sbin/ip link show dev \"\${interface}\" >/dev/null 2>&1; do attempts=\$((attempts + 1)); [ \"\${attempts}\" -lt 30 ] || exit 1; sleep 1; done; done'" \
+        "ExecStartPre=/bin/sh -ec 'for interface in ${LAN_IFACE} ${WAN_IFACE}; do attempts=0; until /sbin/ip link show dev \"\$\${interface}\" >/dev/null 2>&1; do attempts=\$\$((attempts + 1)); [ \"\$\${attempts}\" -lt 30 ] || exit 1; sleep 1; done; done'" \
         'ExecStart=/sbin/ifup --allow=hotplug -a' \
         'RemainAfterExit=yes' \
         '' \
