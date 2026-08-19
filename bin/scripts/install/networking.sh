@@ -10,6 +10,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 NETWORK_INTERFACES_FILE="/etc/network/interfaces"
 NETWORK_INTERFACES_DIR="/etc/network/interfaces.d"
 ARMFIREWALL_INTERFACES_FILE="${NETWORK_INTERFACES_DIR}/armfirewall"
+ARMFIREWALL_HOTPLUG_UNIT="armfirewall-ifup-hotplug.service"
+ARMFIREWALL_HOTPLUG_UNIT_FILE="/etc/systemd/system/${ARMFIREWALL_HOTPLUG_UNIT}"
 
 # Return success when an address specification requests DHCP.
 uses_dhcp() {
@@ -108,11 +110,40 @@ is_debian_family() {
     [[ "$distro_id" == "debian" || "$distro_id" == "ubuntu" || " $distro_like " == *" debian "* ]]
 }
 
+# Install a boot-time activation unit for interfaces declared with allow-hotplug.
+# networking.service only runs ifup -a, which does not include that interface class.
+install_hotplug_activation_service() {
+    local tmp_file
+
+    tmp_file="$(mktemp)"
+
+    printf '%s\n' \
+        '[Unit]' \
+        'Description=Activate ArmFirewall allow-hotplug network interfaces' \
+        'Wants=networking.service' \
+        'After=networking.service' \
+        '' \
+        '[Service]' \
+        'Type=oneshot' \
+        'ExecStart=/sbin/ifup --allow=hotplug -a' \
+        'RemainAfterExit=yes' \
+        '' \
+        '[Install]' \
+        'WantedBy=multi-user.target' > "$tmp_file"
+    
+    install -m 0644 "$tmp_file" "$ARMFIREWALL_HOTPLUG_UNIT_FILE"
+    rm -f "$tmp_file"
+
+    systemctl daemon-reload
+    systemctl enable "$ARMFIREWALL_HOTPLUG_UNIT"
+}
+
 # Configure requested network interfaces through Debian's ifupdown backend.
 configure_debian_interfaces() {
     local tmp_file iface applied_iface=""
 
     mkdir -p "$NETWORK_INTERFACES_DIR"
+    
     if [[ ! -f "$NETWORK_INTERFACES_FILE" ]]; then
         printf 'auto lo\niface lo inet loopback\nsource %s/*\n' "$NETWORK_INTERFACES_DIR" > "$NETWORK_INTERFACES_FILE"
     elif ! grep -Fqx "source ${NETWORK_INTERFACES_DIR}/*" "$NETWORK_INTERFACES_FILE"; then
@@ -131,6 +162,7 @@ configure_debian_interfaces() {
     systemctl disable --now NetworkManager.service >/dev/null 2>&1 || true
     systemctl disable --now NetworkManager-wait-online.service >/dev/null 2>&1 || true
     systemctl enable networking.service
+    install_hotplug_activation_service
     log "Restarting networking.service."
     systemctl restart networking.service
 
