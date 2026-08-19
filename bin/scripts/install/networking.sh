@@ -30,11 +30,13 @@ validate_ipv4_cidr() {
     local -a octets
 
     IFS=/ read -r address prefix extra <<< "$value"
+    
     [[ -n "$address" && -n "$prefix" && -z "$extra" ]] || return 1
     [[ "$prefix" =~ ^[0-9]+$ ]] && (( 10#$prefix <= 32 )) || return 1
 
     IFS=. read -r -a octets <<< "$address"
     [[ ${#octets[@]} -eq 4 ]] || return 1
+    
     for octet in "${octets[@]}"; do
         [[ "$octet" =~ ^[0-9]+$ ]] && (( 10#$octet <= 255 )) || return 1
     done
@@ -63,6 +65,7 @@ cidr_to_netmask() {
         fi
         octets+=("$octet")
     done
+
     (IFS=.; printf '%s\n' "${octets[*]}")
 }
 
@@ -72,7 +75,9 @@ write_interface_stanza() {
     local address prefix netmask
 
     [[ -n "$iface" && -n "$ipv4_address_spec" ]] || return 0
+    
     printf 'allow-hotplug %s\n' "$iface"
+    
     if uses_dhcp "$ipv4_address_spec"; then
         printf 'iface %s inet dhcp\n\n' "$iface"
     else
@@ -84,18 +89,22 @@ write_interface_stanza() {
     fi
 
     [[ -n "$ipv6_address_spec" ]] || return 0
+   
     if uses_dhcp "$ipv6_address_spec"; then
         printf 'iface %s inet6 dhcp\n\n' "$iface"
         return 0
     fi
+   
     if uses_ipv6_auto "$ipv6_address_spec"; then
         printf 'iface %s inet6 auto\n\n' "$iface"
         return 0
     fi
 
     validate_ipv6_cidr "$ipv6_address_spec" || fatal "Invalid IPv6 address/prefix for ${iface}: ${ipv6_address_spec}."
+   
     address="${ipv6_address_spec%/*}"
     prefix="${ipv6_address_spec#*/}"
+   
     printf 'iface %s inet6 static\n    address %s\n    netmask %s\n\n' "$iface" "$address" "$prefix"
 }
 
@@ -104,9 +113,12 @@ is_debian_family() {
     local distro_id distro_like
 
     [[ -r /etc/os-release ]] || fatal "/etc/os-release was not found."
+   
     . /etc/os-release
+   
     distro_id="${ID:-}"
     distro_like="${ID_LIKE:-}"
+   
     [[ "$distro_id" == "debian" || "$distro_id" == "ubuntu" || " $distro_like " == *" debian "* ]]
 }
 
@@ -162,17 +174,22 @@ configure_debian_interfaces() {
     systemctl disable --now NetworkManager.service >/dev/null 2>&1 || true
     systemctl disable --now NetworkManager-wait-online.service >/dev/null 2>&1 || true
     systemctl enable networking.service
+   
     install_hotplug_activation_service
+   
     log "Restarting networking.service."
     systemctl restart networking.service
 
     for iface in "$LAN_IFACE" "$WAN_IFACE"; do
         [[ -n "$iface" && "$iface" != "$applied_iface" ]] || continue
+       
         applied_iface="$iface"
+       
         log "Applying network configuration on ${iface}."
         ifdown --force "$iface" >/dev/null 2>&1 || true
         ifup "$iface" || fatal "Could not apply network configuration on ${iface}."
     done
+    
     log "Configured Debian interfaces in ${ARMFIREWALL_INTERFACES_FILE} and disabled NetworkManager."
 }
 
@@ -185,16 +202,20 @@ main() {
     WAN_IPV6_ADDR="${6:-}"
 
     [[ -n "$LAN_IPV4_ADDR$WAN_IPV4_ADDR" ]] || return 0
+
     for address_spec in "$LAN_IPV4_ADDR" "$WAN_IPV4_ADDR"; do
         uses_dhcp "$address_spec" || validate_ipv4_cidr "$address_spec" || fatal "Invalid IPv4 address/mask: ${address_spec}."
     done
+    
     for address_spec in "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR"; do
         [[ -z "$address_spec" ]] || uses_dhcp "$address_spec" || uses_ipv6_auto "$address_spec" || validate_ipv6_cidr "$address_spec" || fatal "Invalid IPv6 address/prefix: ${address_spec}."
     done
+    
     is_debian_family || {
         log "Network reconfiguration is currently supported only on Debian-family systems; leaving the active network backend unchanged."
         return 0
     }
+    
     configure_debian_interfaces
 }
 
