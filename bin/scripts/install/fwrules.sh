@@ -403,7 +403,7 @@ record_icmpv6_input_rule() {
             protected, enabled, created_at, updated_at)
                 SELECT
                     'ANY', (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
-                    1, 0, 0, 0, $(sql_quote "$src_addr"), NULL,
+                    0, 0, 0, 0, $(sql_quote "$src_addr"), NULL,
                     '::/0', NULL,
                     'icmpv6', ${icmp_type}, ${icmp_code},
                     'ACCEPT', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -416,7 +416,20 @@ record_icmpv6_input_rule() {
                             AND protocol_code = ${icmp_code}
                             AND action = 'ACCEPT'
                             AND enabled = 1
-                );"
+                );
+
+                UPDATE filter_input_rules
+                SET ct_new = 0,
+                    ct_established = 0,
+                    ct_related = 0,
+                    ct_invalid = 0,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE iface_in = 'ANY'
+                    AND src_addr = $(sql_quote "$src_addr")
+                    AND protocol_name = 'icmpv6'
+                    AND protocol_type = ${icmp_type}
+                    AND protocol_code = ${icmp_code}
+                    AND action = 'ACCEPT';"
 }
 
 # Record one ICMPv6 FORWARD rule in SQLite.
@@ -477,9 +490,14 @@ allow_required_icmpv6() {
         allow_icmpv6_forward_rule "${rule%/*}" "${rule#*/}"
     done
 
-    # Router Solicitation, Router Advertisement, Neighbor Solicitation, Neighbor Advertisement.
-    for rule in 133/0 134/0 135/0 136/0; do
+    # Router Solicitation and Router Advertisement are link-local by definition.
+    for rule in 133/0 134/0; do
         allow_icmpv6_input_rule "fe80::/10" "${rule%/*}" "${rule#*/}"
+    done
+
+    # Neighbor Discovery messages can use the neighbor global IPv6 address.
+    for rule in 135/0 136/0; do
+        allow_icmpv6_input_rule "::/0" "${rule%/*}" "${rule#*/}"
     done
 }
 
