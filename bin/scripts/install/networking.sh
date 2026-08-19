@@ -124,6 +124,8 @@ is_debian_family() {
 
 # Install a boot-time activation unit for interfaces declared with allow-hotplug.
 # networking.service only runs ifup -a, which does not include that interface class.
+# Some systems rename network devices after networking.service starts, so wait for
+# the requested interface names before invoking ifup.
 install_hotplug_activation_service() {
     local tmp_file
 
@@ -137,6 +139,8 @@ install_hotplug_activation_service() {
         '' \
         '[Service]' \
         'Type=oneshot' \
+        'TimeoutStartSec=75' \
+        "ExecStartPre=/bin/sh -ec 'for interface in ${LAN_IFACE} ${WAN_IFACE}; do attempts=0; until /sbin/ip link show dev \"\${interface}\" >/dev/null 2>&1; do attempts=\$((attempts + 1)); [ \"\${attempts}\" -lt 30 ] || exit 1; sleep 1; done; done'" \
         'ExecStart=/sbin/ifup --allow=hotplug -a' \
         'RemainAfterExit=yes' \
         '' \
