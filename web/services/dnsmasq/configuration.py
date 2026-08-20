@@ -139,7 +139,7 @@ def parse_dnsmasq_config(lines: list[str]) -> dict[str, Any]:
         if not line or line.startswith("#"):
             known.add(index)
             continue
-        if line == "bind-interfaces":
+        if line in {"bind-interfaces", "bind-dynamic"}:
             known.add(index)
             continue
         if line == "expand-hosts":
@@ -234,7 +234,7 @@ def render_config(config: dict[str, Any]) -> str:
         "# Generated from Services / Dnsmasq.",
         f"# armfirewall-adguardhome-upstream={1 if config['adguardhome_upstream_enabled'] else 0}",
         f"port={DNSMASQ_DNS_PORT if dns_enabled else 0}",
-        "bind-interfaces",
+        "bind-dynamic",
     ]
 
     if ipv6_ra_enabled:
