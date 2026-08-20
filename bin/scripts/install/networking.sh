@@ -174,6 +174,14 @@ configure_networkmanager_ipv6() {
         fatal "Could not configure static IPv6 for NetworkManager connection ${connection}."
 }
 
+# Return success when an Ethernet interface has a physical link.
+network_interface_has_carrier() {
+    local iface="$1"
+
+    [[ -r "/sys/class/net/${iface}/carrier" ]] || return 1
+    [[ "$(<"/sys/class/net/${iface}/carrier")" == "1" ]]
+}
+
 # Configure requested interfaces through the operating system's NetworkManager backend.
 configure_networkmanager_interfaces() {
     local iface ipv4_address_spec ipv6_address_spec connection applied_iface=""
@@ -206,10 +214,13 @@ configure_networkmanager_interfaces() {
         configure_networkmanager_ipv4 "$connection" "$ipv4_address_spec"
         configure_networkmanager_ipv6 "$connection" "$ipv6_address_spec"
 
-        log "Applying NetworkManager configuration on ${iface}."
-       
-        nmcli connection up "$connection" ifname "$iface" >/dev/null || \
-            fatal "Could not activate the NetworkManager connection on ${iface}."
+        if network_interface_has_carrier "$iface"; then
+            log "Applying NetworkManager configuration on ${iface}."
+            nmcli connection up "$connection" ifname "$iface" >/dev/null || \
+                fatal "Could not activate the NetworkManager connection on ${iface}."
+        else
+            log "Saved NetworkManager configuration for ${iface}; activation will occur when a physical link is detected."
+        fi
     done
 
     log "Configured network interfaces through NetworkManager."
