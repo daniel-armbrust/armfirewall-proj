@@ -63,14 +63,16 @@ def route_spec(route: RouteRow) -> list[str]:
     command.append(destination)
     command.extend(["table", str(route["table_id"])])
 
-    add_if_value(command, "via", route.get("gateway"))
+    gateway = route.get("gateway")
+    add_if_value(command, "via", gateway)
     add_if_value(command, "dev", route.get("dev"))
     add_if_value(command, "src", route.get("preferred_source"))
     add_if_value(command, "metric", route.get("metric"))
     add_if_value(command, "scope", route.get("scope"))
     add_if_value(command, "proto", route.get("protocol"))
-    
-    if int(route.get("onlink") or 0) == 1:
+
+    # Allow a configured next hop even when it is outside a directly connected subnet.
+    if gateway:
         command.append("onlink")
 
     return command

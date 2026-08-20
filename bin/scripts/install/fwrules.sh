@@ -186,7 +186,7 @@ record_loopback_rules() {
     done
 }
 
-# Record one protected DNS redirect to the local DNS service.
+# Record one system-managed, editable DNS redirect to the local DNS service.
 record_dns_redirect_rule() {
     local family="$1"
     local protocol="$2"
@@ -202,14 +202,14 @@ record_dns_redirect_rule() {
             iface_in, rule_order, src_addr, src_port, dst_addr, dst_port,
             protocol_name, protocol_type, protocol_code,
             nat_action, to_addr, to_port,
-            protected, enabled, created_at, updated_at
+            protected, rule_source, enabled, created_at, updated_at
         )
         SELECT
             $(sql_quote "$iface"), 0,
             $(sql_quote "$any_addr"), NULL, $(sql_quote "$any_addr"), 53,
             $(sql_quote "$protocol"), NULL, NULL,
             'REDIRECT', NULL, 53,
-            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            0, 'system', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         WHERE NOT EXISTS (
             SELECT 1
             FROM nat_prerouting_rules
@@ -218,7 +218,6 @@ record_dns_redirect_rule() {
               AND dst_port = 53
               AND nat_action = 'REDIRECT'
               AND to_port = 53
-              AND protected = 1
         );
     "
 }

@@ -102,7 +102,7 @@ def ensure_pending_delete_column(conn: db.Connection, table: str) -> None:
     db.execute_on(
         conn,
         f"UPDATE {table} SET rule_source = CASE WHEN protected = 1 THEN 'system' ELSE 'user' END "
-        "WHERE rule_source IS NULL OR rule_source = '' OR (rule_source = 'system' AND protected = 0)",
+        "WHERE rule_source IS NULL OR rule_source = ''",
     )
 
 
