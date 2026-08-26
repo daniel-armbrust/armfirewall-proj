@@ -50,14 +50,15 @@ def write_dnsmasq_conf(config_text: str) -> None:
     tmp_path.replace(DNSMASQ_CONF_PATH)
 
 
-def reload_running_dnsmasq() -> None:
-    """Reload DNSMasq only when it was already running."""
+def reload_running_dnsmasq() -> bool:
+    """Restart DNSMasq when it is running and report whether it was restarted."""
     if supervisor_status("dnsmasq") != "RUNNING":
-        return
+        return False
 
     supervisor_command("restart", "dnsmasq", timeout=60)
     if supervisor_status("dnsmasq") != "RUNNING":
         raise RuntimeError("Dnsmasq did not return to RUNNING after configuration apply.")
+    return True
 
 
 def clear_pending_apply() -> None:
@@ -86,8 +87,17 @@ def apply_config() -> None:
         raise RuntimeError(message)
 
     write_dnsmasq_conf(config_text)
-    configure_system_resolver(bool(config.get("dns_enabled")))
-    reload_running_dnsmasq()
+    dns_enabled = bool(config.get("dns_enabled"))
+    if dns_enabled:
+        if not reload_running_dnsmasq():
+            raise RuntimeError(
+                "DNS is enabled but dnsmasq is not running; start dnsmasq before applying DNS settings."
+            )
+        configure_system_resolver(True)
+    else:
+        configure_system_resolver(False)
+        reload_running_dnsmasq()
+
     filtering_active = sync_dns_filtering_redirect()
     clear_pending_apply()
     logger.log(
