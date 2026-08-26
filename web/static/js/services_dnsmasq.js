@@ -2,7 +2,7 @@
     const stateLabel = document.querySelector("#dnsmasq-state");
     const form = document.querySelector("#dnsmasq-form");
     const statusLabel = document.querySelector("#dnsmasq-form-status");
-    const applyButton = document.querySelector("#dnsmasq-apply");
+    const applyButtons = Array.from(document.querySelectorAll("#dnsmasq-apply, #dnsmasq-dhcp-apply"));
     const interfacePicker = document.querySelector("#dnsmasq-interface-picker");
     const interfaceAddButton = document.querySelector("#dnsmasq-interface-add");
     const activeInterfacesBody = document.querySelector("#dnsmasq-active-interfaces");
@@ -77,9 +77,9 @@
 
     function setDirty(value) {
         dirty = Boolean(value);
-        if (applyButton) {
-            applyButton.hidden = !dirty;
-        }
+        applyButtons.forEach((button) => {
+            button.hidden = !dirty;
+        });
     }
 
     function setState(state, updated = "") {

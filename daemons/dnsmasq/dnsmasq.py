@@ -15,6 +15,7 @@ from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_LEASES_PATH
 from core.payload import decode_json_payload
 from web.services.dnsmasq import api as dnsmasq_config
 from .dns_filtering import sync_dns_filtering_redirect
+from .resolver import configure_system_resolver
 
 
 def request_from_args(args: argparse.Namespace) -> DnsmasqWorkRequest:
@@ -74,6 +75,7 @@ def apply_config() -> None:
         raise RuntimeError(message)
 
     write_dnsmasq_conf(config_text)
+    configure_system_resolver(bool(config.get("dns_enabled")))
     filtering_active = sync_dns_filtering_redirect()
     clear_pending_apply()
     logger.log(
