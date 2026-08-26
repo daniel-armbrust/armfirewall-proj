@@ -405,83 +405,36 @@
             return;
         }
         const config = globalDnsConfig();
-        const forwardedEnabled = Boolean(config.forwarded_domains_enabled) || (config.domain_upstreams || []).length > 0;
-        dnsScopeList.innerHTML = `
-            <section class="dnsmasq-scope-card" data-dnsmasq-scope="dns-global">
-                <div class="dnsmasq-scope-head">
-                    <strong>DNS configuration</strong>
-                    <span><b>Global DNS configuration</b> / applied to every listen interface</span>
-                </div>
-                <div class="form-grid dnsmasq-scope-form">
-                    <label class="field">
-                        <span>DNS enabled</span>
-                        <select data-global-dns-field="dns_enabled">
-                            <option value="1"${selectedAttr(config.dns_enabled ? "1" : "0", "1")}>enabled</option>
-                            <option value="0"${selectedAttr(config.dns_enabled ? "1" : "0", "0")}>disabled</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>LAN local domain</span>
-                        <input data-global-dns-field="local_domain" type="text" autocomplete="off" value="${fieldValue(config.local_domain, "armfirewall.local")}">
-                    </label>
-                    <label class="field">
-                        <span>Cache size</span>
-                        <input data-global-dns-field="cache_size" type="number" min="0" max="1000000" value="${fieldValue(config.cache_size, 1000)}">
-                    </label>
-                    <label class="field">
-                        <span>Expand hosts</span>
-                        <select data-global-dns-field="expand_hosts">
-                            <option value="1"${selectedAttr(config.expand_hosts ? "1" : "0", "1")}>enabled</option>
-                            <option value="0"${selectedAttr(config.expand_hosts ? "1" : "0", "0")}>disabled</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Domain needed</span>
-                        <select data-global-dns-field="domain_needed">
-                            <option value="1"${selectedAttr(config.domain_needed ? "1" : "0", "1")}>enabled</option>
-                            <option value="0"${selectedAttr(config.domain_needed ? "1" : "0", "0")}>disabled</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Bogus priv</span>
-                        <select data-global-dns-field="bogus_priv">
-                            <option value="1"${selectedAttr(config.bogus_priv ? "1" : "0", "1")}>enabled</option>
-                            <option value="0"${selectedAttr(config.bogus_priv ? "1" : "0", "0")}>disabled</option>
-                        </select>
-                    </label>
-                    <label class="field wide">
-                        <span>Default upstream DNS servers</span>
-                        <textarea data-global-dns-field="upstream_dns_servers" rows="3" spellcheck="false">${fieldValue((config.upstream_dns_servers || []).join("\n"))}</textarea>
-                    </label>
-                    <label class="check-line wide">
-                        <input data-global-dns-field="adguardhome_upstream_enabled" type="checkbox"${checkedAttr(config.adguardhome_upstream_enabled)}>
-                        <span>Enable DNS Filtering Upstream?</span>
-                    </label>
-                    <label class="check-line wide">
-                        <input data-global-dns-field="forwarded_domains_enabled" type="checkbox"${checkedAttr(forwardedEnabled)}>
-                        <span>Enable forwarded domains?</span>
-                    </label>
-                    <label class="field dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
-                        <span>Forwarded domain</span>
-                        <input data-dnsmasq-scope-domain type="text" autocomplete="off" placeholder="empresa.local" pattern="(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?" title="Use a valid DNS domain such as empresa.local.">
-                    </label>
-                    <label class="field dnsmasq-domain-upstream-servers dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
-                        <span>Forward to DNS servers</span>
-                        <textarea data-dnsmasq-scope-servers rows="2" spellcheck="false" placeholder="192.168.10.10 192.168.10.11"></textarea>
-                    </label>
-                    <div class="field dnsmasq-domain-upstream-action dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
-                        <span>Action</span>
-                        <button class="icon-button" type="button" data-dnsmasq-scope-domain-add title="Add domain upstream" aria-label="Add domain upstream">+</button>
-                    </div>
-                    <div class="table-wrap wide dnsmasq-domain-upstream-scroll dnsmasq-forwarded-domain-row"${forwardedEnabled ? "" : " hidden"}>
-                        <table class="data-table dnsmasq-domain-upstream-table">
-                            <thead><tr><th>Domain</th><th>Upstreams</th><th>Action</th></tr></thead>
-                            <tbody>${renderDomainRowsForConfig(config)}</tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-        `;
+        dnsScopeList.innerHTML = [
+            "<section class='dnsmasq-scope-card' data-dnsmasq-scope='dns-global'>",
+            "    <div class='dnsmasq-scope-head'>",
+            "        <strong>DNS configuration</strong>",
+            "        <span><b>Global DNS configuration</b> / applied to every listen interface</span>",
+            "    </div>",
+            "    <div class='form-grid dnsmasq-scope-form'>",
+            "        <label class='field'><span>DNS enabled</span><select data-global-dns-field='dns_enabled'>",
+            "            <option value='1'" + selectedAttr(config.dns_enabled ? "1" : "0", "1") + ">enabled</option>",
+            "            <option value='0'" + selectedAttr(config.dns_enabled ? "1" : "0", "0") + ">disabled</option>",
+            "        </select></label>",
+            "        <label class='field'><span>LAN local domain</span><input data-global-dns-field='local_domain' type='text' autocomplete='off' value='" + fieldValue(config.local_domain, "armfirewall.local") + "'></label>",
+            "        <label class='field'><span>Cache size</span><input data-global-dns-field='cache_size' type='number' min='0' max='1000000' value='" + fieldValue(config.cache_size, 1000) + "'></label>",
+            "        <label class='field'><span>Expand hosts</span><select data-global-dns-field='expand_hosts'>",
+            "            <option value='1'" + selectedAttr(config.expand_hosts ? "1" : "0", "1") + ">enabled</option>",
+            "            <option value='0'" + selectedAttr(config.expand_hosts ? "1" : "0", "0") + ">disabled</option>",
+            "        </select></label>",
+            "        <label class='field'><span>Domain needed</span><select data-global-dns-field='domain_needed'>",
+            "            <option value='1'" + selectedAttr(config.domain_needed ? "1" : "0", "1") + ">enabled</option>",
+            "            <option value='0'" + selectedAttr(config.domain_needed ? "1" : "0", "0") + ">disabled</option>",
+            "        </select></label>",
+            "        <label class='field'><span>Bogus priv</span><select data-global-dns-field='bogus_priv'>",
+            "            <option value='1'" + selectedAttr(config.bogus_priv ? "1" : "0", "1") + ">enabled</option>",
+            "            <option value='0'" + selectedAttr(config.bogus_priv ? "1" : "0", "0") + ">disabled</option>",
+            "        </select></label>",
+            "        <label class='field wide'><span>Default upstream DNS servers</span><textarea data-global-dns-field='upstream_dns_servers' rows='3' spellcheck='false'>" + fieldValue((config.upstream_dns_servers || []).join("\n")) + "</textarea></label>",
+            "        <label class='check-line wide'><input data-global-dns-field='adguardhome_upstream_enabled' type='checkbox'" + checkedAttr(config.adguardhome_upstream_enabled) + "><span>Enable DNS Filtering Upstream?</span></label>",
+            "    </div>",
+            "</section>",
+        ].join("");
     }
 
     function renderDhcpScopeCards() {
@@ -1246,7 +1199,6 @@
             interface_configs: interfaceConfigs,
             local_domain: dnsConfig.local_domain || "",
             upstream_dns_servers: dnsConfig.upstream_dns_servers || [],
-            domain_upstreams: dnsConfig.domain_upstreams || [],
             adguardhome_upstream_enabled: Boolean(dnsConfig.adguardhome_upstream_enabled),
             dhcp_range_start: "",
             dhcp_range_end: "",
