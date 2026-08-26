@@ -185,10 +185,13 @@
                     <input id="dnsmasq-adguardhome-upstream" name="adguardhome_upstream_enabled" type="checkbox">
                     <span>Enable DNS Filtering Upstream?</span>
                 </label>
-                    </table>
-                </div>
             </div>
         </div>
+        <div class="form-actions">
+            <input id="dnsmasq-extra-options" name="extra_options" type="hidden" value="">
+            <button class="text-button primary" type="submit" id="dnsmasq-apply" hidden>Apply</button>
+        </div>
+        <div class="form-status" id="dnsmasq-form-status" hidden></div>
     </section>
 
     <section class="panel" data-dnsmasq-panel="dhcp" hidden>
@@ -229,15 +232,6 @@
         </div>
     </section>
 
-    <section class="dnsmasq-form-actions">
-        <div class="edit-form">
-            <input id="dnsmasq-extra-options" name="extra_options" type="hidden" value="">
-            <div class="form-actions">
-                <button class="text-button primary" type="submit" id="dnsmasq-apply" hidden>Apply</button>
-            </div>
-            <div class="form-status" id="dnsmasq-form-status" hidden></div>
-        </div>
-    </section>
 </form>
 
 <div class="modal-backdrop" id="dnsmasq-action-modal" hidden>
