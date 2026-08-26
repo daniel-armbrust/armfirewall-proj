@@ -149,8 +149,10 @@ main() {
     [[ "$normalised_origin" == "$EXPECTED_REPOSITORY" ]] ||
         fatal "Unexpected origin remote: $origin_url"
 
-    [[ -z "$(git -C "$ROOT_DIR" status --porcelain)" ]] ||
-        fatal "The installation has local changes. Commit or stash them before updating."
+    git -C "$ROOT_DIR" diff --quiet ||
+        fatal "The installation has modified tracked files. Commit, stash, or revert them before updating."
+    git -C "$ROOT_DIR" diff --cached --quiet ||
+        fatal "The installation has staged tracked files. Commit, stash, or revert them before updating."
 
     branch="$(git -C "$ROOT_DIR" symbolic-ref --quiet --short HEAD)" ||
         fatal "The checkout is detached; switch to a tracked branch first."
