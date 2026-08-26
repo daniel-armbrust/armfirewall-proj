@@ -93,7 +93,11 @@ find_supervisorctl() {
 capture_running_programs() {
     local status_output program
 
-    status_output="$("$SUPERVISORCTL" -c "$ROOT_DIR/conf/supervisord.conf" status)" ||
+    "$SUPERVISORCTL" -c "$ROOT_DIR/conf/supervisord.conf" pid >/dev/null 2>&1 ||
+        fatal "Could not connect to supervisord."
+
+    status_output="$("$SUPERVISORCTL" -c "$ROOT_DIR/conf/supervisord.conf" status 2>&1 || true)"
+    [[ -n "$status_output" ]] ||
         fatal "Could not obtain supervisord program status."
 
     while IFS= read -r program; do
