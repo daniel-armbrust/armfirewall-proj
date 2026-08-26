@@ -11,21 +11,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/scripts/common/globals.sh"
 
 ROOT_DIR=""
+FORCE_UPDATE=0
 SUPERVISORCTL=""
 
 usage() {
     cat <<'USAGE'
     
-Usage: armfwupdate.sh --root-dir <installation-directory>
+Usage: armfwupdate.sh --root-dir <installation-directory> [--force]
 
 Options:
   --root-dir <directory>  ArmFirewall installation directory to update (required).
+  --force                 Overwrite locally modified tracked files.
   -h, --help              Show this help message.
 
-The installation must be a clean checkout whose origin is
+The installation must be a checkout whose origin is
 github.com/daniel-armbrust/armfirewall-proj.git. Only fast-forward updates are
 accepted. Programs that were RUNNING before the update are restarted one by one
 and each one must return to RUNNING before the next restart begins.
+
+--force does not remove untracked files, so runtime databases, logs, certificates,
+and generated configuration remain in place.
 USAGE
 }
 
@@ -45,6 +50,10 @@ parse_args() {
                 (($# >= 2)) || fatal "--root-dir requires a directory."
                 ROOT_DIR="$2"
                 shift 2
+                ;;
+            --force)
+                FORCE_UPDATE=1
+                shift
                 ;;
             -h|--help)
                 usage
@@ -149,10 +158,14 @@ main() {
     [[ "$normalised_origin" == "$EXPECTED_REPOSITORY" ]] ||
         fatal "Unexpected origin remote: $origin_url"
 
-    git -C "$ROOT_DIR" diff --quiet ||
-        fatal "The installation has modified tracked files. Commit, stash, or revert them before updating."
+    if ((FORCE_UPDATE)); then
+        info "Force mode enabled: locally modified tracked files will be overwritten."
+    else
+        git -C "$ROOT_DIR" diff --quiet ||
+        fatal "The installation has modified tracked files. Re-run with --force to overwrite them."
     git -C "$ROOT_DIR" diff --cached --quiet ||
-        fatal "The installation has staged tracked files. Commit, stash, or revert them before updating."
+        fatal "The installation has staged tracked files. Re-run with --force to overwrite them."
+    fi
 
     branch="$(git -C "$ROOT_DIR" symbolic-ref --quiet --short HEAD)" ||
         fatal "The checkout is detached; switch to a tracked branch first."
@@ -176,7 +189,11 @@ main() {
 
     capture_running_programs
     info "Applying fast-forward update."
-    git -C "$ROOT_DIR" merge --ff-only "$upstream"
+    if ((FORCE_UPDATE)); then
+        git -C "$ROOT_DIR" reset --hard "$upstream"
+    else
+        git -C "$ROOT_DIR" merge --ff-only "$upstream"
+    fi
 
     restart_running_programs "${running_programs[@]}"
     info "Update completed successfully."
