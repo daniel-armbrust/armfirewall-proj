@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from typing import Any
 from core.constants import (
+    ADGUARD_HOME_DNS_PORT,
     DNSMASQ_ALL_INTERFACES_TOKEN,
     DNSMASQ_BOOL_DEFAULTS,
     DNSMASQ_CONF_PATH,
