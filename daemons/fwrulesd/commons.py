@@ -158,11 +158,16 @@ def mark_apply_state(
         applied_at = apply_times.get(category_name)
         is_enabled = int(rule["enabled"]) == 1
         is_protected = int(rule["protected"]) == 1
+        is_system_managed = str(rule.get("rule_source") or "").lower() == "system"
         is_pending_delete = int(rule.get("pending_delete") or 0) == 1
         is_active = bool(
             is_enabled
             and not is_pending_delete
-            and (is_protected or (applied_at and str(rule["updated_at"]) <= applied_at))
+            and (
+                is_protected
+                or is_system_managed
+                or (applied_at and str(rule["updated_at"]) <= applied_at)
+            )
         )
         rule["applied"] = 1 if is_active else 0
         rule["apply_state"] = "delete_pending" if is_pending_delete else "active" if is_active else "pending" if is_enabled else "disabled"
