@@ -16,6 +16,7 @@ from core.payload import decode_json_payload
 from web.services.dnsmasq import api as dnsmasq_config
 from .dns_filtering import sync_dns_filtering_redirect
 from .resolver import configure_system_resolver
+from daemons.svcmgmtd.supervisor import supervisor_command, supervisor_status
 
 
 def request_from_args(args: argparse.Namespace) -> DnsmasqWorkRequest:
@@ -49,6 +50,16 @@ def write_dnsmasq_conf(config_text: str) -> None:
     tmp_path.replace(DNSMASQ_CONF_PATH)
 
 
+def reload_running_dnsmasq() -> None:
+    """Reload DNSMasq only when it was already running."""
+    if supervisor_status("dnsmasq") != "RUNNING":
+        return
+
+    supervisor_command("restart", "dnsmasq", timeout=60)
+    if supervisor_status("dnsmasq") != "RUNNING":
+        raise RuntimeError("Dnsmasq did not return to RUNNING after configuration apply.")
+
+
 def clear_pending_apply() -> None:
     """Mark the persisted Dnsmasq configuration as applied."""
     with db.transaction(DNSMASQ_DB_PATH) as conn:
@@ -76,6 +87,7 @@ def apply_config() -> None:
 
     write_dnsmasq_conf(config_text)
     configure_system_resolver(bool(config.get("dns_enabled")))
+    reload_running_dnsmasq()
     filtering_active = sync_dns_filtering_redirect()
     clear_pending_apply()
     logger.log(
