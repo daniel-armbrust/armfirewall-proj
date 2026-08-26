@@ -147,12 +147,15 @@
     }
 
     function syncAdGuardHomeUpstreamState() {
-        const upstream = document.querySelector("#dnsmasq-upstream-dns");
-        if (upstream) {
-            upstream.disabled = false;
-            upstream.classList.remove("is-disabled");
+        const filtering = document.querySelector("[data-global-dns-field='adguardhome_upstream_enabled']");
+        const upstream = document.querySelector("[data-global-dns-field='upstream_dns_servers']");
+        if (!upstream) {
+            return;
         }
-        syncForwardedDomainState();
+
+        const enabled = Boolean(filtering?.checked);
+        upstream.disabled = enabled;
+        upstream.classList.toggle("is-disabled", enabled);
     }
 
     function forwardedDomainsAreEnabled() {
@@ -333,7 +336,9 @@
         return {
             dns_enabled: Boolean(currentConfig.dns_enabled),
             local_domain: currentConfig.local_domain || "armfirewall.local",
-            upstream_dns_servers: [...(currentConfig.upstream_dns_servers || ["1.1.1.1", "8.8.8.8"])],
+            upstream_dns_servers: currentConfig.adguardhome_upstream_enabled
+                ? []
+                : [...(currentConfig.upstream_dns_servers?.length ? currentConfig.upstream_dns_servers : ["1.1.1.1", "8.8.8.8"])],
             domain_upstreams: (currentConfig.domain_upstreams || []).map((item) => ({domain: item.domain, upstreams: [...(item.upstreams || [])]})),
             forwarded_domains_enabled: Boolean(currentConfig.forwarded_domains_enabled || (currentConfig.domain_upstreams || []).length),
             adguardhome_upstream_enabled: Boolean(currentConfig.adguardhome_upstream_enabled),
@@ -494,6 +499,7 @@
         renderDnsScopeCards();
         renderDhcpScopeCards();
         removeDuplicateScopeCards();
+        syncAdGuardHomeUpstreamState();
     }
 
     function removeDuplicateScopeCards() {
@@ -1289,11 +1295,13 @@
             renderScopeCards();
             return true;
         }
-        updateGlobalDnsConfig(field, scopeFieldValue(element, field));
-        setDirty(true);
+        const value = scopeFieldValue(element, field);
+        updateGlobalDnsConfig(field, value);
         if (field === "adguardhome_upstream_enabled") {
+            updateGlobalDnsConfig("upstream_dns_servers", value ? [] : ["1.1.1.1", "8.8.8.8"]);
             renderScopeCards();
         }
+        setDirty(true);
         return true;
     }
 
