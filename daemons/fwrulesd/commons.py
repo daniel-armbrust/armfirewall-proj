@@ -69,6 +69,12 @@ def normalize_enabled(value: Any) -> int:
     return 1 if str(value).lower() in {"1", "true", "yes", "on"} else 0
 
 
+def normalize_interface(value: Any) -> str:
+    """Preserve Linux interface names while normalizing the any wildcard."""
+    interface = str(value or "").strip()
+    return "any" if not interface or interface.lower() == "any" else interface
+
+
 def default_address(family: str) -> str:
     """Return the wildcard source or destination address for one family."""
     return "::/0" if family == "IPV6" else "0.0.0.0/0"
@@ -118,6 +124,10 @@ def row_to_rule(family: str, chain: str, row: Any, *, chain_tables: Mapping[str,
     if rule_source not in {"system", "user"}:
         rule_source = "system" if int(data["protected"]) == 1 else "user"
     data["rule_source"] = rule_source
+    for interface_key in ("iface_in", "iface_out"):
+        interface = str(data.get(interface_key) or "").strip()
+        if interface.upper() == "ANY":
+            data[interface_key] = "any"
     data["user_defined"] = 1 if rule_source == "user" else 0
     data["rule_source_label"] = "user defined" if rule_source == "user" else "system"
 

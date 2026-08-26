@@ -33,6 +33,7 @@ normalize_chain = partial(
 )
 normalize_protocol = partial(commons.normalize_protocol, error_cls=NatRuleError)
 normalize_enabled = commons.normalize_enabled
+normalize_interface = commons.normalize_interface
 default_address = commons.default_address
 optional_int = partial(commons.optional_int, error_cls=NatRuleError)
 next_rule_order = commons.next_rule_order
@@ -205,8 +206,8 @@ def sanitize_nat_payload(payload: dict[str, Any]) -> dict[str, Any]:
     is_icmp = protocol in {"icmp", "icmpv6"}
     is_all = protocol == "all"
 
-    iface_in = str(payload.get("iface_in", "")).strip().upper() or "ANY"
-    iface_out = str(payload.get("iface_out", "")).strip().upper() or "ANY"
+    iface_in = normalize_interface(payload.get("iface_in"))
+    iface_out = normalize_interface(payload.get("iface_out"))
 
     rule = {
         "family": family,

@@ -52,6 +52,36 @@ def get_lan_interface_names() -> list[str]:
     return [str(row["name"]) for row in rows if str(row["name"] or "").strip()]
 
 
+def get_lan_dns_bind_hosts() -> list[str]:
+    """Return loopback plus valid addresses assigned to interfaces with the LAN role."""
+    hosts = ["127.0.0.1"]
+    try:
+        rows = fetch_iface_rows(
+            """
+            SELECT a.addr
+            FROM ifaces i
+            JOIN addresses a ON a.iface_id = i.id
+            WHERE i.role = 'LAN' AND i.name <> 'lo'
+            ORDER BY i.id, a.id
+            """
+        )
+    except (FileNotFoundError, db.DatabaseError):
+        return hosts
+
+    for row in rows:
+        address = str(row["addr"] or "").strip()
+        try:
+            parsed = ipaddress.ip_address(address)
+        except ValueError:
+            continue
+        if parsed.is_unspecified or parsed.is_loopback or parsed.is_multicast or parsed.is_link_local:
+            continue
+        normalized = str(parsed)
+        if normalized not in hosts:
+            hosts.append(normalized)
+    return hosts
+
+
 def get_lan_primary_ipv4_address() -> str | None:
     """Return the preferred LAN IPv4 address for router-facing defaults."""
     try:

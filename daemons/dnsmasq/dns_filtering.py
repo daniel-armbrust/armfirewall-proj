@@ -33,8 +33,8 @@ def adguard_is_running() -> bool:
     return supervisor_status(ADGUARD_HOME_SERVICE_NAME) == "RUNNING"
 
 
-def replace_managed_dns_ports(port: int) -> None:
-    """Replace managed DNS redirect and protected INPUT ports in persistent rule stores."""
+def sync_managed_dns_ports(port: int, *, redirect_protected: bool) -> None:
+    """Set the LAN DNS redirect and protected INPUT rules to the active DNS listener."""
     protocol_marks = ", ".join("?" for _ in DNS_PROTOCOLS)
 
     for db_path in NAT_FAMILY_DATABASES.values():
@@ -43,14 +43,14 @@ def replace_managed_dns_ports(port: int) -> None:
                 conn,
                 f"""
                 UPDATE nat_prerouting_rules
-                SET to_port = ?, protected = 0, rule_source = 'system', updated_at = CURRENT_TIMESTAMP
+                SET to_port = ?, protected = ?, rule_source = 'system', updated_at = CURRENT_TIMESTAMP
                 WHERE (protected = 1 OR rule_source = 'system')
                   AND enabled = 1
                   AND nat_action = 'REDIRECT'
                   AND dst_port = ?
                   AND protocol_name IN ({protocol_marks})
                 """,
-                (port, DNSMASQ_DNS_PORT, *DNS_PROTOCOLS),
+                (port, int(redirect_protected), DNSMASQ_DNS_PORT, *DNS_PROTOCOLS),
             )
 
     for db_path in FILTER_FAMILY_DATABASES.values():
@@ -93,7 +93,7 @@ def sync_dns_filtering_redirect(adguard_running: bool | None = None) -> bool:
         adguard_is_running() if adguard_running is None else adguard_running
     )
     target_port = ADGUARD_HOME_DNS_PORT if active else DNSMASQ_DNS_PORT
-    replace_managed_dns_ports(target_port)
+    sync_managed_dns_ports(target_port, redirect_protected=active)
 
     for family in ("IPV4", "IPV6"):
         apply_table(family, "FIREWALL_RULES", "filter_input_rules")

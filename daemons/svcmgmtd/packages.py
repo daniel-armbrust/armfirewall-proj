@@ -20,6 +20,7 @@ from core.constants import (
     ADGUARD_HOME_DIR,
     ADGUARD_HOME_WORK_DIR,
 )
+from core.iface import get_lan_dns_bind_hosts
 from core.process import command_exists
 
 from .commons import run_bounded_command
@@ -127,8 +128,9 @@ def configure_adguard_home_dns_listener() -> bool:
         raise RuntimeError("AdGuard Home configuration does not contain a DNS section.")
 
     body = dns_section.group("body")
+    dns_bind_hosts = get_lan_dns_bind_hosts() or list(ADGUARD_HOME_DNS_BIND_HOSTS)
     bind_hosts = "  bind_hosts:\n" + "".join(
-        f'    - "{host}"\n' for host in ADGUARD_HOME_DNS_BIND_HOSTS
+        f'    - "{host}"\n' for host in dns_bind_hosts
     )
     if re.search(r"(?m)^  bind_hosts:\n(?:^    - .*\n)*", body):
         body = re.sub(r"(?m)^  bind_hosts:\n(?:^    - .*\n)*", bind_hosts, body, count=1)

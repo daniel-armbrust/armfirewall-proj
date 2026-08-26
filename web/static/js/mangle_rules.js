@@ -188,7 +188,7 @@
     }
 
     function renderInterfaceChoices(interfaces) {
-        const options = [{value: "ANY", label: "any"}].concat(
+        const options = [{value: "any", label: "any"}].concat(
             interfaces.map((iface) => ({
                 value: iface.name,
                 label: interfaceOptionLabel(iface),
