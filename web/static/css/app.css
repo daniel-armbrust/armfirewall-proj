@@ -2142,7 +2142,7 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     padding-top: 14px;
 }
 
-.dnsmasq-form-actions .form-actions {
+.form-actions.dnsmasq-form-actions {
     justify-content: flex-start;
 }
 

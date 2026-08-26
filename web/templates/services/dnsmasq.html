@@ -186,12 +186,12 @@
                     <span>Enable DNS Filtering Upstream?</span>
                 </label>
             </div>
+            <div class="form-actions dnsmasq-form-actions">
+                <input id="dnsmasq-extra-options" name="extra_options" type="hidden" value="">
+                <button class="text-button primary" type="submit" id="dnsmasq-apply" hidden>Apply</button>
+            </div>
+            <div class="form-status" id="dnsmasq-form-status" hidden></div>
         </div>
-        <div class="form-actions">
-            <input id="dnsmasq-extra-options" name="extra_options" type="hidden" value="">
-            <button class="text-button primary" type="submit" id="dnsmasq-apply" hidden>Apply</button>
-        </div>
-        <div class="form-status" id="dnsmasq-form-status" hidden></div>
     </section>
 
     <section class="panel" data-dnsmasq-panel="dhcp" hidden>
