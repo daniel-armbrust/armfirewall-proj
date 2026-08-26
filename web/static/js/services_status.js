@@ -20,6 +20,7 @@
     let pendingOptionalAction = null;
     let loading = false;
     let workRequestsLoading = false;
+    let pendingServiceNames = new Set();
     const POLL_MS = 5000;
     const SERVICE_REFRESH_KEY = "armfw.pendingServiceMenuRefresh";
     const SERVICE_REFRESH_TTL_MS = 10 * 60 * 1000;
@@ -141,6 +142,15 @@
         } finally {
             workRequestsLoading = false;
         }
+    }
+
+    function applyPendingServiceControlState() {
+        document.querySelectorAll("[data-service-name], [data-optional-service-name]").forEach((button) => {
+            const serviceName = button.dataset.serviceName || button.dataset.optionalServiceName;
+            if (pendingServiceNames.has(String(serviceName || ""))) {
+                button.disabled = true;
+            }
+        });
     }
 
     function renderArmFirewallServices(services) {
@@ -357,6 +367,7 @@
             const summary = data.summary || {};
             const services = data.services || [];
             const optionalServices = data.optional_services || [];
+            pendingServiceNames = new Set((data.pending_service_names || []).map((name) => String(name)));
             setMetric("#services-summary-total", summary.services);
             setMetric("#services-summary-active", summary.installed);
             setMetric("#services-summary-inactive", summary.running);
@@ -369,6 +380,7 @@
             }
             renderArmFirewallServices(services);
             renderOptionalServices(optionalServices);
+            applyPendingServiceControlState();
             reloadWhenPendingServiceStateChanges(services, optionalServices);
             setState("Live", summary.updated_at || "-");
             if (workRequestsPanel && !workRequestsPanel.hidden) {
@@ -401,6 +413,8 @@
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({action}),
             });
+            pendingServiceNames.add(serviceName);
+            applyPendingServiceControlState();
             if (action === "enable" || action === "disable") {
                 rememberPendingServiceRefresh(serviceName, action);
             }
@@ -428,6 +442,8 @@
             await HF.fetchJson(`/api/services/status/${encodeURIComponent(serviceName)}/${encodeURIComponent(action)}`, {
                 method: "POST",
             });
+            pendingServiceNames.add(serviceName);
+            applyPendingServiceControlState();
             if (action === "install" || action === "uninstall") {
                 rememberPendingServiceRefresh(serviceName, action);
             }

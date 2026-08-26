@@ -5,6 +5,7 @@ from typing import Any
 
 from web.constants import SERVICES_STATUS_ACTIONS
 from web.services.catalog import main_service_public_catalog, optional_service_public_catalog, service_by_name
+from web.workrequests import api as workrequests_api
 
 
 def service_status_payload(service: dict[str, Any], *, optional: bool = False) -> dict[str, Any]:
@@ -66,6 +67,20 @@ def optional_service_statuses() -> list[dict[str, Any]]:
     return services
 
 
+PENDING_SERVICE_WORK_REQUEST_STATUSES = {"queue", "queued", "running"}
+
+
+def pending_service_names() -> list[str]:
+    """Return service names with a queued or running management request."""
+    work_requests = workrequests_api.get_service_work_requests(limit=500).get("requests", [])
+    return sorted({
+        str(request.get("service_name") or "")
+        for request in work_requests
+        if str(request.get("status") or "").lower() in PENDING_SERVICE_WORK_REQUEST_STATUSES
+        and str(request.get("service_name") or "") not in {"", "-"}
+    })
+
+
 def services_status() -> dict[str, Any]:
     """Return persisted ArmFirewall service status data."""
     services = expected_service_statuses()
@@ -83,6 +98,7 @@ def services_status() -> dict[str, Any]:
         },
         "services": services,
         "optional_services": optional_services,
+        "pending_service_names": pending_service_names(),
     }
 
 

@@ -225,8 +225,7 @@ def render_config(config: dict[str, Any]) -> str:
         for iface_name in config.get("listen_interfaces", [])
         if iface_name != DNSMASQ_ALL_INTERFACES_TOKEN
     ]
-    has_listen_scope = bool(config.get("listen_interfaces"))
-    dns_enabled = bool(config["dns_enabled"]) and has_listen_scope
+    dns_enabled = bool(config["dns_enabled"])
     dhcp_enabled = any(item["dhcp_enabled"] for item in interface_configs) or bool(config["dhcp_enabled"])
     ipv6_ra_enabled = any(item["ipv6_ra_enabled"] for item in interface_configs)
     lines = [
@@ -245,12 +244,7 @@ def render_config(config: dict[str, Any]) -> str:
         for static_lease in config.get("static_leases", []):
             lines.append(f"dhcp-host={static_lease['mac_address']},{static_lease['ip_address']}")
 
-    if DNSMASQ_ALL_INTERFACES_TOKEN in config["listen_interfaces"]:
-        lines.append("# armfirewall-listen-all-interfaces=1")
-    else:
-        lines.append("# armfirewall-listen-all-interfaces=0")
-        for iface_name in config["listen_interfaces"]:
-            lines.append(f"interface={iface_name}")
+    lines.append("# armfirewall-listen-all-interfaces=1")
 
     rendered_domains: set[str] = set()
     rendered_locals: set[str] = set()
@@ -270,11 +264,11 @@ def render_config(config: dict[str, Any]) -> str:
         ):
             if enabled:
                 lines.append(directive)
-        for server in config["upstream_dns_servers"]:
-            lines.append(f"server={server}")
-        for domain_item in config["domain_upstreams"]:
-            for server in domain_item["upstreams"]:
-                lines.append(f"server=/{domain_item['domain']}/{server}")
+        if config["adguardhome_upstream_enabled"]:
+            lines.append(f"server=127.0.0.1#{ADGUARD_HOME_DNS_PORT}")
+        else:
+            for server in config["upstream_dns_servers"]:
+                lines.append(f"server={server}")
 
     for item in interface_configs:
         if item["dhcp_enabled"]:

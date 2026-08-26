@@ -109,6 +109,26 @@ class SupervisorStatusParserTests(unittest.TestCase):
         finally:
             workrequests_api.WORK_REQUEST_DB_PATH = original_db_path
 
+    def test_pending_service_names_include_only_incomplete_requests(self) -> None:
+        """Expose queued and running service requests as pending service controls."""
+        original_db_path = workrequests_api.WORK_REQUEST_DB_PATH
+        ddl_path = Path(__file__).resolve().parents[2] / "db" / "ddl" / "work-requests.ddl"
+        try:
+            with TemporaryDirectory() as tmpdir:
+                tmp_db_path = Path(tmpdir) / "work-requests.db"
+                workrequests_api.WORK_REQUEST_DB_PATH = tmp_db_path
+                with workrequests_api.db.transaction(tmp_db_path, require_existing=False) as conn:
+                    conn.executescript(ddl_path.read_text(encoding="utf-8"))
+
+                request_id = workrequests_api.queue_service_work_request("install", {"service_name": "squid"})
+                self.assertEqual(services_status.pending_service_names(), ["squid"])
+
+                with workrequests_api.db.transaction(tmp_db_path) as conn:
+                    workrequests_api.db.execute_on(conn, "UPDATE work_requests SET status = 'success' WHERE id = ?", (request_id,))
+                self.assertEqual(services_status.pending_service_names(), [])
+        finally:
+            workrequests_api.WORK_REQUEST_DB_PATH = original_db_path
+
     def test_optional_service_uninstall_is_queued(self) -> None:
         """Queue optional service removal as a work request."""
         original_db_path = workrequests_api.WORK_REQUEST_DB_PATH
