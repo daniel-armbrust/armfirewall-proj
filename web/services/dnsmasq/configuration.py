@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 from typing import Any
+from core.iface import get_lan_interface_names
 from core.constants import (
     ADGUARD_HOME_DNS_PORT,
     DNSMASQ_ALL_INTERFACES_TOKEN,
@@ -245,7 +246,11 @@ def render_config(config: dict[str, Any]) -> str:
         for static_lease in config.get("static_leases", []):
             lines.append(f"dhcp-host={static_lease['mac_address']},{static_lease['ip_address']}")
 
-    lines.append("# armfirewall-listen-all-interfaces=1")
+    if dns_enabled:
+        lan_interfaces = get_lan_interface_names()
+        if not lan_interfaces:
+            raise ValueError("DNSMasq DNS requires at least one interface with role LAN.")
+        lines.extend(f"interface={iface_name}" for iface_name in lan_interfaces)
 
     rendered_domains: set[str] = set()
     rendered_locals: set[str] = set()

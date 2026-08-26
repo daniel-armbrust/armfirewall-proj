@@ -35,6 +35,23 @@ def get_role_config() -> dict[str, str]:
     return values
 
 
+def get_lan_interface_names() -> list[str]:
+    """Return every interface explicitly assigned the LAN role."""
+    try:
+        rows = fetch_iface_rows(
+            """
+            SELECT name
+            FROM ifaces
+            WHERE role = 'LAN' AND name <> 'lo'
+            ORDER BY id
+            """
+        )
+    except (FileNotFoundError, db.DatabaseError):
+        return []
+
+    return [str(row["name"]) for row in rows if str(row["name"] or "").strip()]
+
+
 def get_lan_primary_ipv4_address() -> str | None:
     """Return the preferred LAN IPv4 address for router-facing defaults."""
     try:
