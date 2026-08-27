@@ -1894,6 +1894,24 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     min-width: 86px;
 }
 
+.policy-route-get-destination {
+    grid-column: span 2;
+}
+
+.policy-route-get-control {
+    display: flex;
+    gap: 10px;
+}
+
+.policy-route-get-control input {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.policy-route-get-control .policy-apply-button {
+    flex: 0 0 auto;
+}
+
 .filter-chain-tabs {
     margin-bottom: 12px;
 }
@@ -2142,7 +2160,7 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
     padding-top: 14px;
 }
 
-.form-actions.dnsmasq-form-actions {
+.dnsmasq-form-actions .form-actions {
     justify-content: flex-start;
 }
 
@@ -2931,6 +2949,10 @@ body.arm-tooltips-enabled .iface-tooltip[data-tooltip]::after {
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .policy-route-get-destination {
+        grid-column: auto;
     }
 
     .panel-head {

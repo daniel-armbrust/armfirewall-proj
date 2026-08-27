@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import ipaddress
+from pathlib import Path
+import subprocess
 import uuid
 from typing import Any
 
@@ -157,22 +159,135 @@ def get_tables() -> list[dict[str, Any]]:
         )
 
 
-def get_routes() -> list[dict[str, Any]]:
-    """Return persisted policy routes."""
-    ensure_policy_db()
-    with db.connection(POLICY_DB_PATH) as conn:
-        return db.fetch_all_on(
-            conn,
-            """
-            SELECT r.id, r.route_order, r.addr_family, r.table_id, t.table_name,
-                   r.route_type, r.destination, r.gateway, r.dev, r.preferred_source,
-                   r.metric, r.scope, r.protocol, r.onlink, r.protected, r.enabled,
-                   r.applied, r.pending_delete, r.created_at, r.updated_at
-            FROM routes r
-            JOIN routing_tables t ON t.table_id = r.table_id
-            ORDER BY r.addr_family, r.table_id, r.route_order, r.id
-            """,
+def route_table_ids(tables: list[dict[str, Any]]) -> dict[str, int]:
+    """Map iproute2 table names to numeric identifiers."""
+    mapping = {"local": 255, "main": 254, "default": 253}
+
+    for table in tables:
+        try:
+            table_id = int(table["table_id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        mapping[str(table.get("table_name") or table_id)] = table_id
+        mapping[str(table_id)] = table_id
+
+    for table_file in (Path("/etc/iproute2/rt_tables"), Path("/usr/lib/iproute2/rt_tables")):
+        try:
+            lines = table_file.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            fields = line.split("#", 1)[0].split()
+            if len(fields) != 2:
+                continue
+            try:
+                mapping[fields[1]] = int(fields[0])
+            except ValueError:
+                continue
+
+    return mapping
+
+
+def runtime_table_id(value: Any, table_ids: dict[str, int]) -> int:
+    """Resolve the table value emitted by `ip -j route` to a numeric id."""
+    text = str(value or "main")
+    if text in table_ids:
+        return table_ids[text]
+    try:
+        return int(text)
+    except ValueError:
+        return 0
+
+
+def runtime_route_rows(tables: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return a read-only snapshot of routes currently installed in the kernel."""
+    records_by_family: list[tuple[str, dict[str, Any]]] = []
+
+    for family, flag in (("ipv4", "-4"), ("ipv6", "-6")):
+        command = ["ip", "-j", flag, "route", "show", "table", "all"]
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=5)
+        except OSError as exc:
+            raise RuntimeError(f"Could not run ip route: {exc}") from exc
+        except subprocess.SubprocessError as exc:
+            raise RuntimeError(f"Could not read kernel routes: {exc}") from exc
+
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout or "ip route failed").strip())
+
+        try:
+            records = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("Could not parse the kernel route inventory.") from exc
+        if not isinstance(records, list):
+            raise RuntimeError("The kernel route inventory has an unexpected format.")
+        records_by_family.extend((family, record) for record in records if isinstance(record, dict))
+
+    table_ids = route_table_ids(tables)
+    rows: list[dict[str, Any]] = []
+    route_order: dict[tuple[str, int], int] = {}
+
+    for index, (family, record) in enumerate(records_by_family, start=1):
+        table_name = str(record.get("table") or "main")
+        table_id = runtime_table_id(table_name, table_ids)
+        order_key = (family, table_id)
+        route_order[order_key] = route_order.get(order_key, 0) + 1
+        flags = record.get("flags") or []
+        onlink = int("onlink" in flags) if isinstance(flags, list) else 0
+
+        rows.append(
+            {
+                "id": f"runtime-{index}",
+                "route_order": route_order[order_key],
+                "addr_family": family,
+                "table_id": table_id,
+                "table_name": table_name,
+                "route_type": str(record.get("type") or "unicast"),
+                "destination": str(record.get("dst") or "default"),
+                "gateway": record.get("gateway"),
+                "dev": record.get("dev"),
+                "preferred_source": record.get("prefsrc"),
+                "metric": record.get("metric"),
+                "scope": record.get("scope"),
+                "protocol": record.get("protocol"),
+                "onlink": onlink,
+                "protected": 1,
+                "enabled": 1,
+                "applied": 1,
+                "pending_delete": 0,
+            }
         )
+
+    return rows
+
+
+def route_get(destination: Any) -> dict[str, Any]:
+    """Resolve one destination through the kernel routing-policy database."""
+    target = optional_text(destination)
+    if target is None:
+        raise HTTPException(status_code=400, detail="destination is required.")
+    try:
+        address = ipaddress.ip_address(target)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="destination must be a valid IP address.") from exc
+
+    family = "ipv6" if address.version == 6 else "ipv4"
+    command = ["ip", "route", "get", str(address)]
+    try:
+        result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=5)
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail=f"Could not run ip route get: {exc}") from exc
+    except subprocess.SubprocessError as exc:
+        raise HTTPException(status_code=503, detail=f"Could not resolve route: {exc}") from exc
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "ip route get failed").strip()
+        raise HTTPException(status_code=422, detail=detail)
+    output = result.stdout.strip()
+    if not output:
+        raise HTTPException(status_code=502, detail="ip route get returned no route output.")
+
+    return {"destination": str(address), "addr_family": family, "command": command, "output": output}
 
 
 def get_rules() -> list[dict[str, Any]]:
@@ -213,9 +328,9 @@ def get_policy_work_requests(limit: int = 50) -> dict[str, Any]:
 
 
 def get_policy_routing() -> dict[str, Any]:
-    """Return all policy routing data used by the frontend."""
+    """Return live routes plus persisted policy-routing configuration."""
     tables = get_tables()
-    routes = get_routes()
+    routes = runtime_route_rows(tables)
     rules = get_rules()
     enabled_routes = sum(1 for route in routes if int(route["enabled"]) == 1)
     enabled_rules = sum(1 for rule in rules if int(rule["enabled"]) == 1)

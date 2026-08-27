@@ -37,11 +37,12 @@
 
 <div class="policy-create-actions">
     <button class="local-tab policy-create-button" type="button" data-policy-tab="new-route" data-policy-create-for="routes">New Route</button>
+    <button class="local-tab" type="button" data-policy-route-view="get">Route Get</button>
     <button class="local-tab policy-create-button" type="button" data-policy-tab="new-rule" data-policy-create-for="rules" hidden>New Rule</button>
     <button class="local-tab policy-create-button" type="button" data-policy-tab="new-table" data-policy-create-for="tables" hidden>New Table</button>
 </div>
 
-<section class="panel" data-policy-view="routes">
+<section class="panel" id="policy-routes-panel" data-policy-view="routes">
     <div class="panel-head">
         <div class="policy-routes-title">
             <h2>Routes</h2>
@@ -191,6 +192,34 @@
             <button class="text-button primary policy-apply-button" type="submit">Add</button>
         </div>
     </form>
+</section>
+
+<section id="policy-route-get-panel" data-policy-view="routes" hidden>
+    <form id="policy-route-get-form">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Route Get</h2>
+                <span id="policy-route-get-status">ready</span>
+            </div>
+            <div class="edit-form">
+                <div class="form-grid firewall-form-grid">
+                    <label class="field policy-route-get-destination">
+                        <span>Destination IP</span>
+                        <div class="policy-route-get-control">
+                            <input name="destination" type="text" inputmode="text" placeholder="e.g. 192.0.2.10 or 2001:db8::10" required>
+                            <button class="text-button primary policy-apply-button" type="submit">Lookup Route</button>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </section>
+    </form>
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Kernel Decision</h2>
+        </div>
+        <pre id="policy-route-get-output" class="tool-output">Enter a destination IP and select Lookup Route.</pre>
+    </section>
 </section>
 
 <section class="panel" data-policy-view="rules" hidden>

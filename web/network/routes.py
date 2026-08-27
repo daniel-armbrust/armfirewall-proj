@@ -139,6 +139,13 @@ async def api_create_policy_rule(request: Request) -> dict[str, Any]:
     return policy_routing_views.create_rule(payload)
 
 
+@router.post("/api/network/policy-routing/route-get")
+async def api_policy_route_get(request: Request) -> dict[str, Any]:
+    """Resolve a destination using the current kernel routing policy."""
+    payload = await request.json()
+    return policy_routing_views.route_get(payload.get("destination"))
+
+
 @router.put("/api/network/policy-routing/{table_name}/{item_id}/enabled")
 async def api_set_policy_routing_enabled(request: Request, table_name: str, item_id: int) -> dict[str, Any]:
     """Enable or disable one policy routing item."""

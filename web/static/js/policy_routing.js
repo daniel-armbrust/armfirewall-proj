@@ -1,9 +1,15 @@
 (function () {
     const stateLabel = document.querySelector("#policy-routing-state");
     const routeForm = document.querySelector("#policy-route-form");
+    const routeGetForm = document.querySelector("#policy-route-get-form");
     const ruleForm = document.querySelector("#policy-rule-form");
     const tableForm = document.querySelector("#policy-table-form");
     const routeStatus = document.querySelector("#policy-route-form-status");
+    const routeGetStatus = document.querySelector("#policy-route-get-status");
+    const routeGetOutput = document.querySelector("#policy-route-get-output");
+    const routesPanel = document.querySelector("#policy-routes-panel");
+    const routeGetPanel = document.querySelector("#policy-route-get-panel");
+    const routeGetButton = document.querySelector("[data-policy-route-view='get']");
     const ruleStatus = document.querySelector("#policy-rule-form-status");
     const tableStatus = document.querySelector("#policy-table-form-status");
     const routesBody = document.querySelector("#policy-routes-body");
@@ -66,6 +72,7 @@
     let interfaceRoles = new Map();
     let activeFamily = "ipv4";
     let activeRouteTable = "";
+    let activeRoutesView = "list";
     let activeRuleFamily = "ipv4";
     let activeRuleTable = "";
     const viewPagination = {
@@ -623,17 +630,52 @@
         return tabName;
     }
 
+    function primaryTabForView(tabName) {
+        if (tabName === "new-route") {
+            return "routes";
+        }
+        if (tabName === "new-rule") {
+            return "rules";
+        }
+        if (tabName === "new-table") {
+            return "tables";
+        }
+        return tabName;
+    }
+
+    function setRoutesView(view) {
+        activeRoutesView = view === "get" ? "get" : "list";
+        if (routesPanel) {
+            routesPanel.hidden = activeRoutesView !== "list";
+        }
+        if (routeGetPanel) {
+            routeGetPanel.hidden = activeRoutesView !== "get";
+        }
+        if (routeGetButton) {
+            routeGetButton.classList.toggle("active", activeRoutesView === "get");
+        }
+    }
+
     function setActiveTab(tabName, refreshData = false) {
         const createContext = createContextForTab(tabName);
+        const primaryTab = primaryTabForView(tabName);
         document.querySelectorAll("[data-policy-tab]").forEach((tab) => {
-            tab.classList.toggle("active", tab.dataset.policyTab === tabName);
+            tab.classList.toggle("active", tab.dataset.policyTab === tabName || tab.dataset.policyTab === primaryTab);
         });
         document.querySelectorAll("[data-policy-view]").forEach((view) => {
             view.hidden = view.dataset.policyView !== tabName;
         });
+        if (tabName === "routes") {
+            setRoutesView(activeRoutesView);
+        } else if (routeGetButton) {
+            routeGetButton.classList.remove("active");
+        }
         createButtons.forEach((button) => {
             button.hidden = button.dataset.policyCreateFor !== createContext;
         });
+        if (routeGetButton) {
+            routeGetButton.hidden = primaryTab !== "routes";
+        }
         if (tabName === "new-rule") {
             setSuggestedRulePriority();
         }
@@ -774,8 +816,40 @@
         }
     }
 
+    async function lookupRoute(event) {
+        event.preventDefault();
+        const destination = String(new FormData(routeGetForm).get("destination") || "").trim();
+        if (!destination) {
+            setStatus(routeGetStatus, "error=destination is required");
+            return;
+        }
+        try {
+            setStatus(routeGetStatus, "querying");
+            routeGetOutput.textContent = "Resolving route through the kernel...";
+            const result = await HF.fetchJson("/api/network/policy-routing/route-get", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({destination}),
+            });
+            routeGetOutput.textContent = result.output || "No route output returned.";
+            setStatus(routeGetStatus, `${result.addr_family} destination=${result.destination}`);
+        } catch (error) {
+            routeGetOutput.textContent = "No route result available.";
+            setStatus(routeGetStatus, `error=${error.message}`);
+        }
+    }
+
     document.querySelectorAll("[data-policy-tab]").forEach((tab) => {
-        tab.addEventListener("click", () => setActiveTab(tab.dataset.policyTab, true));
+        tab.addEventListener("click", () => {
+            if (tab.dataset.policyTab === "routes") {
+                setRoutesView("list");
+            }
+            setActiveTab(tab.dataset.policyTab, true);
+        });
+    });
+    routeGetButton.addEventListener("click", () => {
+        setRoutesView("get");
+        setActiveTab("routes", false);
     });
     familyButtons.forEach((button) => {
         button.addEventListener("click", () => setActiveFamily(button.dataset.policyFamily));
@@ -839,6 +913,7 @@
     routeFamilySelect.addEventListener("change", () => setActiveFamily(routeFamilySelect.value));
     ruleFamilySelect.addEventListener("change", () => setActiveRuleFamily(ruleFamilySelect.value));
     routeForm.addEventListener("submit", (event) => submitForm(event, routeForm, "/api/network/policy-routing/routes", routeStatus));
+    routeGetForm.addEventListener("submit", lookupRoute);
     ruleForm.addEventListener("submit", (event) => submitForm(event, ruleForm, "/api/network/policy-routing/rules", ruleStatus));
     tableForm.addEventListener("submit", (event) => submitForm(event, tableForm, "/api/network/policy-routing/tables", tableStatus));
     document.querySelectorAll("[data-policy-view]").forEach((view) => {
