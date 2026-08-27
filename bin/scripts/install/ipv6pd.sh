@@ -96,6 +96,8 @@ install_legacy_pd_service() {
 noipv6rs
 allowinterfaces $WAN_IFACE $LAN_IFACE
 interface $WAN_IFACE
+# Request both the WAN IPv6 address and a prefix to delegate to LAN.
+ia_na 0
 ia_pd 1 $LAN_IFACE/$PD_SUBNET_ID/64/1
 CONF
     cat > "$PD_SERVICE_CONF" <<CONF
