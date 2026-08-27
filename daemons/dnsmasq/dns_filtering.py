@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 from core import db
 from core.constants import ADGUARD_HOME_DNS_PORT, DNSMASQ_DB_PATH, DNSMASQ_DNS_PORT
+from core.iface import get_lan_interface_names
 from daemons.fwrulesd.actions import execute_work_request
 from daemons.fwrulesd.constants import FILTER_FAMILY_DATABASES, NAT_FAMILY_DATABASES
 from daemons.svcmgmtd.supervisor import supervisor_status
@@ -13,7 +14,20 @@ from daemons.svcmgmtd.supervisor import supervisor_status
 
 ADGUARD_HOME_SERVICE_NAME = "adguardhome"
 FILTERING_COLUMN = "adguardhome_upstream_enabled"
+DNS_ENABLED_COLUMN = "dns_enabled"
 DNS_PROTOCOLS = ("tcp", "udp")
+
+
+def dns_requested() -> bool:
+    """Return whether DNSMasq DNS service is enabled."""
+    if not DNSMASQ_DB_PATH.exists():
+        return False
+
+    row = db.fetch_one(
+        f"SELECT {DNS_ENABLED_COLUMN} AS enabled FROM dnsmasq_settings WHERE id = 1",
+        db_path=DNSMASQ_DB_PATH,
+    )
+    return bool(row and int(row.get("enabled") or 0) == 1)
 
 
 def filtering_requested() -> bool:
@@ -33,8 +47,56 @@ def adguard_is_running() -> bool:
     return supervisor_status(ADGUARD_HOME_SERVICE_NAME) == "RUNNING"
 
 
-def sync_managed_dns_ports(port: int, *, redirect_protected: bool) -> None:
-    """Set the LAN DNS redirect and protected INPUT rules to the active DNS listener."""
+def ensure_adguard_lan_input_rules() -> None:
+    """Create protected TCP and UDP 5353 INPUT rules for every LAN interface."""
+    lan_interfaces = get_lan_interface_names()
+    if not lan_interfaces:
+        return
+
+    for family, db_path in FILTER_FAMILY_DATABASES.items():
+        any_address = "::/0" if family == "IPV6" else "0.0.0.0/0"
+        with db.transaction(db_path) as conn:
+            for iface in lan_interfaces:
+                for protocol in DNS_PROTOCOLS:
+                    db.execute_on(
+                        conn,
+                        """
+                        INSERT INTO filter_input_rules (
+                            iface_in, rule_order, ct_new, ct_established, ct_related,
+                            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+                            protocol_name, protocol_type, protocol_code, action,
+                            protected, rule_source, enabled, pending_delete, created_at, updated_at
+                        )
+                        SELECT
+                            ?, (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
+                            1, 0, 0, 0, ?, 0, ?, ?, ?, NULL, NULL, 'ACCEPT',
+                            1, 'system', 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                        WHERE NOT EXISTS (
+                            SELECT 1
+                            FROM filter_input_rules
+                            WHERE iface_in = ?
+                              AND protocol_name = ?
+                              AND dst_port = ?
+                              AND action = 'ACCEPT'
+                              AND protected = 1
+                              AND COALESCE(pending_delete, 0) = 0
+                        )
+                        """,
+                        (
+                            iface,
+                            any_address,
+                            any_address,
+                            ADGUARD_HOME_DNS_PORT,
+                            protocol,
+                            iface,
+                            protocol,
+                            ADGUARD_HOME_DNS_PORT,
+                        ),
+                    )
+
+
+def sync_managed_dns_redirect(port: int, *, enabled: bool) -> None:
+    """Set protected LAN DNS REDIRECT rules to the selected local DNS listener."""
     protocol_marks = ", ".join("?" for _ in DNS_PROTOCOLS)
 
     for db_path in NAT_FAMILY_DATABASES.values():
@@ -43,30 +105,15 @@ def sync_managed_dns_ports(port: int, *, redirect_protected: bool) -> None:
                 conn,
                 f"""
                 UPDATE nat_prerouting_rules
-                SET to_port = ?, protected = ?, rule_source = 'system', updated_at = CURRENT_TIMESTAMP
+                SET to_port = ?, protected = 1, rule_source = 'system',
+                    enabled = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE (protected = 1 OR rule_source = 'system')
-                  AND enabled = 1
+                  AND COALESCE(pending_delete, 0) = 0
                   AND nat_action = 'REDIRECT'
                   AND dst_port = ?
                   AND protocol_name IN ({protocol_marks})
                 """,
-                (port, int(redirect_protected), DNSMASQ_DNS_PORT, *DNS_PROTOCOLS),
-            )
-
-    for db_path in FILTER_FAMILY_DATABASES.values():
-        with db.transaction(db_path) as conn:
-            db.execute_on(
-                conn,
-                f"""
-                UPDATE filter_input_rules
-                SET dst_port = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE protected = 1
-                  AND enabled = 1
-                  AND action = 'ACCEPT'
-                  AND dst_port IN (?, ?)
-                  AND protocol_name IN ({protocol_marks})
-                """,
-                (port, DNSMASQ_DNS_PORT, ADGUARD_HOME_DNS_PORT, *DNS_PROTOCOLS),
+                (port, int(enabled), DNSMASQ_DNS_PORT, *DNS_PROTOCOLS),
             )
 
 
@@ -88,12 +135,14 @@ def apply_table(family: str, category: str, table: str) -> None:
 
 
 def sync_dns_filtering_redirect(adguard_running: bool | None = None) -> bool:
-    """Apply the managed DNS target selected by configuration and service state."""
-    active = filtering_requested() and (
+    """Apply protected LAN DNS redirects according to DNSMasq and AdGuard state."""
+    dns_enabled = dns_requested()
+    active = dns_enabled and filtering_requested() and (
         adguard_is_running() if adguard_running is None else adguard_running
     )
     target_port = ADGUARD_HOME_DNS_PORT if active else DNSMASQ_DNS_PORT
-    sync_managed_dns_ports(target_port, redirect_protected=active)
+    ensure_adguard_lan_input_rules()
+    sync_managed_dns_redirect(target_port, enabled=dns_enabled)
 
     for family in ("IPV4", "IPV6"):
         apply_table(family, "FIREWALL_RULES", "filter_input_rules")
