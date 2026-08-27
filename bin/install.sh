@@ -29,14 +29,19 @@ Options:
   --lan-iface <iface>          LAN network interface to persist in iface.db
   --lan-ipv4-addr <addr>       Set LAN IPv4 address/mask, dhcp, or auto.
   --lan-ipv4-gateway <addr>    Optional LAN IPv4 gateway for a static address.
+  --lan-ipv6-addr <addr>       Optional LAN IPv6 address/prefix, dhcp, or auto.
+  
   --wan-iface <iface>          WAN network interface to persist in iface.db
   --wan-ipv4-addr <addr>       Set WAN IPv4 address/mask, dhcp, or auto.
   --wan-ipv4-gateway <addr>    Optional WAN IPv4 gateway for a static address.
-  --lan-ipv6-addr <addr>       Optional LAN IPv6 address/prefix, dhcp, or auto.
   --wan-ipv6-addr <addr>       Optional WAN IPv6 address/prefix, dhcp, or auto.
+  
   --router-mode                Enable routing, forwarding, and NAT. Requires --wan-iface
+  
   --set-hostname <name>        Set the system hostname (a hostname or FQDN).
+  
   --timezone <Region/City>     Set the system timezone, e.g. America/Sao_Paulo.
+  
   -h, --help                   Show this help message
 
 USAGE
