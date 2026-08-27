@@ -213,6 +213,13 @@ main() {
         "$LAN_IFACE" "$LAN_IPV4_ADDR" "$WAN_IFACE" "$WAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR" \
         "$LAN_IPV4_GATEWAY" "$WAN_IPV4_GATEWAY" "$LAN_IPV6_GATEWAY" "$WAN_IPV6_GATEWAY"
 
+    # Provisions DNSMasq only on the selected LAN with a calculated private
+    # IPv4 DHCP scope and IPv6 Router Advertisement settings.
+    "$ROOT_DIR/bin/scripts/install/dnsmasq.sh" "$LAN_IFACE" "$LAN_IPV4_ADDR"
+
+    # Registers DNSMasq with supervisord and starts its LAN-only DHCP/DNS/RA service.
+    "$ROOT_DIR/bin/scripts/install/dnsmasq.sh" --activate
+
     # Request an IPv6 delegated prefix on WAN and allocate one /64 to LAN.
     "$ROOT_DIR/bin/scripts/install/ipv6pd.sh"
 }

@@ -13,6 +13,22 @@ declare -F fatal >/dev/null 2>&1 || . "$ROOT_DIR/bin/scripts/common/log.sh"
 SYSTEMD_UNIT_FILE="/etc/systemd/system/armfirewall-supervisord.service"
 SYSTEMD_SERVICE_NAME="armfirewall-supervisord.service"
 
+# The distribution package can enable its own supervisord service. ArmFirewall
+# owns a separate configuration and socket, so the packaged service must not
+# run alongside armfirewall-supervisord.service.
+disable_packaged_supervisord_services() {
+    local unit
+
+    command -v systemctl >/dev/null 2>&1 || return 0
+    for unit in supervisor.service supervisord.service; do
+        if systemctl cat "$unit" >/dev/null 2>&1; then
+            systemctl disable --now "$unit" >/dev/null 2>&1 || \
+                fatal "Could not disable packaged Supervisord service: ${unit}."
+            log "Disabled packaged Supervisord service: ${unit}."
+        fi
+    done
+}
+
 # Stop any existing ArmFirewall supervisord process before systemd owns it.
 stop_existing_supervisord() {
     local supervisorctl_bin
@@ -247,6 +263,7 @@ SUPERVISOR
 main() {
     create_supervisord_conf
     create_systemd_unit
+    disable_packaged_supervisord_services
     stop_existing_supervisord
     enable_and_start_systemd_unit
     sync_services_status

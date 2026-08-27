@@ -199,7 +199,27 @@ activate_dnsmasq() {
         cd "$ROOT_DIR"
         "$ROOT_DIR/.venv/bin/python" - <<'PY'
 from daemons.dnsmasq.resolver import configure_system_resolver
-from daemons.svcmgmtd.supervisor import supervisor_command, supervisor_status
+from daemons.svcmgmtd.catalog import optional_service_for_daemon, set_service_autostart_enabled
+from daemons.svcmgmtd.models import OptionalService
+from daemons.svcmgmtd.supervisor import (
+    register_supervisor_program,
+    reread_and_update,
+    supervisor_command,
+    supervisor_status,
+)
+
+metadata = optional_service_for_daemon("dnsmasq")
+if metadata is None:
+    raise RuntimeError("DNSMasq service metadata was not found.")
+service = OptionalService(
+    name="dnsmasq",
+    package=str(metadata["package"]),
+    binary=str(metadata["binary"]),
+    supervisor_program=str(metadata["supervisor_program"]),
+)
+register_supervisor_program(service)
+set_service_autostart_enabled("dnsmasq", True)
+reread_and_update()
 
 if supervisor_status("dnsmasq") != "RUNNING":
     supervisor_command("start", "dnsmasq", timeout=60)
