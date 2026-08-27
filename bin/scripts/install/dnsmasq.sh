@@ -94,6 +94,9 @@ if address_spec != "dhcp":
         dhcp_range_start=str(ipaddress.IPv4Address(pool[0])),
         dhcp_range_end=str(ipaddress.IPv4Address(pool[-1])),
     )
+    config["extra_options"] = (
+        f"dhcp-option=tag:{iface},option:router,{interface.ip}"
+    )
     config["dhcp_enabled"] = True
 
 config["interface_configs"] = [interface_config]
@@ -114,7 +117,7 @@ with db.transaction(DNSMASQ_DB_PATH) as conn:
                expand_hosts = ?,
                domain_needed = ?,
                bogus_priv = ?,
-               extra_options = '',
+               extra_options = ?,
                pending_apply = 0,
                updated_at = CURRENT_TIMESTAMP
          WHERE id = 1
@@ -126,6 +129,7 @@ with db.transaction(DNSMASQ_DB_PATH) as conn:
             int(config["expand_hosts"]),
             int(config["domain_needed"]),
             int(config["bogus_priv"]),
+            config["extra_options"],
         ),
     )
     db.execute_on(conn, "DELETE FROM dnsmasq_global_domain_upstreams")
@@ -204,6 +208,7 @@ from daemons.svcmgmtd.models import OptionalService
 from daemons.svcmgmtd.supervisor import (
     register_supervisor_program,
     reread_and_update,
+    set_supervisor_program_autostart,
     supervisor_command,
     supervisor_status,
 )
@@ -218,6 +223,7 @@ service = OptionalService(
     supervisor_program=str(metadata["supervisor_program"]),
 )
 register_supervisor_program(service)
+set_supervisor_program_autostart("dnsmasq", True)
 set_service_autostart_enabled("dnsmasq", True)
 reread_and_update()
 
