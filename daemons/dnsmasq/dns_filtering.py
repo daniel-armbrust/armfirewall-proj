@@ -96,6 +96,22 @@ def ensure_adguard_lan_input_rules() -> None:
 
 
 
+
+def ensure_nat_prerouting_schema(conn: db.Connection) -> None:
+    """Add NAT columns required by DNS-managed rules to older databases."""
+    columns = {
+        str(row["name"])
+        for row in db.execute_on(conn, "PRAGMA table_info(nat_prerouting_rules)").fetchall()
+    }
+    if "pending_delete" not in columns:
+        db.execute_on(
+            conn,
+            "ALTER TABLE nat_prerouting_rules "
+            "ADD COLUMN pending_delete INTEGER NOT NULL DEFAULT 0 "
+            "CHECK (pending_delete IN (0, 1))",
+        )
+
+
 def ensure_dnsmasq_lan_redirect_rules() -> None:
     """Create protected DNS REDIRECT rules for every LAN interface."""
     lan_interfaces = get_lan_interface_names()
@@ -105,6 +121,7 @@ def ensure_dnsmasq_lan_redirect_rules() -> None:
     for family, db_path in NAT_FAMILY_DATABASES.items():
         any_address = "::/0" if family == "IPV6" else "0.0.0.0/0"
         with db.transaction(db_path) as conn:
+            ensure_nat_prerouting_schema(conn)
             for iface in lan_interfaces:
                 for protocol in DNS_PROTOCOLS:
                     db.execute_on(
