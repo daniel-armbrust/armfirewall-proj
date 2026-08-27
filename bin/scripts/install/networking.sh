@@ -23,6 +23,13 @@ uses_ipv6_auto() {
     [[ "${1:-}" == "auto" ]]
 }
 
+# With no NetworkManager, odhcp6c owns DHCPv6/RA processing for dynamic PD.
+# Do not generate ifupdown IPv6 stanzas for its WAN and delegated LAN.
+legacy_ipv6_pd_requested() {
+    [[ "${ROUTER_MODE:-0}" == "1" ]] || return 1
+    uses_dhcp "${WAN_IPV6_ADDR:-}" && uses_dhcp "${LAN_IPV6_ADDR:-}"
+}
+
 # Validate an IPv4 address with a CIDR prefix, such as 192.0.2.10/24.
 validate_ipv4_cidr() {
     local value="$1"
@@ -71,7 +78,7 @@ cidr_to_netmask() {
 
 # Append IPv4 and optional IPv6 stanzas for one interface to an ifupdown configuration file.
 write_interface_stanza() {
-    local iface="$1" ipv4_address_spec="$2" ipv6_address_spec="$3" ipv4_gateway="$4" allow_default="$5"
+    local iface="$1" ipv4_address_spec="$2" ipv6_address_spec="$3" ipv4_gateway="$4" ipv6_gateway="$5" allow_default="$6"
     local address prefix netmask
 
     [[ -n "$iface" && -n "$ipv4_address_spec" ]] || return 0
@@ -93,6 +100,10 @@ write_interface_stanza() {
     fi
 
     [[ -n "$ipv6_address_spec" ]] || return 0
+    if legacy_ipv6_pd_requested && [[ "$iface" == "${WAN_IFACE:-}" || "$iface" == "${LAN_IFACE:-}" ]]; then
+        printf '# IPv6 on %s is managed by the ArmFirewall prefix-delegation client.\n\n' "$iface"
+        return 0
+    fi
    
     if uses_dhcp "$ipv6_address_spec"; then
         printf 'iface %s inet6 dhcp\n' "$iface"
@@ -113,7 +124,9 @@ write_interface_stanza() {
     address="${ipv6_address_spec%/*}"
     prefix="${ipv6_address_spec#*/}"
    
-    printf 'iface %s inet6 static\n    address %s\n    netmask %s\n\n' "$iface" "$address" "$prefix"
+    printf 'iface %s inet6 static\n    address %s\n    netmask %s\n' "$iface" "$address" "$prefix"
+    [[ -z "$ipv6_gateway" ]] || printf '    gateway %s\n' "$ipv6_gateway"
+    printf '\n'
 }
 
 # Return success when NetworkManager can be configured through nmcli.
@@ -192,7 +205,7 @@ configure_networkmanager_ipv4() {
 
 # Apply optional IPv6 configuration to one NetworkManager connection.
 configure_networkmanager_ipv6() {
-    local connection="$1" address_spec="$2"
+    local connection="$1" address_spec="$2" gateway="$3"
 
     [[ -n "$address_spec" ]] || return 0
     if uses_dhcp "$address_spec" || uses_ipv6_auto "$address_spec"; then
@@ -204,7 +217,7 @@ configure_networkmanager_ipv6() {
     fi
 
     nmcli connection modify "$connection" \
-        ipv6.method manual ipv6.addresses "$address_spec" ipv6.gateway "" || \
+        ipv6.method manual ipv6.addresses "$address_spec" ipv6.gateway "$gateway" || \
         fatal "Could not configure static IPv6 for NetworkManager connection ${connection}."
 }
 
@@ -244,11 +257,12 @@ network_interface_has_carrier() {
 
 # Configure requested interfaces through the operating system's NetworkManager backend.
 configure_networkmanager_interfaces() {
-    local iface ipv4_address_spec ipv4_gateway ipv6_address_spec connection applied_iface="" allow_default
+    local iface ipv4_address_spec ipv4_gateway ipv6_address_spec ipv6_gateway connection applied_iface="" allow_default
     local -a ifaces=("$LAN_IFACE" "$WAN_IFACE")
     local -a ipv4_addresses=("$LAN_IPV4_ADDR" "$WAN_IPV4_ADDR")
     local -a ipv4_gateways=("$LAN_IPV4_GATEWAY" "$WAN_IPV4_GATEWAY")
     local -a ipv6_addresses=("$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR")
+    local -a ipv6_gateways=("$LAN_IPV6_GATEWAY" "$WAN_IPV6_GATEWAY")
     local index
 
     cleanup_legacy_ifupdown_backend
@@ -262,6 +276,7 @@ configure_networkmanager_interfaces() {
         ipv4_address_spec="${ipv4_addresses[$index]}"
         ipv4_gateway="${ipv4_gateways[$index]}"
         ipv6_address_spec="${ipv6_addresses[$index]}"
+        ipv6_gateway="${ipv6_gateways[$index]}"
         [[ -n "$iface" && "$iface" != "$applied_iface" ]] || continue
         applied_iface="$iface"
 
@@ -278,7 +293,7 @@ configure_networkmanager_interfaces() {
         [[ "$allow_default" == "yes" ]] || ipv4_gateway=""
 
         configure_networkmanager_ipv4 "$connection" "$ipv4_address_spec" "$ipv4_gateway"
-        configure_networkmanager_ipv6 "$connection" "$ipv6_address_spec"
+        configure_networkmanager_ipv6 "$connection" "$ipv6_address_spec" "$ipv6_gateway"
         configure_networkmanager_default_route_policy "$connection" "$allow_default"
 
         if network_interface_has_carrier "$iface"; then
@@ -369,8 +384,8 @@ configure_debian_interfaces() {
     tmp_file="$(mktemp "${NETWORK_INTERFACES_DIR}/.armfirewall.XXXXXX")"
     {
         printf '# Managed by ArmFirewall installer.\n'
-        write_interface_stanza "$LAN_IFACE" "$LAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$LAN_IPV4_GATEWAY" no
-        write_interface_stanza "$WAN_IFACE" "$WAN_IPV4_ADDR" "$WAN_IPV6_ADDR" "$WAN_IPV4_GATEWAY" yes
+        write_interface_stanza "$LAN_IFACE" "$LAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$LAN_IPV4_GATEWAY" "$LAN_IPV6_GATEWAY" no
+        write_interface_stanza "$WAN_IFACE" "$WAN_IPV4_ADDR" "$WAN_IPV6_ADDR" "$WAN_IPV4_GATEWAY" "$WAN_IPV6_GATEWAY" yes
     } > "$tmp_file"
     install -m 0644 "$tmp_file" "$ARMFIREWALL_INTERFACES_FILE"
     rm -f "$tmp_file"
@@ -406,6 +421,8 @@ main() {
     WAN_IPV6_ADDR="${6:-}"
     LAN_IPV4_GATEWAY="${7:-}"
     WAN_IPV4_GATEWAY="${8:-}"
+    LAN_IPV6_GATEWAY="${9:-}"
+    WAN_IPV6_GATEWAY="${10:-}"
 
     [[ -n "$LAN_IPV4_ADDR$WAN_IPV4_ADDR" ]] || return 0
 
@@ -414,6 +431,9 @@ main() {
     done
     for gateway in "$LAN_IPV4_GATEWAY" "$WAN_IPV4_GATEWAY"; do
         [[ -z "$gateway" ]] || validate_ipv4_cidr "${gateway}/32" || fatal "Invalid IPv4 gateway: ${gateway}."
+    done
+    for gateway in "$LAN_IPV6_GATEWAY" "$WAN_IPV6_GATEWAY"; do
+        [[ -z "$gateway" ]] || python3 -c 'import ipaddress, sys; ipaddress.IPv6Address(sys.argv[1])' "$gateway" >/dev/null 2>&1 || fatal "Invalid IPv6 gateway: ${gateway}."
     done
     
     for address_spec in "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR"; do

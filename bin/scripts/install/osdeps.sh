@@ -243,87 +243,32 @@ install_system_deps() {
     esac
 }
 
-# Return success when the first version is greater than or equal to the second.
-# NetworkManager versions may contain a distro release suffix, therefore only
-# the numeric dotted prefix is considered here.
-version_at_least() {
-    local actual="$1" required="$2"
-    local actual_major actual_minor required_major required_minor
-
-    actual="${actual%%[-+~]*}"
-    required="${required%%[-+~]*}"
-    IFS=. read -r actual_major actual_minor _ <<<"$actual"
-    IFS=. read -r required_major required_minor _ <<<"$required"
-
-    [[ "$actual_major" =~ ^[0-9]+$ && "$actual_minor" =~ ^[0-9]+$ ]] || return 1
-    [[ "$required_major" =~ ^[0-9]+$ && "$required_minor" =~ ^[0-9]+$ ]] || return 1
-
-    (( 10#$actual_major > 10#$required_major ||
-       (10#$actual_major == 10#$required_major && 10#$actual_minor >= 10#$required_minor) ))
+dynamic_ipv6_pd_requested() {
+    [[ "${ROUTER_MODE:-0}" == "1" ]] || return 1
+    [[ "${WAN_IPV6_ADDR:-}" == "auto" || "${WAN_IPV6_ADDR:-}" == "dhcp" ]] || return 1
+    [[ "${LAN_IPV6_ADDR:-}" == "auto" || "${LAN_IPV6_ADDR:-}" == "dhcp" ]] || return 1
 }
 
-# Print the NetworkManager version reported by nmcli.
-networkmanager_version() {
-    nmcli --version 2>/dev/null | awk 'NR == 1 { print $NF }'
+networkmanager_supports_ipv6_pd() {
+    local version major minor
+    command -v nmcli >/dev/null 2>&1 || return 1
+    version="$(nmcli --version 2>/dev/null | awk 'NR == 1 { print $NF }')"
+    IFS=. read -r major minor _ <<<"$version"
+    [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] || return 1
+    (( major > 1 || (major == 1 && minor >= 54) ))
 }
 
-# Update NetworkManager through the repositories prepared by addpkgmirrors.sh.
-# This deliberately does not install packages built for a different OS release:
-# replacing core networking packages from an arbitrary RPM/DEB repository can
-# make a remotely installed firewall unreachable.
-upgrade_networkmanager_from_configured_repositories() {
+# Legacy NetworkManager cannot request DHCPv6 prefix delegation. Install only
+# the small DHCPv6 client used by ArmFirewall's persistent PD fallback.
+install_ipv6_pd_fallback_dependency() {
+    dynamic_ipv6_pd_requested || return 0
+    networkmanager_supports_ipv6_pd && return 0
+
+    log "Installing the odhcp6c IPv6 prefix-delegation client for the legacy NetworkManager fallback."
     case "$PKG_MANAGER" in
-        dnf)
-            run_dnf_transaction upgrade NetworkManager
-            ;;
-        apt)
-            apt-get update
-            run_apt_transaction_without_service_start install --only-upgrade network-manager
-            ;;
+        dnf) run_dnf_transaction install odhcp6c ;;
+        apt) run_apt_transaction_without_service_start install odhcp6c ;;
     esac
-}
-
-# Load the upgraded daemon before nmcli writes prefix-delegation properties.
-# The installer runs this before it changes interface profiles, so a brief
-# NetworkManager restart cannot leave a partially configured ArmFirewall.
-restart_networkmanager_after_upgrade() {
-    if has_cmd systemctl && systemctl is-active --quiet NetworkManager.service; then
-        log "Restarting NetworkManager to load the upgraded IPv6 delegation support."
-        systemctl restart NetworkManager.service || fatal "Could not restart NetworkManager after its upgrade."
-    fi
-}
-
-# Ensure router-mode IPv6 prefix delegation has the NetworkManager capability
-# required by ipv6pd.sh. Hosts that do not use NetworkManager keep using the
-# legacy networking backend; ipv6pd.sh will then report that PD is unavailable.
-ensure_networkmanager_ipv6_pd_support() {
-    local current_version
-
-    [[ "${ROUTER_MODE:-0}" == "1" ]] || return 0
-
-    if ! has_cmd nmcli; then
-        log "NetworkManager is not installed; skipping its upgrade. IPv6 prefix delegation requires a NetworkManager backend."
-        return 0
-    fi
-
-    current_version="$(networkmanager_version)"
-    [[ -n "$current_version" ]] || fatal "Could not determine the installed NetworkManager version."
-
-    if version_at_least "$current_version" "$NETWORKMANAGER_MIN_VERSION"; then
-        log "NetworkManager ${current_version} supports IPv6 prefix delegation (minimum ${NETWORKMANAGER_MIN_VERSION})."
-        return 0
-    fi
-
-    log "NetworkManager ${current_version} is older than ${NETWORKMANAGER_MIN_VERSION}; upgrading it from the configured ${PKG_MANAGER} repositories."
-    upgrade_networkmanager_from_configured_repositories
-    restart_networkmanager_after_upgrade
-
-    current_version="$(networkmanager_version)"
-    [[ -n "$current_version" ]] || fatal "NetworkManager upgrade completed but nmcli is no longer available."
-    version_at_least "$current_version" "$NETWORKMANAGER_MIN_VERSION" || fatal \
-        "Configured repositories provide NetworkManager ${current_version}, but IPv6 prefix delegation requires ${NETWORKMANAGER_MIN_VERSION} or newer. Use an OS/repository release that provides the required version."
-
-    log "NetworkManager was upgraded to ${current_version}; IPv6 prefix delegation is supported."
 }
 
 # Return success when a Python binary meets the minimum supported version.
@@ -394,10 +339,7 @@ main() {
     # package manager
     install_system_deps
 
-    # Router mode with IPv6 prefix delegation requires NetworkManager 1.54+.
-    # The update is performed only through the signed repositories configured
-    # earlier in the installer.
-    ensure_networkmanager_ipv6_pd_support
+    install_ipv6_pd_fallback_dependency
     
     # Creates the Python virtual environment and installs ArmFirewall Python 
     # dependencies

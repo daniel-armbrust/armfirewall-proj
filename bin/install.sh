@@ -9,6 +9,8 @@ LAN_IPV4_ADDR=""
 WAN_IPV4_ADDR=""
 LAN_IPV6_ADDR=""
 WAN_IPV6_ADDR=""
+LAN_IPV6_GATEWAY=""
+WAN_IPV6_GATEWAY=""
 LAN_IPV4_GATEWAY=""
 WAN_IPV4_GATEWAY=""
 
@@ -22,19 +24,24 @@ Usage: $0 --lan-iface <iface> --lan-ipv4-addr <IPv4/CIDR|dhcp|auto>
           --wan-iface <iface> --wan-ipv4-addr <IPv4/CIDR|dhcp|auto>
           [--lan-ipv4-gateway <IPv4>] [--wan-ipv4-gateway <IPv4>]
           [--lan-ipv6-addr <IPv6/CIDR|dhcp|auto>]
+          [--lan-ipv6-gateway <IPv6>]
           [--wan-ipv6-addr <IPv6/CIDR|dhcp|auto>]
+          [--wan-ipv6-gateway <IPv6>]
           [--router-mode] [--set-hostname <name>] [--timezone <Region/City>]
 
 Options:
+  
   --lan-iface <iface>          LAN network interface to persist in iface.db
   --lan-ipv4-addr <addr>       Set LAN IPv4 address/mask, dhcp, or auto.
   --lan-ipv4-gateway <addr>    Optional LAN IPv4 gateway for a static address.
   --lan-ipv6-addr <addr>       Optional LAN IPv6 address/prefix, dhcp, or auto.
+  --lan-ipv6-gateway <addr>    Optional LAN IPv6 gateway for a static address.
   
   --wan-iface <iface>          WAN network interface to persist in iface.db
   --wan-ipv4-addr <addr>       Set WAN IPv4 address/mask, dhcp, or auto.
   --wan-ipv4-gateway <addr>    Optional WAN IPv4 gateway for a static address.
   --wan-ipv6-addr <addr>       Optional WAN IPv6 address/prefix, dhcp, or auto.
+  --wan-ipv6-gateway <addr>    Optional WAN IPv6 gateway for a static address.
   
   --router-mode                Enable routing, forwarding, and NAT. Requires --wan-iface
   
@@ -104,6 +111,18 @@ parse_args() {
                 shift 2
                 ;;
 
+            --lan-ipv6-gateway)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv6-gateway requires an IPv6 address."
+                LAN_IPV6_GATEWAY="$2"
+                shift 2
+                ;;
+
+            --wan-ipv6-gateway)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-ipv6-gateway requires an IPv6 address."
+                WAN_IPV6_GATEWAY="$2"
+                shift 2
+                ;;
+
             --lan-ipv4-gateway)
                 [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv4-gateway requires an IPv4 address."
                 LAN_IPV4_GATEWAY="$2"
@@ -143,7 +162,14 @@ main() {
     # Ensure the script is running with root privileges
     need_root
 
+    # Child installer scripts use these values to decide whether dynamic IPv6
+    # prefix delegation was requested.
+    export LAN_IPV6_ADDR WAN_IPV6_ADDR
+
+    # Sets the requested hostname, or derives a stable hostname from the LAN IPv4 address.
     "$ROOT_DIR/bin/scripts/install/hostname.sh" "$SET_HOSTNAME" "$LAN_IPV4_ADDR"
+
+    # Configures the requested timezone and enables operating system time synchronization.
     "$ROOT_DIR/bin/scripts/install/timesync.sh" "$TIMEZONE"
 
     # Configures the operating system package repositories used by ArmFirewall
@@ -185,7 +211,7 @@ main() {
 
     "$ROOT_DIR/bin/scripts/install/networking.sh" \
         "$LAN_IFACE" "$LAN_IPV4_ADDR" "$WAN_IFACE" "$WAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR" \
-        "$LAN_IPV4_GATEWAY" "$WAN_IPV4_GATEWAY"
+        "$LAN_IPV4_GATEWAY" "$WAN_IPV4_GATEWAY" "$LAN_IPV6_GATEWAY" "$WAN_IPV6_GATEWAY"
 
     # Request an IPv6 delegated prefix on WAN and allocate one /64 to LAN.
     "$ROOT_DIR/bin/scripts/install/ipv6pd.sh"

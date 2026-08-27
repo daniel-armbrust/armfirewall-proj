@@ -3,112 +3,95 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-
-# shellcheck source=../common/globals.sh
 . "$ROOT_DIR/bin/scripts/common/globals.sh"
 
 PD_HINT="${IPV6_PD_HINT:-::/56}"
 PD_SUBNET_ID="${IPV6_PD_SUBNET_ID:-0}"
-NETWORKMANAGER_MIN_VERSION="${NETWORKMANAGER_MIN_VERSION:-1.54}"
+PD_RUNTIME_DIR="/run/armfirewall/ipv6pd"
+PD_HOOK="$ROOT_DIR/daemons/nmlegacyipv6pd/odhcp6c_hook.py"
+PD_SERVICE_CONF="$CONF_DIR/supervisor.d/ipv6pd.ini"
 
-router_mode_enabled() {
-    [[ "${ROUTER_MODE:-0}" == "1" ]]
+uses_dynamic_ipv6() { [[ "${1:-}" == "auto" || "${1:-}" == "dhcp" ]]; }
+
+pd_requested() {
+    [[ "${ROUTER_MODE:-0}" == "1" ]] && uses_dynamic_ipv6 "${WAN_IPV6_ADDR:-}" && uses_dynamic_ipv6 "${LAN_IPV6_ADDR:-}"
 }
 
-# Return the UUID of an active NetworkManager connection for an interface.
-active_connection_uuid() {
-    local iface="$1"
-    local uuid
-
-    uuid="$(nmcli -g GENERAL.CON-UUID device show "$iface" 2>/dev/null | head -n 1 || true)"
-    [[ -n "$uuid" && "$uuid" != "--" ]] && printf '%s\n' "$uuid"
-}
-
-# Return one persisted NetworkManager connection UUID bound to an interface.
-connection_uuid_for_interface() {
-    local iface="$1" uuid profile_iface
-
-    uuid="$(active_connection_uuid "$iface" || true)"
-    [[ -n "$uuid" ]] && {
-        printf '%s\n' "$uuid"
-        return 0
-    }
-
-    while IFS= read -r uuid; do
-        [[ -n "$uuid" ]] || continue
-        profile_iface="$(nmcli -g connection.interface-name connection show uuid "$uuid" 2>/dev/null | head -n 1 || true)"
-        [[ "$profile_iface" == "$iface" ]] && {
-            printf '%s\n' "$uuid"
-            return 0
-        }
-    done < <(nmcli -g UUID connection show 2>/dev/null || true)
-
-    fatal "No NetworkManager connection profile was found for ${iface}."
-}
-
-# Reapply a device only when it has an active NetworkManager connection.
-reapply_active_device() {
-    local iface="$1"
-
-    if active_connection_uuid "$iface" >/dev/null; then
-        nmcli device reapply "$iface"
-    else
-        log "Saved IPv6 prefix delegation configuration for ${iface}; it will apply when the connection becomes active."
-    fi
-}
-
-networkmanager_supports_prefix_delegation() {
+networkmanager_version_supports_pd() {
     local version major minor
-
+    has_cmd nmcli || return 1
     version="$(nmcli --version | awk 'NR == 1 { print $NF }')"
     IFS=. read -r major minor _ <<<"$version"
     [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] || return 1
-    local required_major required_minor
-    IFS=. read -r required_major required_minor _ <<<"$NETWORKMANAGER_MIN_VERSION"
-    [[ "$required_major" =~ ^[0-9]+$ && "$required_minor" =~ ^[0-9]+$ ]] || return 1
-    (( major > required_major || (major == required_major && minor >= required_minor) ))
+    (( major > 1 || (major == 1 && minor >= 54) ))
 }
 
-validate_settings() {
-    [[ -n "${WAN_IFACE:-}" ]] || fatal "IPv6 prefix delegation requires WAN_IFACE."
-    [[ -n "${LAN_IFACE:-}" ]] || fatal "IPv6 prefix delegation requires LAN_IFACE."
-    [[ "$WAN_IFACE" != "$LAN_IFACE" ]] || fatal "IPv6 prefix delegation requires different WAN and LAN interfaces."
-    [[ "$PD_HINT" =~ ^::/[0-9]{1,3}$ ]] || fatal "IPV6_PD_HINT must be an IPv6 prefix-length hint such as ::/56."
-    local pd_length="${PD_HINT#::/}"
-    (( 48 <= 10#$pd_length && 10#$pd_length <= 64 )) || fatal "IPV6_PD_HINT must request a prefix between /48 and /64."
-    [[ "$PD_SUBNET_ID" =~ ^[0-9]+$ ]] || fatal "IPV6_PD_SUBNET_ID must be a non-negative integer."
-    has_cmd nmcli || fatal "NetworkManager (nmcli) is required for IPv6 prefix delegation."
+active_connection_uuid() {
+    local uuid
+    uuid="$(nmcli -g GENERAL.CON-UUID device show "$1" 2>/dev/null | head -n1 || true)"
+    [[ -n "$uuid" && "$uuid" != "--" ]] && printf '%s\n' "$uuid"
 }
 
-configure_ipv6_prefix_delegation() {
+configure_networkmanager_pd() {
     local wan_connection lan_connection
-
-    router_mode_enabled || return 0
-    validate_settings
-
     wan_connection="$(active_connection_uuid "$WAN_IFACE" || true)"
-    [[ -n "$wan_connection" ]] || fatal "No active NetworkManager connection was found for ${WAN_IFACE}."
-    lan_connection="$(connection_uuid_for_interface "$LAN_IFACE")"
-    networkmanager_supports_prefix_delegation || fatal \
-        "NetworkManager ${NETWORKMANAGER_MIN_VERSION} or newer is required for IPv6 prefix delegation; upgrade NetworkManager before enabling router mode."
-
-    log "Requesting IPv6 prefix delegation (${PD_HINT}) through ${WAN_IFACE}."
-    nmcli connection modify "$wan_connection" \
-        ipv6.method auto \
-        ipv6.dhcp-pd-hint "$PD_HINT" \
-        ipv6.forwarding yes
-
-    log "Assigning delegated IPv6 subnet ${PD_SUBNET_ID} to ${LAN_IFACE}."
-    nmcli connection modify "$lan_connection" \
-        ipv6.method auto \
-        ipv6.never-default yes \
-        ipv6.forwarding yes \
-        prefix-delegation.subnet-id "$PD_SUBNET_ID"
-
-    # Reapply instead of cycling the connections: this preserves the active
-    # management path while making NetworkManager request/assign the prefix.
-    reapply_active_device "$WAN_IFACE"
-    reapply_active_device "$LAN_IFACE"
+    lan_connection="$(active_connection_uuid "$LAN_IFACE" || true)"
+    [[ -n "$wan_connection" && -n "$lan_connection" ]] || fatal "Active NetworkManager connections are required for IPv6 prefix delegation."
+    nmcli connection modify "$wan_connection" ipv6.method auto ipv6.dhcp-pd-hint "$PD_HINT" ipv6.forwarding yes
+    nmcli connection modify "$lan_connection" ipv6.method auto ipv6.never-default yes ipv6.forwarding yes prefix-delegation.subnet-id "$PD_SUBNET_ID"
+    nmcli device reapply "$WAN_IFACE"
+    nmcli device reapply "$LAN_IFACE"
+    log "NetworkManager will manage IPv6 prefix delegation."
 }
 
-configure_ipv6_prefix_delegation
+configure_legacy_networkmanager() {
+    local wan_connection lan_connection
+    has_cmd nmcli || return 0
+    wan_connection="$(active_connection_uuid "$WAN_IFACE" || true)"
+    lan_connection="$(active_connection_uuid "$LAN_IFACE" || true)"
+    [[ -n "$wan_connection" ]] && nmcli connection modify "$wan_connection" ipv6.method disabled
+    [[ -n "$lan_connection" ]] && nmcli connection modify "$lan_connection" ipv6.method disabled
+    [[ -n "$wan_connection" ]] && nmcli device reapply "$WAN_IFACE" || true
+    [[ -n "$lan_connection" ]] && nmcli device reapply "$LAN_IFACE" || true
+}
+
+install_legacy_pd_service() {
+    local odhcp6c_bin pd_length
+    has_cmd odhcp6c || fatal "odhcp6c is required for the IPv6 prefix-delegation fallback."
+    [[ -x "$PD_HOOK" ]] || fatal "IPv6 prefix-delegation hook was not found: ${PD_HOOK}."
+    odhcp6c_bin="$(command -v odhcp6c)"
+    pd_length="${PD_HINT#::/}"
+    [[ "$pd_length" =~ ^[0-9]+$ ]] || fatal "IPV6_PD_HINT must have the form ::/56."
+    chmod 0755 "$PD_HOOK"
+    mkdir -p "$PD_RUNTIME_DIR" "$CONF_DIR/supervisor.d"
+    cat > "$PD_SERVICE_CONF" <<CONF
+[program:armfirewall-nmlegacyipv6pd]
+directory=$ROOT_DIR
+command=$ROOT_DIR/.venv/bin/python -m daemons.nmlegacyipv6pd
+autostart=true
+autorestart=true
+startsecs=3
+stopsignal=TERM
+stopasgroup=true
+killasgroup=true
+environment=ARMFW_IPV6PD_WAN="$WAN_IFACE",ARMFW_IPV6PD_LAN="$LAN_IFACE",ARMFW_IPV6PD_SUBNET_ID="$PD_SUBNET_ID",ARMFW_IPV6PD_PREFIX_LENGTH="$pd_length",ARMFW_IPV6PD_RUNTIME_DIR="$PD_RUNTIME_DIR",ARMFW_ODHCP6C_BIN="$odhcp6c_bin"
+stdout_logfile=$ROOT_DIR/logs/armfirewall-nmlegacyipv6pd.out.log
+stderr_logfile=$ROOT_DIR/logs/armfirewall-nmlegacyipv6pd.err.log
+CONF
+    supervisorctl -c "$SUPERVISORD_CONF" reread
+    supervisorctl -c "$SUPERVISORD_CONF" update
+    log "Installed the NetworkManager legacy IPv6 prefix-delegation fallback."
+}
+
+main() {
+    pd_requested || { log "IPv6 prefix delegation was not requested."; return 0; }
+    [[ -n "${WAN_IFACE:-}" && -n "${LAN_IFACE:-}" && "$WAN_IFACE" != "$LAN_IFACE" ]] || fatal "IPv6 prefix delegation requires distinct WAN and LAN interfaces."
+    if networkmanager_version_supports_pd; then
+        configure_networkmanager_pd
+    else
+        configure_legacy_networkmanager
+        install_legacy_pd_service
+    fi
+}
+
+main "$@"
