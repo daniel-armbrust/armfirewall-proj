@@ -188,7 +188,6 @@ def normalize_config(payload: dict[str, Any]) -> dict[str, Any]:
     config["local_domain"] = validate_domain(payload.get("local_domain"))
     config["upstream_dns_servers"] = normalize_upstream_list(payload.get("upstream_dns_servers"), "upstream_dns_servers")
     config["domain_upstreams"] = validate_domain_upstreams(payload.get("domain_upstreams"))
-    config["adguardhome_upstream_enabled"] = bool(payload.get("adguardhome_upstream_enabled"))
     config["dhcp_range_start"] = validate_optional_ipv4(payload.get("dhcp_range_start"), "dhcp_range_start")
     config["dhcp_range_end"] = validate_optional_ipv4(payload.get("dhcp_range_end"), "dhcp_range_end")
     config["lease_time"] = validate_lease_time(payload.get("lease_time"))
@@ -215,7 +214,6 @@ def normalize_config(payload: dict[str, Any]) -> dict[str, Any]:
         config["dhcp_enabled"] = any(item["dhcp_enabled"] for item in config["interface_configs"])
         return config
 
-    config["upstream_dns_servers"] = [] if config["adguardhome_upstream_enabled"] else ["1.1.1.1", "8.8.8.8"]
     if config["dhcp_enabled"] and (not config["dhcp_range_start"] or not config["dhcp_range_end"]):
         raise HTTPException(status_code=400, detail="DHCP range start and end are required when DHCP is enabled.")
     if config["dhcp_enabled"]:

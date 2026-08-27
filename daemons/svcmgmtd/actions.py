@@ -25,7 +25,8 @@ from .packages import (
     uninstall_adguard_home,
     uninstall_package,
 )
-from daemons.dnsmasq.dns_filtering import ensure_adguard_lan_input_rules, sync_dns_filtering_redirect
+from daemons.dnsmasq.dns_routing import ensure_lan_dns_input_rules
+from daemons.dnsmasq.dnsmasq import apply_config as apply_dnsmasq_config
 from .supervisor import (
     register_supervisor_program,
     remove_supervisor_program,
@@ -78,23 +79,19 @@ def install_service(service: OptionalService) -> None:
     if service.name == ADGUARD_HOME_SERVICE_NAME:
         install_adguard_home()
         configure_adguard_home_dns_listener()
-        ensure_adguard_lan_input_rules()
+        ensure_lan_dns_input_rules()
     else:
         install_package(service.package)
     register_supervisor_program(service)
     set_supervisor_program_autostart(service.name, False)
     set_service_autostart_enabled(service.name, False)
     reread_and_update()
-    if service.name == ADGUARD_HOME_SERVICE_NAME:
-        sync_dns_filtering_redirect(adguard_running=False)
     sync_supervisor_statuses()
     logger.log(f"Installed optional service {service.name}.", source=LOG_SOURCE)
 
 
 def uninstall_service(service: OptionalService) -> None:
     """Stop, unregister, and remove one optional service package."""
-    if service.name == ADGUARD_HOME_SERVICE_NAME:
-        sync_dns_filtering_redirect(adguard_running=False)
     if supervisor_program_exists(service.name):
         supervisor_command("stop", service.name, check=False)
         remove_supervisor_program(service.name)
@@ -117,11 +114,11 @@ def control_service(service: ControllableService, action: str) -> None:
     ensure_dnsmasq_lease_directory(service_name)
     if service_name == ADGUARD_HOME_SERVICE_NAME and action in {"start", "restart"}:
         configure_adguard_home_dns_listener()
-        ensure_adguard_lan_input_rules()
-    if service_name == ADGUARD_HOME_SERVICE_NAME and action in {"stop", "disable"}:
-        sync_dns_filtering_redirect(adguard_running=False)
+        ensure_lan_dns_input_rules()
     reread_and_update()
 
+    if service_name == ADGUARD_HOME_SERVICE_NAME and action in {"start", "restart"}:
+        apply_dnsmasq_config(adguard_active=True)
     state = supervisor_status(service_name)
     
     if action == "start":
@@ -155,8 +152,8 @@ def control_service(service: ControllableService, action: str) -> None:
 
     if action in {"enable", "disable"}:
         reread_and_update()
-    if service_name == ADGUARD_HOME_SERVICE_NAME and action in {"start", "restart"}:
-        sync_dns_filtering_redirect(adguard_running=True)
+    if service_name == ADGUARD_HOME_SERVICE_NAME and action in {"stop", "disable"}:
+        apply_dnsmasq_config(adguard_active=False)
     sync_supervisor_statuses()
     logger.log(f"Service {service_name} {action} completed.", source=LOG_SOURCE)
 

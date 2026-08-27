@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any
 from fastapi import HTTPException
 from core import db
-from core.constants import ADGUARD_HOME_SERVICE_NAME, DNSMASQ_CONF_PATH, DNSMASQ_DB_PATH, DNSMASQ_LEASES_PATH, DNSMASQ_MAC_ADDRESS_PATTERN, WORK_REQUEST_DB_PATH
+from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_DB_PATH, DNSMASQ_LEASES_PATH, DNSMASQ_MAC_ADDRESS_PATTERN, WORK_REQUEST_DB_PATH
 from web.services.api import service_status_by_name
 from web.workrequests.api import list_work_requests
 from .configuration import default_config, parse_dnsmasq_config, read_config_lines, render_config, validate_dnsmasq_syntax
@@ -352,66 +352,18 @@ def update_static_lease(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def save_dnsmasq_config(payload: dict[str, Any]) -> dict[str, Any]:
-    """Persist dnsmasq settings and queue an apply work request."""
-    previous_config = load_config_from_db() or {}
+    """Persist DNSMasq settings and queue an apply work request."""
     config = normalize_config(payload)
-    if config["adguardhome_upstream_enabled"] and not previous_config.get("adguardhome_upstream_enabled"):
-        adguard_state = str(service_status_by_name(ADGUARD_HOME_SERVICE_NAME).get("state") or "").upper()
-        if adguard_state != "RUNNING":
-            raise HTTPException(status_code=400, detail="AdGuard Home must be running before DNS filtering can be enabled.")
     config_text = render_config(config)
     ok, message = validate_dnsmasq_syntax(config_text)
     if not ok:
         raise HTTPException(status_code=400, detail=message)
-
     work_request_id = save_config_to_db(config)
-    adguard_restart_work_request_id = None
-    if config["adguardhome_upstream_enabled"]:
-        with db.transaction(WORK_REQUEST_DB_PATH) as conn:
-            cursor = db.execute_on(
-                conn,
-                """
-                INSERT INTO work_requests (
-                    request_uid, source, category_name, action_name,
-                    target_rule_id, priority, status, payload_json
-                )
-                VALUES (?, 'gui', 'SERVICE_MANAGEMENT.SERVICE_CONTROL', 'restart', NULL, 69, 'queue', ?)
-                """,
-                (
-                    str(uuid.uuid4()),
-                    json.dumps(
-                        {
-                            "service_name": ADGUARD_HOME_SERVICE_NAME,
-                            "display_name": "AdGuard Home",
-                            "kind": "dns-filtering",
-                        },
-                        sort_keys=True,
-                    ),
-                ),
-            )
-            adguard_restart_work_request_id = int(cursor.lastrowid)
-            db.execute_on(
-                conn,
-                """
-                INSERT INTO work_request_events (work_request_id, event_type, message)
-                VALUES (?, 'queue', 'Queued AdGuard Home restart before DNS filtering apply.')
-                """,
-                (adguard_restart_work_request_id,),
-            )
     return {
-        "saved": True,
-        "queued": True,
-        "work_request_id": work_request_id,
-        "adguard_restart_work_request_id": adguard_restart_work_request_id,
-        "message": "DNSMasq configuration queued for apply.",
-        "config": config,
-        "summary": {
-            "config_path": str(DNSMASQ_CONF_PATH),
-            "config_db": str(DNSMASQ_DB_PATH),
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        },
+        "saved": True, "queued": True, "work_request_id": work_request_id,
+        "message": "DNSMasq configuration queued for apply.", "config": config,
+        "summary": {"config_path": str(DNSMASQ_CONF_PATH), "config_db": str(DNSMASQ_DB_PATH)},
     }
-
 
 def test_dnsmasq_config(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     """Validate either posted settings or the current dnsmasq.conf."""

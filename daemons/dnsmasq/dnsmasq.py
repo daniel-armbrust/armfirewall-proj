@@ -12,9 +12,10 @@ from .models import DnsmasqWorkRequest
 from core import db
 from core import log as logger
 from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_LEASES_PATH
+from core.iface import get_lan_ipv4_addresses_by_interface
 from core.payload import decode_json_payload
 from web.services.dnsmasq import api as dnsmasq_config
-from .dns_filtering import sync_dns_filtering_redirect
+from .dns_routing import adguard_is_running, sync_dns_routing
 from .resolver import configure_system_resolver
 from daemons.svcmgmtd.supervisor import supervisor_command, supervisor_status
 
@@ -74,14 +75,19 @@ def clear_pending_apply() -> None:
         )
 
 
-def apply_config() -> None:
+def apply_config(adguard_active: bool | None = None) -> None:
     """Render SQLite Dnsmasq settings to conf/dnsmasq.conf only."""
     DNSMASQ_LEASES_PATH.parent.mkdir(parents=True, exist_ok=True)
     config = dnsmasq_config.load_config_from_db()
     if config is None:
         raise RuntimeError("No Dnsmasq configuration was found in dnsmasq.db.")
 
-    config_text = dnsmasq_config.render_config(config)
+    adguard_active = adguard_is_running() if adguard_active is None else adguard_active
+    dns_requested = bool(config.get("dns_enabled"))
+    config = {**config, "dns_enabled": dns_requested and not adguard_active}
+    config_text = dnsmasq_config.render_config(
+        config, adguard_dns_servers=get_lan_ipv4_addresses_by_interface() if adguard_active else None
+    )
     ok, message = dnsmasq_config.validate_dnsmasq_syntax(config_text)
     if not ok:
         raise RuntimeError(message)
@@ -95,13 +101,13 @@ def apply_config() -> None:
             )
         configure_system_resolver(True)
     else:
-        configure_system_resolver(False)
+        configure_system_resolver(dns_requested or adguard_active)
         reload_running_dnsmasq()
 
-    filtering_active = sync_dns_filtering_redirect()
+    routing_active = sync_dns_routing(adguard_running=adguard_active)
     clear_pending_apply()
     logger.log(
-        f"Dnsmasq configuration file was rendered from SQLite; DNS filtering active={filtering_active}.",
+        f"Dnsmasq configuration file was rendered from SQLite; protected DNS routing active={routing_active}.",
         source=LOG_SOURCE,
     )
 

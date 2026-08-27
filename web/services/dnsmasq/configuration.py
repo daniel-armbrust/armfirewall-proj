@@ -7,7 +7,6 @@ import subprocess
 from typing import Any
 from core.iface import get_lan_interface_names
 from core.constants import (
-    ADGUARD_HOME_DNS_PORT,
     DNSMASQ_ALL_INTERFACES_TOKEN,
     DNSMASQ_BOOL_DEFAULTS,
     DNSMASQ_CONF_PATH,
@@ -26,7 +25,6 @@ def default_config() -> dict[str, Any]:
         "upstream_dns_servers": ["8.8.8.8", "1.1.1.1"],
         "domain_upstreams": [],
         "interface_configs": [],
-        "adguardhome_upstream_enabled": False,
         "dhcp_range_start": "",
         "dhcp_range_end": "",
         "lease_time": "12h",
@@ -51,7 +49,6 @@ def default_interface_config(iface_name: str) -> dict[str, Any]:
         "local_domain": "armfirewall.local",
         "upstream_dns_servers": ["8.8.8.8", "1.1.1.1"],
         "domain_upstreams": [],
-        "adguardhome_upstream_enabled": False,
         "cache_size": 1000,
         "expand_hosts": DNSMASQ_BOOL_DEFAULTS["expand_hosts"],
         "domain_needed": DNSMASQ_BOOL_DEFAULTS["domain_needed"],
@@ -132,10 +129,6 @@ def parse_dnsmasq_config(lines: list[str]) -> dict[str, Any]:
         if line.startswith("# armfirewall-listen-all-interfaces="):
             if line.split("=", 1)[1].strip() == "1":
                 interfaces = [DNSMASQ_ALL_INTERFACES_TOKEN]
-            known.add(index)
-            continue
-        if line.startswith("# armfirewall-adguardhome-upstream="):
-            config["adguardhome_upstream_enabled"] = line.split("=", 1)[1].strip() == "1"
             known.add(index)
             continue
         if not line or line.startswith("#"):
@@ -220,7 +213,9 @@ def parse_dnsmasq_config(lines: list[str]) -> dict[str, Any]:
     return config
 
 
-def render_config(config: dict[str, Any]) -> str:
+def render_config(
+    config: dict[str, Any], *, adguard_dns_servers: dict[str, list[str]] | None = None
+) -> str:
     """Render normalized settings as dnsmasq.conf content."""
     interface_configs = config.get("interface_configs") or [
         interface_config_from_global(iface_name, config)
@@ -233,7 +228,6 @@ def render_config(config: dict[str, Any]) -> str:
     lines = [
         "# ArmFirewall managed dnsmasq configuration.",
         "# Generated from Services / Dnsmasq.",
-        f"# armfirewall-adguardhome-upstream={1 if config['adguardhome_upstream_enabled'] else 0}",
         f"port={DNSMASQ_DNS_PORT if dns_enabled else 0}",
         "bind-dynamic",
     ]
@@ -246,11 +240,13 @@ def render_config(config: dict[str, Any]) -> str:
         for static_lease in config.get("static_leases", []):
             lines.append(f"dhcp-host={static_lease['mac_address']},{static_lease['ip_address']}")
 
+    managed_interfaces = {item["iface"] for item in interface_configs if item["dhcp_enabled"] or item["ipv6_ra_enabled"]}
     if dns_enabled:
         lan_interfaces = get_lan_interface_names()
         if not lan_interfaces:
             raise ValueError("DNSMasq DNS requires at least one interface with role LAN.")
-        lines.extend(f"interface={iface_name}" for iface_name in lan_interfaces)
+        managed_interfaces.update(lan_interfaces)
+    lines.extend(f"interface={iface_name}" for iface_name in sorted(managed_interfaces))
 
     rendered_domains: set[str] = set()
     rendered_locals: set[str] = set()
@@ -270,11 +266,8 @@ def render_config(config: dict[str, Any]) -> str:
         ):
             if enabled:
                 lines.append(directive)
-        if config["adguardhome_upstream_enabled"]:
-            lines.append(f"server=127.0.0.1#{ADGUARD_HOME_DNS_PORT}")
-        else:
-            for server in config["upstream_dns_servers"]:
-                lines.append(f"server={server}")
+        for server in config["upstream_dns_servers"]:
+            lines.append(f"server={server}")
 
     for item in interface_configs:
         if item["dhcp_enabled"]:
@@ -286,7 +279,7 @@ def render_config(config: dict[str, Any]) -> str:
                 lines.append(f"# DHCP scope for {item['iface']}")
                 lines.append(range_line)
                 rendered_ranges.add(range_line)
-            dns_servers = item.get("upstream_dns_servers") or config["upstream_dns_servers"]
+            dns_servers = (adguard_dns_servers or {}).get(item["iface"]) or item.get("upstream_dns_servers") or config["upstream_dns_servers"]
             if dns_servers:
                 dns_option = (
                     f"dhcp-option=tag:{item['iface']},option:dns-server,"

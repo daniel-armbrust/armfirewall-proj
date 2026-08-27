@@ -82,6 +82,21 @@ def get_lan_dns_bind_hosts() -> list[str]:
     return hosts
 
 
+def get_lan_ipv4_addresses_by_interface() -> dict[str, list[str]]:
+    """Return usable IPv4 LAN addresses keyed by interface name."""
+    result: dict[str, list[str]] = {}
+    try:
+        rows = fetch_iface_rows("""SELECT i.name, a.addr FROM ifaces i JOIN addresses a ON a.iface_id=i.id WHERE i.role='LAN' AND a.addr_family='ipv4' AND i.name<>'lo' ORDER BY i.id, a.is_secondary, a.id""")
+    except (FileNotFoundError, db.DatabaseError):
+        return result
+    for row in rows:
+        try: address = ipaddress.IPv4Address(str(row["addr"] or ""))
+        except ipaddress.AddressValueError: continue
+        if address.is_loopback or address.is_unspecified: continue
+        result.setdefault(str(row["name"]), []).append(str(address))
+    return result
+
+
 def get_lan_primary_ipv4_address() -> str | None:
     """Return the preferred LAN IPv4 address for router-facing defaults."""
     try:

@@ -20,7 +20,7 @@ import sys
 
 from core import db
 from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_DB_PATH, DNSMASQ_LEASES_PATH, SERVICES_DB_PATH
-from daemons.dnsmasq.dns_filtering import ensure_dnsmasq_lan_redirect_rules
+from daemons.dnsmasq.dns_routing import ensure_lan_dns_redirect_rules
 from web.services.dnsmasq.configuration import (
     default_config,
     default_interface_config,
@@ -110,7 +110,6 @@ with db.transaction(DNSMASQ_DB_PATH) as conn:
            SET dns_enabled = 1,
                local_domain = ?,
                upstream_dns_servers_json = ?,
-               adguardhome_upstream_enabled = 0,
                cache_size = ?,
                expand_hosts = ?,
                domain_needed = ?,
@@ -136,7 +135,7 @@ with db.transaction(DNSMASQ_DB_PATH) as conn:
         """
         INSERT INTO dnsmasq_interface_configs (
             iface, dns_enabled, local_domain, upstream_dns_servers_json,
-            adguardhome_upstream_enabled, cache_size, expand_hosts, domain_needed,
+            cache_size, expand_hosts, domain_needed,
             bogus_priv, dhcp_enabled, dhcp_range_start, dhcp_range_end,
             lease_time, dhcp_authoritative, ipv6_ra_enabled,
             ipv6_ra_names, ipv6_ra_lifetime, enabled
@@ -178,7 +177,7 @@ DNSMASQ_CONF_PATH.parent.mkdir(parents=True, exist_ok=True)
 DNSMASQ_LEASES_PATH.parent.mkdir(parents=True, exist_ok=True)
 DNSMASQ_LEASES_PATH.touch(exist_ok=True)
 DNSMASQ_CONF_PATH.write_text(config_text, encoding="utf-8")
-ensure_dnsmasq_lan_redirect_rules()
+ensure_lan_dns_redirect_rules()
 
 print(
     "DNSMasq provisioned for "
