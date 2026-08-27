@@ -11,7 +11,9 @@ provision_dnsmasq() {
     local lan_iface="$1"
     local lan_ipv4_addr="$2"
 
-    "$ROOT_DIR/.venv/bin/python" - "$lan_iface" "$lan_ipv4_addr" <<'PY'
+    (
+        cd "$ROOT_DIR"
+        "$ROOT_DIR/.venv/bin/python" - "$lan_iface" "$lan_ipv4_addr" <<'PY'
 import ipaddress
 import json
 import sys
@@ -182,6 +184,7 @@ print(
     f" - {interface_config['dhcp_range_end'] or 'not configured'}."
 )
 PY
+    )
 
     if [[ "$lan_ipv4_addr" == "dhcp" ]]; then
         log "DNSMasq DNS and IPv6 RA enabled for $lan_iface; DHCP scope skipped because the LAN address uses DHCP."
@@ -191,7 +194,9 @@ PY
 }
 
 activate_dnsmasq() {
-    "$ROOT_DIR/.venv/bin/python" - <<'PY'
+    (
+        cd "$ROOT_DIR"
+        "$ROOT_DIR/.venv/bin/python" - <<'PY'
 from daemons.dnsmasq.resolver import configure_system_resolver
 from daemons.svcmgmtd.supervisor import supervisor_status
 
@@ -199,6 +204,7 @@ if supervisor_status("dnsmasq") != "RUNNING":
     raise RuntimeError("DNSMasq did not start during ArmFirewall installation.")
 configure_system_resolver(True)
 PY
+    )
     log "DNSMasq is running and configured as the local system resolver."
 }
 
