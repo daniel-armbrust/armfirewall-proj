@@ -481,7 +481,6 @@
         renderDnsScopeCards();
         renderDhcpScopeCards();
         removeDuplicateScopeCards();
-        syncAdGuardHomeUpstreamState();
     }
 
     function removeDuplicateScopeCards() {
@@ -1420,8 +1419,7 @@
                 return;
             }
             setDirty(true);
-            syncAdGuardHomeUpstreamState();
-            syncCurrentConfigFromForm();
+                syncCurrentConfigFromForm();
             renderScopeCards();
         });
 
