@@ -186,7 +186,7 @@ record_loopback_rules() {
     done
 }
 
-# Record one system-managed, editable DNS redirect to the local DNS service.
+# Record one protected DNS redirect to the local DNS service.
 record_dns_redirect_rule() {
     local family="$1"
     local protocol="$2"
@@ -202,14 +202,14 @@ record_dns_redirect_rule() {
             iface_in, rule_order, src_addr, src_port, dst_addr, dst_port,
             protocol_name, protocol_type, protocol_code,
             nat_action, to_addr, to_port,
-            protected, rule_source, enabled, created_at, updated_at
+            protected, enabled, created_at, updated_at
         )
         SELECT
             $(sql_quote "$iface"), 0,
             $(sql_quote "$any_addr"), NULL, $(sql_quote "$any_addr"), 53,
             $(sql_quote "$protocol"), NULL, NULL,
             'REDIRECT', NULL, 53,
-            0, 'system', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         WHERE NOT EXISTS (
             SELECT 1
             FROM nat_prerouting_rules
@@ -218,6 +218,7 @@ record_dns_redirect_rule() {
               AND dst_port = 53
               AND nat_action = 'REDIRECT'
               AND to_port = 53
+              AND protected = 1
         );
     "
 }
@@ -280,15 +281,18 @@ enforce_lan_dns() {
     local lan_iface="$1"
     local family binary protocol
 
-    log "Registering protected DNS-over-TLS blocking on ${lan_iface}."
+    log "Enforcing protected DNS redirection and DNS-over-TLS blocking on ${lan_iface}."
 
-    # DNS REDIRECT rules are owned by the DNSMasq configuration state. This
-    # installer deliberately does not create them while DNS is disabled.
     for family in ipv4 ipv6; do
+        record_dns_redirect_rule "$family" tcp "$lan_iface"
+        record_dns_redirect_rule "$family" udp "$lan_iface"
         record_dns_over_tls_block_rule "$family" "$lan_iface"
     done
 
     for binary in iptables ip6tables; do
+        for protocol in tcp udp; do
+            apply_dns_redirect_rule "$binary" "$protocol" "$lan_iface"
+        done
         apply_dns_over_tls_block_rule "$binary" "$lan_iface"
     done
 }
@@ -399,7 +403,7 @@ record_icmpv6_input_rule() {
             protected, enabled, created_at, updated_at)
                 SELECT
                     'ANY', (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
-                    0, 0, 0, 0, $(sql_quote "$src_addr"), NULL,
+                    1, 0, 0, 0, $(sql_quote "$src_addr"), NULL,
                     '::/0', NULL,
                     'icmpv6', ${icmp_type}, ${icmp_code},
                     'ACCEPT', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -412,20 +416,7 @@ record_icmpv6_input_rule() {
                             AND protocol_code = ${icmp_code}
                             AND action = 'ACCEPT'
                             AND enabled = 1
-                );
-
-                UPDATE filter_input_rules
-                SET ct_new = 0,
-                    ct_established = 0,
-                    ct_related = 0,
-                    ct_invalid = 0,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE iface_in = 'ANY'
-                    AND src_addr = $(sql_quote "$src_addr")
-                    AND protocol_name = 'icmpv6'
-                    AND protocol_type = ${icmp_type}
-                    AND protocol_code = ${icmp_code}
-                    AND action = 'ACCEPT';"
+                );"
 }
 
 # Record one ICMPv6 FORWARD rule in SQLite.
@@ -486,84 +477,10 @@ allow_required_icmpv6() {
         allow_icmpv6_forward_rule "${rule%/*}" "${rule#*/}"
     done
 
-    # Router Solicitation and Router Advertisement are link-local by definition.
-    for rule in 133/0 134/0; do
+    # Router Solicitation, Router Advertisement, Neighbor Solicitation, Neighbor Advertisement.
+    for rule in 133/0 134/0 135/0 136/0; do
         allow_icmpv6_input_rule "fe80::/10" "${rule%/*}" "${rule#*/}"
     done
-
-    # Neighbor Discovery messages can use the neighbor global IPv6 address.
-    for rule in 135/0 136/0; do
-        allow_icmpv6_input_rule "::/0" "${rule%/*}" "${rule#*/}"
-    done
-}
-
-# Record and apply DHCP client reply rules required on the WAN interface.
-record_wan_dhcp_input_rule() {
-    local family="$1"
-    local protocol="$2"
-    local iface="$3"
-    local source_port="$4"
-    local destination_port="$5"
-    local db_path any_addr
-
-    db_path="$(filter_rules_db "$family")"
-    any_addr="$(filter_any_addr "$family")"
-    sqlite_exec "$db_path" "
-        INSERT INTO filter_input_rules (
-            iface_in, rule_order, ct_new, ct_established, ct_related,
-            ct_invalid, src_addr, src_port, dst_addr, dst_port,
-            protocol_name, protocol_type, protocol_code, action,
-            protected, enabled, created_at, updated_at)
-        SELECT
-            $(sql_quote "$iface"), (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
-            0, 0, 0, 0, $(sql_quote "$any_addr"), ${source_port},
-            $(sql_quote "$any_addr"), ${destination_port},
-            $(sql_quote "$protocol"), NULL, NULL, 'ACCEPT',
-            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        WHERE NOT EXISTS (
-            SELECT 1 FROM filter_input_rules
-            WHERE iface_in = $(sql_quote "$iface")
-              AND src_port = ${source_port}
-              AND dst_port = ${destination_port}
-              AND protocol_name = $(sql_quote "$protocol")
-              AND action = 'ACCEPT'
-              AND protected = 1
-        );
-
-        UPDATE filter_input_rules
-        SET ct_new = 0,
-            ct_established = 0,
-            ct_related = 0,
-            ct_invalid = 0,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE iface_in = $(sql_quote "$iface")
-          AND src_port = ${source_port}
-          AND dst_port = ${destination_port}
-          AND protocol_name = $(sql_quote "$protocol")
-          AND action = 'ACCEPT'
-          AND protected = 1;"
-}
-
-apply_wan_dhcp_input_rule() {
-    local binary="$1"
-    local protocol="$2"
-    local iface="$3"
-    local source_port="$4"
-    local destination_port="$5"
-
-    "$binary" -t filter -C INPUT -i "$iface" -p "$protocol" --sport "$source_port" --dport "$destination_port" -j ACCEPT 2>/dev/null || \
-    "$binary" -t filter -I INPUT 1 -i "$iface" -p "$protocol" --sport "$source_port" --dport "$destination_port" -j ACCEPT
-}
-
-allow_wan_dhcp_client() {
-    local wan_iface="$1"
-
-    [[ -n "$wan_iface" ]] || return 0
-    log "Allowing DHCP client replies on WAN interface ${wan_iface}."
-    record_wan_dhcp_input_rule ipv4 udp "$wan_iface" 67 68
-    apply_wan_dhcp_input_rule iptables udp "$wan_iface" 67 68
-    record_wan_dhcp_input_rule ipv6 udp "$wan_iface" 547 546
-    apply_wan_dhcp_input_rule ip6tables udp "$wan_iface" 547 546
 }
 
 # Record one filter chain policy in the selected database.
@@ -737,11 +654,75 @@ allow_lan_services() {
     done
 }
 
+# Return every interface currently designated as LAN.
+lan_interfaces() {
+    sqlite_query "$IFACE_DB" "
+        SELECT name
+        FROM ifaces
+        WHERE role = 'LAN'
+        ORDER BY name;
+    "
+}
+
+# Persist an IPv4 ICMP allow rule for packets addressed to the firewall.
+record_lan_icmp_input_rule() {
+    local iface="$1"
+    local any_addr
+
+    any_addr="$(filter_any_addr ipv4)"
+
+    sqlite_exec "$IPV4_FILTER_RULES_DB" "
+        INSERT INTO filter_input_rules (
+            iface_in, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at)
+        SELECT
+            $(sql_quote "$iface"),
+            (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
+            0, 0, 0, 0,
+            $(sql_quote "$any_addr"), NULL, $(sql_quote "$any_addr"), NULL,
+            'icmp', NULL, NULL, 'ACCEPT',
+            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM filter_input_rules
+            WHERE iface_in = $(sql_quote "$iface")
+              AND protocol_name = 'icmp'
+              AND protocol_type IS NULL
+              AND protocol_code IS NULL
+              AND action = 'ACCEPT'
+              AND protected = 1
+        );
+    "
+}
+
+# Allow all IPv4 ICMP types from a LAN to the firewall itself.
+apply_lan_icmp_input_rule() {
+    local iface="$1"
+
+    iptables -t filter -C INPUT -i "$iface" -p icmp -j ACCEPT 2>/dev/null || \
+    iptables -t filter -A INPUT -i "$iface" -p icmp -j ACCEPT
+}
+
+# Register and apply the IPv4 ICMP INPUT rule on every interface with LAN role.
+allow_lan_icmp() {
+    local iface
+
+    while IFS= read -r iface; do
+        [[ -n "$iface" ]] || continue
+
+        log "Registering and applying IPv4 ICMP INPUT rule on ${iface}."
+        record_lan_icmp_input_rule "$iface"
+        apply_lan_icmp_input_rule "$iface"
+    done < <(lan_interfaces)
+}
+
 main() {
     [[ -n "${LAN_IFACE:-}" ]] || fatal "LAN_IFACE is not set."
 
     allow_lan_services "$LAN_IFACE"
-    allow_wan_dhcp_client "${WAN_IFACE:-}"
+    allow_lan_icmp
     record_conntrack_base_rules
     apply_conntrack_base_rules
     record_loopback_rules
@@ -751,6 +732,7 @@ main() {
     record_default_filter_policies
     set_default_filter_policies
     record_install_filter_apply_work_requests
+    record_install_dns_nat_apply_work_requests
 }
 
 main "$@"

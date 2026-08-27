@@ -7,8 +7,8 @@ SET_HOSTNAME=""
 TIMEZONE=""
 LAN_IPV4_ADDR=""
 WAN_IPV4_ADDR=""
-LAN_IPV6_ADDR=""
-WAN_IPV6_ADDR=""
+LAN_IPV4_GATEWAY=""
+WAN_IPV4_GATEWAY=""
 
 # shellcheck source=scripts/common/globals.sh
 . "$ROOT_DIR/bin/scripts/common/globals.sh"
@@ -16,26 +16,22 @@ WAN_IPV6_ADDR=""
 # Print command install.sh usage
 usage() {
     cat <<USAGE
-    
-Usage: $0 --lan-iface <iface> --lan-ipv4-addr <IPv4/CIDR|dhcp>
-          --wan-iface <iface> --wan-ipv4-addr <IPv4/CIDR|dhcp>
-          [--lan-ipv6-addr <IPv6/CIDR|dhcp|auto>] [--wan-ipv6-addr <IPv6/CIDR|dhcp|auto>]
+Usage: $0 --lan-iface <iface> --lan-ipv4-addr <IPv4/CIDR|dhcp|auto>
+          --wan-iface <iface> --wan-ipv4-addr <IPv4/CIDR|dhcp|auto>
+          [--lan-ipv4-gateway <IPv4>] [--wan-ipv4-gateway <IPv4>]
           [--router-mode] [--set-hostname <name>] [--timezone <Region/City>]
 
 Options:
-  --lan-iface <iface>       LAN network interface to persist in iface.db
-  --lan-ipv4-addr <addr>    Set LAN IPv4 address/mask, or dhcp.
-  --lan-ipv6-addr <addr>    Optionally set LAN IPv6 address/prefix, dhcp, or auto.
-
-  --wan-iface <iface>       WAN network interface to persist in iface.db
-  --wan-ipv4-addr <addr>    Set WAN IPv4 address/mask, or dhcp.
-  --wan-ipv6-addr <addr>    Optionally set WAN IPv6 address/prefix, dhcp, or auto.
-
-  --router-mode             Enable routing, forwarding, and NAT. Requires --wan-iface
-  --set-hostname <name>     Set the system hostname (a hostname or FQDN).
-  --timezone <Region/City>  Set the system timezone, e.g. America/Sao_Paulo.
-  
-  -h, --help                Show this help message
+  --lan-iface <iface>          LAN network interface to persist in iface.db
+  --lan-ipv4-addr <addr>       Set LAN IPv4 address/mask, dhcp, or auto.
+  --lan-ipv4-gateway <addr>    Optional LAN IPv4 gateway for a static address.
+  --wan-iface <iface>          WAN network interface to persist in iface.db
+  --wan-ipv4-addr <addr>       Set WAN IPv4 address/mask, dhcp, or auto.
+  --wan-ipv4-gateway <addr>    Optional WAN IPv4 gateway for a static address.
+  --router-mode                Enable routing, forwarding, and NAT. Requires --wan-iface
+  --set-hostname <name>        Set the system hostname (a hostname or FQDN).
+  --timezone <Region/City>     Set the system timezone, e.g. America/Sao_Paulo.
+  -h, --help                   Show this help message
 
 USAGE
 }
@@ -74,26 +70,26 @@ parse_args() {
                 ;;
 
             --lan-ipv4-addr)
-                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv4-addr requires an IPv4 address/mask or dhcp."
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv4-addr requires an IPv4 address/mask, dhcp, or auto."
                 LAN_IPV4_ADDR="$2"
                 shift 2
                 ;;
 
             --wan-ipv4-addr)
-                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-ipv4-addr requires an IPv4 address/mask or dhcp."
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-ipv4-addr requires an IPv4 address/mask, dhcp, or auto."
                 WAN_IPV4_ADDR="$2"
                 shift 2
                 ;;
 
-            --lan-ipv6-addr)
-                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv6-addr requires an IPv6 address/prefix, dhcp, or auto."
-                LAN_IPV6_ADDR="$2"
+            --lan-ipv4-gateway)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--lan-ipv4-gateway requires an IPv4 address."
+                LAN_IPV4_GATEWAY="$2"
                 shift 2
                 ;;
 
-            --wan-ipv6-addr)
-                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-ipv6-addr requires an IPv6 address/prefix, dhcp, or auto."
-                WAN_IPV6_ADDR="$2"
+            --wan-ipv4-gateway)
+                [[ $# -ge 2 && -n "${2:-}" ]] || fatal "--wan-ipv4-gateway requires an IPv4 address."
+                WAN_IPV4_GATEWAY="$2"
                 shift 2
                 ;;
 
@@ -109,17 +105,12 @@ parse_args() {
     done
 
     [[ -n "$LAN_IFACE" ]] || fatal "Missing required option: --lan-iface <iface>."
-    [[ -n "$LAN_IPV4_ADDR" ]] || fatal "Missing required option: --lan-ipv4-addr <IPv4/CIDR|dhcp>."
+    [[ -n "$LAN_IPV4_ADDR" ]] || fatal "Missing required option: --lan-ipv4-addr <IPv4/CIDR|dhcp|auto>."
     [[ -n "$WAN_IFACE" ]] || fatal "Missing required option: --wan-iface <iface>."
-    [[ -n "$WAN_IPV4_ADDR" ]] || fatal "Missing required option: --wan-ipv4-addr <IPv4/CIDR|dhcp>."
+    [[ -n "$WAN_IPV4_ADDR" ]] || fatal "Missing required option: --wan-ipv4-addr <IPv4/CIDR|dhcp|auto>."
 }
 
 main() {
-    [[ $# -gt 0 ]] || {
-        usage
-        return 0
-    }
-
     # Print installer banner
     print_banner "installer"
 
@@ -129,10 +120,7 @@ main() {
     # Ensure the script is running with root privileges
     need_root
 
-    # Set the system hostname when explicitly requested.
     "$ROOT_DIR/bin/scripts/install/hostname.sh" "$SET_HOSTNAME" "$LAN_IPV4_ADDR"
-
-    # Enables automatic NTP synchronization.
     "$ROOT_DIR/bin/scripts/install/timesync.sh" "$TIMEZONE"
 
     # Configures the operating system package repositories used by ArmFirewall
@@ -149,9 +137,6 @@ main() {
 
     # Validate and persist the selected LAN interface in iface.db
     "$ROOT_DIR/bin/scripts/install/laniface.sh"
-
-    # Provision the default DNSMasq DNS, DHCP and IPv6 RA configuration for the LAN.
-    "$ROOT_DIR/bin/scripts/install/dnsmasq.sh" "$LAN_IFACE" "$LAN_IPV4_ADDR"
 
     # TODO: apply firewall rules
     "$ROOT_DIR/bin/scripts/install/fwrules.sh"
@@ -175,12 +160,12 @@ main() {
     # Creates supervisord and systemd service manager files
     "$ROOT_DIR/bin/scripts/install/supervisord.sh"
 
-    # Configures requested IPv4 and optional IPv6 interfaces using the platform network backend.
-    "$ROOT_DIR/bin/scripts/install/networking.sh" "$LAN_IFACE" "$LAN_IPV4_ADDR" "$WAN_IFACE" "$WAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR"
+    "$ROOT_DIR/bin/scripts/install/networking.sh" \
+        "$LAN_IFACE" "$LAN_IPV4_ADDR" "$WAN_IFACE" "$WAN_IPV4_ADDR" "" "" \
+        "$LAN_IPV4_GATEWAY" "$WAN_IPV4_GATEWAY"
 
-    # Start DNSMasq only after the requested LAN interface is configured.
-    "$ROOT_DIR/bin/scripts/install/dnsmasq.sh" --activate
-
+    # Request an IPv6 delegated prefix on WAN and allocate one /64 to LAN.
+    "$ROOT_DIR/bin/scripts/install/ipv6pd.sh"
 }
 
 main "$@"

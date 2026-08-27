@@ -77,9 +77,6 @@
             </tbody>
         </table>
     </div>
-    <div class="form-actions dnsmasq-leases-actions">
-        <button class="text-button primary" type="button" id="dnsmasq-add-static-address" disabled>Add Static Address</button>
-    </div>
 </section>
 
 <section class="panel" id="dnsmasq-static-addresses-panel" hidden>
@@ -100,6 +97,9 @@
                 <tr><td colspan="3"><div class="terminal-empty"><span class="prompt">$</span><span>loading static addresses</span></div></td></tr>
             </tbody>
         </table>
+    </div>
+    <div class="form-actions dnsmasq-leases-actions">
+        <button class="text-button primary" type="button" id="dnsmasq-add-static-address" disabled>Add Static Address</button>
     </div>
 </section>
 
@@ -181,12 +181,45 @@
                     <span>Default upstream DNS servers</span>
                     <textarea id="dnsmasq-upstream-dns" name="upstream_dns_servers" rows="3" spellcheck="false"></textarea>
                 </label>
+                <label class="check-line wide">
+                    <input id="dnsmasq-adguardhome-upstream" name="adguardhome_upstream_enabled" type="checkbox">
+                    <span>Enable DNS Filtering Upstream?</span>
+                </label>
+                <label class="check-line wide">
+                    <input id="dnsmasq-forwarded-domains-enabled" name="forwarded_domains_enabled" type="checkbox">
+                    <span>Enable forwarded domains?</span>
+                </label>
+                <label class="field dnsmasq-forwarded-domain-control" hidden>
+                    <span>Forwarded domain</span>
+                    <input id="dnsmasq-domain-upstream-domain" type="text" autocomplete="off" placeholder="empresa.local">
+                </label>
+                <label class="field dnsmasq-domain-upstream-servers dnsmasq-forwarded-domain-control" hidden>
+                    <span>Forward to DNS servers</span>
+                    <textarea id="dnsmasq-domain-upstream-servers" rows="2" spellcheck="false" placeholder="192.168.10.10 192.168.10.11"></textarea>
+                </label>
+                <div class="field dnsmasq-domain-upstream-action dnsmasq-forwarded-domain-control" hidden>
+                    <span>Action</span>
+                    <button class="icon-button" type="button" id="dnsmasq-domain-upstream-add" title="Add domain upstream" aria-label="Add domain upstream">+</button>
+                </div>
+                <div class="table-wrap wide dnsmasq-domain-upstream-scroll dnsmasq-forwarded-domain-control" hidden>
+                    <table class="data-table dnsmasq-domain-upstream-table">
+                        <thead>
+                            <tr>
+                                <th>Domain</th>
+                                <th>Upstreams</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dnsmasq-domain-upstreams">
+                            <tr>
+                                <td colspan="3">
+                                    <div class="terminal-empty"><span class="prompt">$</span><span>no domain upstreams</span></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="form-actions dnsmasq-form-actions">
-                <input id="dnsmasq-extra-options" name="extra_options" type="hidden" value="">
-                <button class="text-button primary" type="submit" id="dnsmasq-apply" hidden>Apply</button>
-            </div>
-            <div class="form-status" id="dnsmasq-form-status" hidden></div>
         </div>
     </section>
 
@@ -225,12 +258,18 @@
                 </div>
             </div>
             <div class="dnsmasq-scope-list dnsmasq-dhcp-scope-list" id="dnsmasq-dhcp-scope-list"></div>
-            <div class="form-actions dnsmasq-form-actions">
-                <button class="text-button primary" type="submit" id="dnsmasq-dhcp-apply" hidden>Apply</button>
-            </div>
         </div>
     </section>
 
+    <section class="dnsmasq-form-actions">
+        <div class="edit-form">
+            <input id="dnsmasq-extra-options" name="extra_options" type="hidden" value="">
+            <div class="form-actions">
+                <button class="text-button primary" type="submit" id="dnsmasq-apply" hidden>Apply</button>
+            </div>
+            <div class="form-status" id="dnsmasq-form-status" hidden></div>
+        </div>
+    </section>
 </form>
 
 <div class="modal-backdrop" id="dnsmasq-action-modal" hidden>
@@ -275,5 +314,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260826-filter-upstream-lock" defer></script>
+<script src="{{ url_for('static', path='/js/services_dnsmasq.js') }}?v=20260820-adguard-direct-dns" defer></script>
 {% endblock %}

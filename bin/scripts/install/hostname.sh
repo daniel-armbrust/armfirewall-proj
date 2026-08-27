@@ -13,8 +13,8 @@ update_hosts_file() {
     local lan_ipv4_addr="$2"
     local lan_ipv4 tmp_file
 
-    [[ "$lan_ipv4_addr" != "dhcp" ]] || {
-        log "LAN IPv4 uses DHCP; no static LAN hostname mapping was added to /etc/hosts."
+    [[ "$lan_ipv4_addr" != "dhcp" && "$lan_ipv4_addr" != "auto" ]] || {
+        log "LAN IPv4 uses automatic addressing; no static LAN hostname mapping was added to /etc/hosts."
         return 0
     }
 

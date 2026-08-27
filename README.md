@@ -159,6 +159,12 @@ bin/install.sh --lan-iface <lan-iface> --wan-iface <wan-iface> --router-mode
 
 Router mode requires `--wan-iface`. Providing only `--wan-iface` registers the WAN interface without enabling forwarding or NAT.
 
+When router mode is enabled, ArmFirewall configures NetworkManager IPv6 prefix
+delegation: it requests a `/56` from the WAN and assigns the first delegated
+`/64` to the selected LAN interface. This requires NetworkManager 1.54 or newer.
+Set `IPV6_PD_HINT` (for example, `::/60`) or `IPV6_PD_SUBNET_ID` before running
+the installer to override the requested delegation size or selected LAN subnet.
+
 The installer prepares operating system dependencies, disables conflicting firewall services, applies DDLs, creates the admin user, persists selected interfaces, imports route tables, creates the runtime OS user, generates TLS files, writes supervisord configuration, and enables the systemd unit.
 
 ## Runtime Data

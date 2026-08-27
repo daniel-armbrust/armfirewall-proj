@@ -15,7 +15,7 @@ ARMFIREWALL_HOTPLUG_UNIT_FILE="/etc/systemd/system/${ARMFIREWALL_HOTPLUG_UNIT}"
 
 # Return success when an address specification requests DHCP.
 uses_dhcp() {
-    [[ "${1:-}" == "dhcp" ]]
+    [[ "${1:-}" == "dhcp" || "${1:-}" == "auto" ]]
 }
 
 # Return success when an IPv6 address specification requests SLAAC.
@@ -71,7 +71,7 @@ cidr_to_netmask() {
 
 # Append IPv4 and optional IPv6 stanzas for one interface to an ifupdown configuration file.
 write_interface_stanza() {
-    local iface="$1" ipv4_address_spec="$2" ipv6_address_spec="$3"
+    local iface="$1" ipv4_address_spec="$2" ipv6_address_spec="$3" ipv4_gateway="$4" allow_default="$5"
     local address prefix netmask
 
     [[ -n "$iface" && -n "$ipv4_address_spec" ]] || return 0
@@ -79,24 +79,32 @@ write_interface_stanza() {
     printf 'allow-hotplug %s\n' "$iface"
     
     if uses_dhcp "$ipv4_address_spec"; then
-        printf 'iface %s inet dhcp\n\n' "$iface"
+        printf 'iface %s inet dhcp\n' "$iface"
+        [[ "$allow_default" == "yes" ]] || printf '    post-up /sbin/ip route del default dev %s || true\n' "$iface"
+        printf '\n'
     else
         validate_ipv4_cidr "$ipv4_address_spec" || fatal "Invalid IPv4 address/mask for ${iface}: ${ipv4_address_spec}."
         address="${ipv4_address_spec%/*}"
         prefix="${ipv4_address_spec#*/}"
         netmask="$(cidr_to_netmask "$prefix")"
-        printf 'iface %s inet static\n    address %s\n    netmask %s\n\n' "$iface" "$address" "$netmask"
+        printf 'iface %s inet static\n    address %s\n    netmask %s\n' "$iface" "$address" "$netmask"
+        [[ "$allow_default" != "yes" || -z "$ipv4_gateway" ]] || printf '    gateway %s\n' "$ipv4_gateway"
+        printf '\n'
     fi
 
     [[ -n "$ipv6_address_spec" ]] || return 0
    
     if uses_dhcp "$ipv6_address_spec"; then
-        printf 'iface %s inet6 dhcp\n\n' "$iface"
+        printf 'iface %s inet6 dhcp\n' "$iface"
+        [[ "$allow_default" == "yes" ]] || printf '    post-up /sbin/ip -6 route del default dev %s || true\n' "$iface"
+        printf '\n'
         return 0
     fi
    
     if uses_ipv6_auto "$ipv6_address_spec"; then
-        printf 'iface %s inet6 auto\n\n' "$iface"
+        printf 'iface %s inet6 auto\n' "$iface"
+        [[ "$allow_default" == "yes" ]] || printf '    post-up /sbin/ip -6 route del default dev %s || true\n' "$iface"
+        printf '\n'
         return 0
     fi
 
@@ -142,17 +150,17 @@ networkmanager_connection_for_interface() {
 
 # Apply an IPv4 DHCP or static configuration to one NetworkManager connection.
 configure_networkmanager_ipv4() {
-    local connection="$1" address_spec="$2"
+    local connection="$1" address_spec="$2" gateway="$3"
 
     if uses_dhcp "$address_spec"; then
         nmcli connection modify "$connection" \
-            ipv4.method auto ipv4.addresses "" ipv4.gateway "" ipv4.never-default no || \
+            ipv4.method auto ipv4.addresses "" ipv4.gateway "" || \
             fatal "Could not configure IPv4 DHCP for NetworkManager connection ${connection}."
         return 0
     fi
 
     nmcli connection modify "$connection" \
-        ipv4.method manual ipv4.addresses "$address_spec" ipv4.gateway "" ipv4.never-default no || \
+        ipv4.method manual ipv4.addresses "$address_spec" ipv4.gateway "$gateway" || \
         fatal "Could not configure static IPv4 for NetworkManager connection ${connection}."
 }
 
@@ -164,14 +172,40 @@ configure_networkmanager_ipv6() {
     if uses_dhcp "$address_spec" || uses_ipv6_auto "$address_spec"; then
         # NetworkManager's automatic method processes Router Advertisements and DHCPv6.
         nmcli connection modify "$connection" \
-            ipv6.method auto ipv6.addresses "" ipv6.gateway "" ipv6.never-default no || \
+            ipv6.method auto ipv6.addresses "" ipv6.gateway "" || \
             fatal "Could not configure automatic IPv6 for NetworkManager connection ${connection}."
         return 0
     fi
 
     nmcli connection modify "$connection" \
-        ipv6.method manual ipv6.addresses "$address_spec" ipv6.gateway "" ipv6.never-default no || \
+        ipv6.method manual ipv6.addresses "$address_spec" ipv6.gateway "" || \
         fatal "Could not configure static IPv6 for NetworkManager connection ${connection}."
+}
+
+# Permit a default route and automatic DNS only on the selected WAN connection.
+configure_networkmanager_default_route_policy() {
+    local connection="$1" allow_default="$2"
+    local never_default="yes" ignore_auto_dns="yes"
+
+    if [[ "$allow_default" == "yes" ]]; then
+        never_default="no"
+        ignore_auto_dns="no"
+    fi
+
+    nmcli connection modify "$connection" \
+        ipv4.never-default "$never_default" ipv4.ignore-auto-dns "$ignore_auto_dns" \
+        ipv6.never-default "$never_default" ipv6.ignore-auto-dns "$ignore_auto_dns" || \
+        fatal "Could not configure the default-route policy for NetworkManager connection ${connection}."
+}
+
+# Return NetworkManager Ethernet devices, excluding loopback and virtual devices.
+networkmanager_ethernet_interfaces() {
+    local iface device_type
+
+    while IFS=: read -r iface device_type; do
+        [[ -n "$iface" && "$iface" != "lo" && "$device_type" == "ethernet" ]] || continue
+        printf '%s\n' "$iface"
+    done < <(nmcli -t -f DEVICE,TYPE device status)
 }
 
 # Return success when an Ethernet interface has a physical link.
@@ -184,9 +218,10 @@ network_interface_has_carrier() {
 
 # Configure requested interfaces through the operating system's NetworkManager backend.
 configure_networkmanager_interfaces() {
-    local iface ipv4_address_spec ipv6_address_spec connection applied_iface=""
+    local iface ipv4_address_spec ipv4_gateway ipv6_address_spec connection applied_iface="" allow_default
     local -a ifaces=("$LAN_IFACE" "$WAN_IFACE")
     local -a ipv4_addresses=("$LAN_IPV4_ADDR" "$WAN_IPV4_ADDR")
+    local -a ipv4_gateways=("$LAN_IPV4_GATEWAY" "$WAN_IPV4_GATEWAY")
     local -a ipv6_addresses=("$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR")
     local index
 
@@ -199,6 +234,7 @@ configure_networkmanager_interfaces() {
     for index in "${!ifaces[@]}"; do
         iface="${ifaces[$index]}"
         ipv4_address_spec="${ipv4_addresses[$index]}"
+        ipv4_gateway="${ipv4_gateways[$index]}"
         ipv6_address_spec="${ipv6_addresses[$index]}"
         [[ -n "$iface" && "$iface" != "$applied_iface" ]] || continue
         applied_iface="$iface"
@@ -211,8 +247,13 @@ configure_networkmanager_interfaces() {
         nmcli connection modify "$connection" connection.interface-name "$iface" connection.autoconnect yes || \
             fatal "Could not prepare the NetworkManager connection for ${iface}."
         
-        configure_networkmanager_ipv4 "$connection" "$ipv4_address_spec"
+        allow_default="no"
+        [[ "$iface" == "$WAN_IFACE" ]] && allow_default="yes"
+        [[ "$allow_default" == "yes" ]] || ipv4_gateway=""
+
+        configure_networkmanager_ipv4 "$connection" "$ipv4_address_spec" "$ipv4_gateway"
         configure_networkmanager_ipv6 "$connection" "$ipv6_address_spec"
+        configure_networkmanager_default_route_policy "$connection" "$allow_default"
 
         if network_interface_has_carrier "$iface"; then
             log "Applying NetworkManager configuration on ${iface}."
@@ -222,6 +263,21 @@ configure_networkmanager_interfaces() {
             log "Saved NetworkManager configuration for ${iface}; activation will occur when a physical link is detected."
         fi
     done
+
+    # Keep every additional Ethernet interface ready for DHCP, without letting
+    # an incidental DHCP/RA gateway replace the WAN's default route or DNS.
+    while IFS= read -r iface; do
+        [[ "$iface" != "$WAN_IFACE" ]] || continue
+
+        connection="$(networkmanager_connection_for_interface "$iface")"
+        nmcli connection modify "$connection" connection.interface-name "$iface" connection.autoconnect yes || \
+            fatal "Could not prepare the NetworkManager connection for ${iface}."
+        configure_networkmanager_default_route_policy "$connection" no
+
+        if network_interface_has_carrier "$iface"; then
+            nmcli device reapply "$iface" >/dev/null 2>&1 || true
+        fi
+    done < <(networkmanager_ethernet_interfaces)
 
     log "Configured network interfaces through NetworkManager."
 }
@@ -287,8 +343,8 @@ configure_debian_interfaces() {
     tmp_file="$(mktemp "${NETWORK_INTERFACES_DIR}/.armfirewall.XXXXXX")"
     {
         printf '# Managed by ArmFirewall installer.\n'
-        write_interface_stanza "$LAN_IFACE" "$LAN_IPV4_ADDR" "$LAN_IPV6_ADDR"
-        write_interface_stanza "$WAN_IFACE" "$WAN_IPV4_ADDR" "$WAN_IPV6_ADDR"
+        write_interface_stanza "$LAN_IFACE" "$LAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$LAN_IPV4_GATEWAY" no
+        write_interface_stanza "$WAN_IFACE" "$WAN_IPV4_ADDR" "$WAN_IPV6_ADDR" "$WAN_IPV4_GATEWAY" yes
     } > "$tmp_file"
     install -m 0644 "$tmp_file" "$ARMFIREWALL_INTERFACES_FILE"
     rm -f "$tmp_file"
@@ -322,11 +378,16 @@ main() {
     WAN_IPV4_ADDR="${4:-}"
     LAN_IPV6_ADDR="${5:-}"
     WAN_IPV6_ADDR="${6:-}"
+    LAN_IPV4_GATEWAY="${7:-}"
+    WAN_IPV4_GATEWAY="${8:-}"
 
     [[ -n "$LAN_IPV4_ADDR$WAN_IPV4_ADDR" ]] || return 0
 
     for address_spec in "$LAN_IPV4_ADDR" "$WAN_IPV4_ADDR"; do
         uses_dhcp "$address_spec" || validate_ipv4_cidr "$address_spec" || fatal "Invalid IPv4 address/mask: ${address_spec}."
+    done
+    for gateway in "$LAN_IPV4_GATEWAY" "$WAN_IPV4_GATEWAY"; do
+        [[ -z "$gateway" ]] || validate_ipv4_cidr "${gateway}/32" || fatal "Invalid IPv4 gateway: ${gateway}."
     done
     
     for address_spec in "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR"; do
