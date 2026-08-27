@@ -19,7 +19,7 @@ import json
 import sys
 
 from core import db
-from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_DB_PATH, SERVICES_DB_PATH
+from core.constants import DNSMASQ_CONF_PATH, DNSMASQ_DB_PATH, DNSMASQ_LEASES_PATH, SERVICES_DB_PATH
 from daemons.dnsmasq.dns_filtering import ensure_dnsmasq_lan_redirect_rules
 from web.services.dnsmasq.configuration import (
     default_config,
@@ -175,6 +175,8 @@ with db.transaction(SERVICES_DB_PATH) as conn:
     )
 
 DNSMASQ_CONF_PATH.parent.mkdir(parents=True, exist_ok=True)
+DNSMASQ_LEASES_PATH.parent.mkdir(parents=True, exist_ok=True)
+DNSMASQ_LEASES_PATH.touch(exist_ok=True)
 DNSMASQ_CONF_PATH.write_text(config_text, encoding="utf-8")
 ensure_dnsmasq_lan_redirect_rules()
 
