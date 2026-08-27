@@ -139,7 +139,7 @@ with db.transaction(DNSMASQ_DB_PATH) as conn:
             bogus_priv, dhcp_enabled, dhcp_range_start, dhcp_range_end,
             lease_time, dhcp_authoritative, ipv6_ra_enabled,
             ipv6_ra_names, ipv6_ra_lifetime, enabled
-        ) VALUES (?, 1, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         """,
         (
             iface,
