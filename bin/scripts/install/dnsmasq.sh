@@ -198,10 +198,12 @@ activate_dnsmasq() {
         cd "$ROOT_DIR"
         "$ROOT_DIR/.venv/bin/python" - <<'PY'
 from daemons.dnsmasq.resolver import configure_system_resolver
-from daemons.svcmgmtd.supervisor import supervisor_status
+from daemons.svcmgmtd.supervisor import supervisor_command, supervisor_status
 
 if supervisor_status("dnsmasq") != "RUNNING":
-    raise RuntimeError("DNSMasq did not start during ArmFirewall installation.")
+    supervisor_command("start", "dnsmasq", timeout=60)
+if supervisor_status("dnsmasq") != "RUNNING":
+    raise RuntimeError("DNSMasq did not start after LAN network configuration.")
 configure_system_resolver(True)
 PY
     )
