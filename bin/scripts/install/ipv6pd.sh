@@ -9,6 +9,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 PD_HINT="${IPV6_PD_HINT:-::/56}"
 PD_SUBNET_ID="${IPV6_PD_SUBNET_ID:-0}"
+NETWORKMANAGER_MIN_VERSION="${NETWORKMANAGER_MIN_VERSION:-1.54}"
 
 router_mode_enabled() {
     [[ "${ROUTER_MODE:-0}" == "1" ]]
@@ -62,7 +63,10 @@ networkmanager_supports_prefix_delegation() {
     version="$(nmcli --version | awk 'NR == 1 { print $NF }')"
     IFS=. read -r major minor _ <<<"$version"
     [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] || return 1
-    (( major > 1 || (major == 1 && minor >= 54) ))
+    local required_major required_minor
+    IFS=. read -r required_major required_minor _ <<<"$NETWORKMANAGER_MIN_VERSION"
+    [[ "$required_major" =~ ^[0-9]+$ && "$required_minor" =~ ^[0-9]+$ ]] || return 1
+    (( major > required_major || (major == required_major && minor >= required_minor) ))
 }
 
 validate_settings() {
@@ -86,7 +90,7 @@ configure_ipv6_prefix_delegation() {
     [[ -n "$wan_connection" ]] || fatal "No active NetworkManager connection was found for ${WAN_IFACE}."
     lan_connection="$(connection_uuid_for_interface "$LAN_IFACE")"
     networkmanager_supports_prefix_delegation || fatal \
-        "NetworkManager 1.54 or newer is required for IPv6 prefix delegation; upgrade NetworkManager before enabling router mode."
+        "NetworkManager ${NETWORKMANAGER_MIN_VERSION} or newer is required for IPv6 prefix delegation; upgrade NetworkManager before enabling router mode."
 
     log "Requesting IPv6 prefix delegation (${PD_HINT}) through ${WAN_IFACE}."
     nmcli connection modify "$wan_connection" \

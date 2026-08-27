@@ -228,7 +228,7 @@ install_system_deps() {
             run_dnf_transaction upgrade
             run_dnf_transaction install ethtool net-tools \
                                 supervisor sqlite tar perl curl openssl nss-tools rrdtool \
-                                traceroute mtr tcpdump dnsmasq bind-utils patch
+                                traceroute mtr tcpdump dnsmasq
             install_python_runtime
             ;;
         apt)
@@ -236,11 +236,94 @@ install_system_deps() {
             run_apt_transaction_without_service_start upgrade
             run_apt_transaction_without_service_start install ethtool net-tools iproute2 iptables \
                                                   supervisor sqlite3 tar perl curl openssl libnss3-tools \
-                                                  rrdtool traceroute mtr tcpdump dnsmasq dnsutils patch ifupdown
+                                                  rrdtool traceroute mtr tcpdump dnsmasq ifupdown
             disable_packaged_armfirewall_services
             install_python_runtime
             ;;
     esac
+}
+
+# Return success when the first version is greater than or equal to the second.
+# NetworkManager versions may contain a distro release suffix, therefore only
+# the numeric dotted prefix is considered here.
+version_at_least() {
+    local actual="$1" required="$2"
+    local actual_major actual_minor required_major required_minor
+
+    actual="${actual%%[-+~]*}"
+    required="${required%%[-+~]*}"
+    IFS=. read -r actual_major actual_minor _ <<<"$actual"
+    IFS=. read -r required_major required_minor _ <<<"$required"
+
+    [[ "$actual_major" =~ ^[0-9]+$ && "$actual_minor" =~ ^[0-9]+$ ]] || return 1
+    [[ "$required_major" =~ ^[0-9]+$ && "$required_minor" =~ ^[0-9]+$ ]] || return 1
+
+    (( 10#$actual_major > 10#$required_major ||
+       (10#$actual_major == 10#$required_major && 10#$actual_minor >= 10#$required_minor) ))
+}
+
+# Print the NetworkManager version reported by nmcli.
+networkmanager_version() {
+    nmcli --version 2>/dev/null | awk 'NR == 1 { print $NF }'
+}
+
+# Update NetworkManager through the repositories prepared by addpkgmirrors.sh.
+# This deliberately does not install packages built for a different OS release:
+# replacing core networking packages from an arbitrary RPM/DEB repository can
+# make a remotely installed firewall unreachable.
+upgrade_networkmanager_from_configured_repositories() {
+    case "$PKG_MANAGER" in
+        dnf)
+            run_dnf_transaction upgrade NetworkManager
+            ;;
+        apt)
+            apt-get update
+            run_apt_transaction_without_service_start install --only-upgrade network-manager
+            ;;
+    esac
+}
+
+# Load the upgraded daemon before nmcli writes prefix-delegation properties.
+# The installer runs this before it changes interface profiles, so a brief
+# NetworkManager restart cannot leave a partially configured ArmFirewall.
+restart_networkmanager_after_upgrade() {
+    if has_cmd systemctl && systemctl is-active --quiet NetworkManager.service; then
+        log "Restarting NetworkManager to load the upgraded IPv6 delegation support."
+        systemctl restart NetworkManager.service || fatal "Could not restart NetworkManager after its upgrade."
+    fi
+}
+
+# Ensure router-mode IPv6 prefix delegation has the NetworkManager capability
+# required by ipv6pd.sh. Hosts that do not use NetworkManager keep using the
+# legacy networking backend; ipv6pd.sh will then report that PD is unavailable.
+ensure_networkmanager_ipv6_pd_support() {
+    local current_version
+
+    [[ "${ROUTER_MODE:-0}" == "1" ]] || return 0
+
+    if ! has_cmd nmcli; then
+        log "NetworkManager is not installed; skipping its upgrade. IPv6 prefix delegation requires a NetworkManager backend."
+        return 0
+    fi
+
+    current_version="$(networkmanager_version)"
+    [[ -n "$current_version" ]] || fatal "Could not determine the installed NetworkManager version."
+
+    if version_at_least "$current_version" "$NETWORKMANAGER_MIN_VERSION"; then
+        log "NetworkManager ${current_version} supports IPv6 prefix delegation (minimum ${NETWORKMANAGER_MIN_VERSION})."
+        return 0
+    fi
+
+    log "NetworkManager ${current_version} is older than ${NETWORKMANAGER_MIN_VERSION}; upgrading it from the configured ${PKG_MANAGER} repositories."
+    upgrade_networkmanager_from_configured_repositories
+    restart_networkmanager_after_upgrade
+
+    current_version="$(networkmanager_version)"
+    [[ -n "$current_version" ]] || fatal "NetworkManager upgrade completed but nmcli is no longer available."
+    version_at_least "$current_version" "$NETWORKMANAGER_MIN_VERSION" || fatal \
+        "Configured repositories provide NetworkManager ${current_version}, but IPv6 prefix delegation requires ${NETWORKMANAGER_MIN_VERSION} or newer. Use an OS/repository release that provides the required version."
+
+    log "NetworkManager was upgraded to ${current_version}; IPv6 prefix delegation is supported."
 }
 
 # Return success when a Python binary meets the minimum supported version.
@@ -310,6 +393,11 @@ main() {
     # Installs required operating system packages using the detected 
     # package manager
     install_system_deps
+
+    # Router mode with IPv6 prefix delegation requires NetworkManager 1.54+.
+    # The update is performed only through the signed repositories configured
+    # earlier in the installer.
+    ensure_networkmanager_ipv6_pd_support
     
     # Creates the Python virtual environment and installs ArmFirewall Python 
     # dependencies
