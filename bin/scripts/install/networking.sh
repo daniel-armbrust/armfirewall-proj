@@ -133,19 +133,45 @@ cleanup_legacy_ifupdown_backend() {
     systemctl disable networking.service >/dev/null 2>&1 || true
 }
 
-# Return the active connection profile for an interface, creating one when needed.
-networkmanager_connection_for_interface() {
-    local iface="$1" connection
+# Return the UUID of the active NetworkManager connection for an interface.
+networkmanager_active_connection_uuid() {
+    local iface="$1" uuid
 
-    connection="$(nmcli -g GENERAL.CONNECTION device show "$iface" 2>/dev/null | head -n 1 || true)"
+    uuid="$(nmcli -g GENERAL.CON-UUID device show "$iface" 2>/dev/null | head -n 1 || true)"
+    [[ -n "$uuid" && "$uuid" != "--" ]] && printf '%s\n' "$uuid"
+}
+
+# Return one persisted NetworkManager connection UUID bound to an interface.
+networkmanager_profile_uuid_for_interface() {
+    local iface="$1" uuid profile_iface
+
+    while IFS= read -r uuid; do
+        [[ -n "$uuid" ]] || continue
+        profile_iface="$(nmcli -g connection.interface-name connection show uuid "$uuid" 2>/dev/null | head -n 1 || true)"
+        [[ "$profile_iface" == "$iface" ]] && {
+            printf '%s\n' "$uuid"
+            return 0
+        }
+    done < <(nmcli -g UUID connection show 2>/dev/null || true)
+
+    return 1
+}
+
+# Return a connection UUID for an interface, creating an unambiguous profile when needed.
+networkmanager_connection_for_interface() {
+    local iface="$1" connection_uuid
+
+    connection_uuid="$(networkmanager_active_connection_uuid "$iface" || true)"
+    [[ -n "$connection_uuid" ]] || connection_uuid="$(networkmanager_profile_uuid_for_interface "$iface" || true)"
     
-    if [[ -z "$connection" || "$connection" == "--" ]]; then
-        connection="armfirewall-${iface}"
-        nmcli connection add type ethernet ifname "$iface" con-name "$connection" autoconnect yes >/dev/null || \
+    if [[ -z "$connection_uuid" ]]; then
+        connection_uuid="$(cat /proc/sys/kernel/random/uuid)"
+        nmcli connection add type ethernet ifname "$iface" con-name "armfirewall-${iface}" \
+            connection.uuid "$connection_uuid" autoconnect yes >/dev/null || \
             fatal "Could not create the NetworkManager connection for ${iface}."
     fi
    
-    printf '%s\n' "$connection"
+    printf '%s\n' "$connection_uuid"
 }
 
 # Apply an IPv4 DHCP or static configuration to one NetworkManager connection.

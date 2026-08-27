@@ -14,13 +14,46 @@ router_mode_enabled() {
     [[ "${ROUTER_MODE:-0}" == "1" ]]
 }
 
-connection_for_interface() {
+# Return the UUID of an active NetworkManager connection for an interface.
+active_connection_uuid() {
     local iface="$1"
-    local connection
+    local uuid
 
-    connection="$(nmcli -g GENERAL.CONNECTION device show "$iface" 2>/dev/null || true)"
-    [[ -n "$connection" && "$connection" != "--" ]] || fatal "No active NetworkManager connection was found for ${iface}."
-    printf '%s\n' "$connection"
+    uuid="$(nmcli -g GENERAL.CON-UUID device show "$iface" 2>/dev/null | head -n 1 || true)"
+    [[ -n "$uuid" && "$uuid" != "--" ]] && printf '%s\n' "$uuid"
+}
+
+# Return one persisted NetworkManager connection UUID bound to an interface.
+connection_uuid_for_interface() {
+    local iface="$1" uuid profile_iface
+
+    uuid="$(active_connection_uuid "$iface" || true)"
+    [[ -n "$uuid" ]] && {
+        printf '%s\n' "$uuid"
+        return 0
+    }
+
+    while IFS= read -r uuid; do
+        [[ -n "$uuid" ]] || continue
+        profile_iface="$(nmcli -g connection.interface-name connection show uuid "$uuid" 2>/dev/null | head -n 1 || true)"
+        [[ "$profile_iface" == "$iface" ]] && {
+            printf '%s\n' "$uuid"
+            return 0
+        }
+    done < <(nmcli -g UUID connection show 2>/dev/null || true)
+
+    fatal "No NetworkManager connection profile was found for ${iface}."
+}
+
+# Reapply a device only when it has an active NetworkManager connection.
+reapply_active_device() {
+    local iface="$1"
+
+    if active_connection_uuid "$iface" >/dev/null; then
+        nmcli device reapply "$iface"
+    else
+        log "Saved IPv6 prefix delegation configuration for ${iface}; it will apply when the connection becomes active."
+    fi
 }
 
 networkmanager_supports_prefix_delegation() {
@@ -49,8 +82,9 @@ configure_ipv6_prefix_delegation() {
     router_mode_enabled || return 0
     validate_settings
 
-    wan_connection="$(connection_for_interface "$WAN_IFACE")"
-    lan_connection="$(connection_for_interface "$LAN_IFACE")"
+    wan_connection="$(active_connection_uuid "$WAN_IFACE" || true)"
+    [[ -n "$wan_connection" ]] || fatal "No active NetworkManager connection was found for ${WAN_IFACE}."
+    lan_connection="$(connection_uuid_for_interface "$LAN_IFACE")"
     networkmanager_supports_prefix_delegation || fatal \
         "NetworkManager 1.54 or newer is required for IPv6 prefix delegation; upgrade NetworkManager before enabling router mode."
 
@@ -69,8 +103,8 @@ configure_ipv6_prefix_delegation() {
 
     # Reapply instead of cycling the connections: this preserves the active
     # management path while making NetworkManager request/assign the prefix.
-    nmcli device reapply "$WAN_IFACE"
-    nmcli device reapply "$LAN_IFACE"
+    reapply_active_device "$WAN_IFACE"
+    reapply_active_device "$LAN_IFACE"
 }
 
 configure_ipv6_prefix_delegation
