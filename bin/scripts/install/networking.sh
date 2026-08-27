@@ -23,7 +23,7 @@ uses_ipv6_auto() {
     [[ "${1:-}" == "auto" ]]
 }
 
-# With no NetworkManager, odhcp6c owns DHCPv6/RA processing for dynamic PD.
+# With no NetworkManager, dhcpcd owns DHCPv6/RA processing for dynamic PD.
 # Do not generate ifupdown IPv6 stanzas for its WAN and delegated LAN.
 legacy_ipv6_pd_requested() {
     [[ "${ROUTER_MODE:-0}" == "1" ]] || return 1

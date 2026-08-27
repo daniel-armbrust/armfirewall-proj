@@ -8,8 +8,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 PD_HINT="${IPV6_PD_HINT:-::/56}"
 PD_SUBNET_ID="${IPV6_PD_SUBNET_ID:-0}"
 PD_RUNTIME_DIR="/run/armfirewall/ipv6pd"
-PD_HOOK="$ROOT_DIR/daemons/nmlegacyipv6pd/odhcp6c_hook.py"
 PD_SERVICE_CONF="$CONF_DIR/supervisor.d/ipv6pd.ini"
+PD_DHCPCD_CONF="$CONF_DIR/ipv6pd-dhcpcd.conf"
 
 uses_dynamic_ipv6() { [[ "${1:-}" == "auto" || "${1:-}" == "dhcp" ]]; }
 
@@ -56,31 +56,36 @@ configure_legacy_networkmanager() {
 }
 
 install_legacy_pd_service() {
-    local odhcp6c_bin pd_length
-    has_cmd odhcp6c || fatal "odhcp6c is required for the IPv6 prefix-delegation fallback."
-    [[ -x "$PD_HOOK" ]] || fatal "IPv6 prefix-delegation hook was not found: ${PD_HOOK}."
-    odhcp6c_bin="$(command -v odhcp6c)"
+    local dhcpcd_bin pd_length
+    has_cmd dhcpcd || fatal "dhcpcd is required for the IPv6 prefix-delegation fallback."
+    dhcpcd_bin="$(command -v dhcpcd)"
     pd_length="${PD_HINT#::/}"
     [[ "$pd_length" =~ ^[0-9]+$ ]] || fatal "IPV6_PD_HINT must have the form ::/56."
-    chmod 0755 "$PD_HOOK"
     mkdir -p "$PD_RUNTIME_DIR" "$CONF_DIR/supervisor.d"
+    cat > "$PD_DHCPCD_CONF" <<CONF
+# Managed by ArmFirewall: DHCPv6 prefix delegation for legacy NetworkManager.
+noipv6rs
+allowinterfaces $WAN_IFACE $LAN_IFACE
+interface $WAN_IFACE
+ia_pd 1 $LAN_IFACE/$PD_SUBNET_ID/64/1
+CONF
     cat > "$PD_SERVICE_CONF" <<CONF
-[program:armfirewall-nmlegacyipv6pd]
+[program:armfirewall-ipv6pd]
 directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/python -m daemons.nmlegacyipv6pd
+command=$dhcpcd_bin -6 -B -f $PD_DHCPCD_CONF $WAN_IFACE $LAN_IFACE
 autostart=true
 autorestart=true
 startsecs=3
 stopsignal=TERM
 stopasgroup=true
 killasgroup=true
-environment=ARMFW_IPV6PD_WAN="$WAN_IFACE",ARMFW_IPV6PD_LAN="$LAN_IFACE",ARMFW_IPV6PD_SUBNET_ID="$PD_SUBNET_ID",ARMFW_IPV6PD_PREFIX_LENGTH="$pd_length",ARMFW_IPV6PD_RUNTIME_DIR="$PD_RUNTIME_DIR",ARMFW_ODHCP6C_BIN="$odhcp6c_bin"
-stdout_logfile=$ROOT_DIR/logs/armfirewall-nmlegacyipv6pd.out.log
-stderr_logfile=$ROOT_DIR/logs/armfirewall-nmlegacyipv6pd.err.log
+environment=ARMFW_IPV6PD_WAN="$WAN_IFACE",ARMFW_IPV6PD_LAN="$LAN_IFACE",ARMFW_IPV6PD_DHCPCD_CONF="$PD_DHCPCD_CONF",ARMFW_DHCPCD_BIN="$dhcpcd_bin"
+stdout_logfile=$ROOT_DIR/logs/armfirewall-ipv6pd.out.log
+stderr_logfile=$ROOT_DIR/logs/armfirewall-ipv6pd.err.log
 CONF
     supervisorctl -c "$SUPERVISORD_CONF" reread
     supervisorctl -c "$SUPERVISORD_CONF" update
-    log "Installed the NetworkManager legacy IPv6 prefix-delegation fallback."
+    log "Installed the dhcpcd IPv6 prefix-delegation service."
 }
 
 main() {

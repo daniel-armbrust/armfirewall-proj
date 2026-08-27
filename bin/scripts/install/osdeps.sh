@@ -264,10 +264,10 @@ install_ipv6_pd_fallback_dependency() {
     dynamic_ipv6_pd_requested || return 0
     networkmanager_supports_ipv6_pd && return 0
 
-    log "Installing the odhcp6c IPv6 prefix-delegation client for the legacy NetworkManager fallback."
+    log "Installing the dhcpcd IPv6 prefix-delegation client for the legacy NetworkManager fallback."
     case "$PKG_MANAGER" in
-        dnf) run_dnf_transaction install odhcp6c ;;
-        apt) run_apt_transaction_without_service_start install odhcp6c ;;
+        dnf) run_dnf_transaction install dhcpcd ;;
+        apt) run_apt_transaction_without_service_start install dhcpcd-base ;;
     esac
 }
 
