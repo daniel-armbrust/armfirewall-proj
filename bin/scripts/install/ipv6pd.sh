@@ -32,10 +32,22 @@ active_connection_uuid() {
     [[ -n "$uuid" && "$uuid" != "--" ]] && printf '%s\n' "$uuid"
 }
 
-# List NetworkManager-controlled Ethernet devices.  In the legacy fallback,
-# dhcpcd must be the sole DHCPv6 client on the host, otherwise another
-# connection can keep UDP 546 bound and prevent prefix delegation on WAN.
-networkmanager_ethernet_interfaces() {
+# List every persisted Ethernet profile. In the legacy fallback, dhcpcd must
+# be the sole DHCPv6 client on the host. Limiting this to currently active
+# devices leaves a later NetworkManager auto-connection able to bind UDP 546
+# and prevent prefix delegation on WAN.
+networkmanager_ethernet_connection_uuids() {
+    local uuid connection_type
+
+    while IFS=: read -r uuid connection_type; do
+        [[ -n "$uuid" && "$connection_type" == "802-3-ethernet" ]] || continue
+        printf '%s\n' "$uuid"
+    done < <(nmcli -t -f UUID,TYPE connection show)
+}
+
+# List active NetworkManager-controlled Ethernet devices. These are reactivated
+# after their profiles are changed so NetworkManager releases any DHCPv6 socket.
+networkmanager_active_ethernet_interfaces() {
     local iface device_type
 
     while IFS=: read -r iface device_type; do
@@ -71,17 +83,20 @@ configure_legacy_networkmanager() {
     local iface connection
     has_cmd nmcli || return 0
 
-    while IFS= read -r iface; do
-        connection="$(active_connection_uuid "$iface" || true)"
-        [[ -n "$connection" ]] || continue
+    while IFS= read -r connection; do
         nmcli connection modify "$connection" \
             ipv6.method disabled ipv6.addresses "" ipv6.gateway "" ipv6.dns "" \
             ipv6.never-default yes ipv6.ignore-auto-routes yes ipv6.ignore-auto-dns yes || \
-            fatal "Could not disable NetworkManager IPv6 on ${iface}."
-        reconnect_networkmanager_connection "$iface" "$connection"
-    done < <(networkmanager_ethernet_interfaces)
+            fatal "Could not disable NetworkManager IPv6 on connection ${connection}."
+    done < <(networkmanager_ethernet_connection_uuids)
 
-    log "Disabled NetworkManager IPv6 on Ethernet interfaces; dhcpcd owns DHCPv6 prefix delegation."
+    while IFS= read -r iface; do
+        connection="$(active_connection_uuid "$iface" || true)"
+        [[ -n "$connection" ]] || continue
+        reconnect_networkmanager_connection "$iface" "$connection"
+    done < <(networkmanager_active_ethernet_interfaces)
+
+    log "Disabled NetworkManager IPv6 on persisted Ethernet profiles; dhcpcd owns DHCPv6 prefix delegation."
 }
 
 install_legacy_pd_service() {
