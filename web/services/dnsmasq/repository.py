@@ -29,7 +29,7 @@ def ensure_dnsmasq_schema(conn: db.Connection) -> None:
     column_defs = {
         "dns_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (dns_enabled IN (0, 1))",
         "local_domain": "TEXT NOT NULL DEFAULT 'armfirewall.local'",
-        "upstream_dns_servers_json": "TEXT NOT NULL DEFAULT '[\"1.1.1.1\",\"8.8.8.8\"]'",
+        "upstream_dns_servers_json": "TEXT NOT NULL DEFAULT '[\"8.8.8.8\",\"1.1.1.1\"]'",
         "adguardhome_upstream_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (adguardhome_upstream_enabled IN (0, 1))",
         "cache_size": "INTEGER NOT NULL DEFAULT 1000 CHECK (cache_size BETWEEN 0 AND 1000000)",
         "expand_hosts": "INTEGER NOT NULL DEFAULT 1 CHECK (expand_hosts IN (0, 1))",

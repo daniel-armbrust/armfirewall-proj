@@ -95,6 +95,47 @@ def ensure_adguard_lan_input_rules() -> None:
                     )
 
 
+
+def ensure_dnsmasq_lan_redirect_rules() -> None:
+    """Create protected DNS REDIRECT rules for every LAN interface."""
+    lan_interfaces = get_lan_interface_names()
+    if not lan_interfaces:
+        return
+
+    for family, db_path in NAT_FAMILY_DATABASES.items():
+        any_address = "::/0" if family == "IPV6" else "0.0.0.0/0"
+        with db.transaction(db_path) as conn:
+            for iface in lan_interfaces:
+                for protocol in DNS_PROTOCOLS:
+                    db.execute_on(
+                        conn,
+                        """
+                        INSERT INTO nat_prerouting_rules (
+                            iface_in, rule_order, src_addr, src_port, dst_addr, dst_port,
+                            protocol_name, protocol_type, protocol_code,
+                            nat_action, to_addr, to_port,
+                            protected, rule_source, enabled, pending_delete, created_at, updated_at
+                        )
+                        SELECT
+                            ?, (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM nat_prerouting_rules),
+                            ?, NULL, ?, ?, ?, NULL, NULL,
+                            'REDIRECT', NULL, ?,
+                            1, 'system', 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM nat_prerouting_rules
+                            WHERE iface_in = ?
+                              AND protocol_name = ?
+                              AND dst_port = ?
+                              AND nat_action = 'REDIRECT'
+                              AND protected = 1
+                              AND rule_source = 'system'
+                              AND COALESCE(pending_delete, 0) = 0
+                        )
+                        """,
+                        (iface, any_address, any_address, DNSMASQ_DNS_PORT,
+                         protocol, DNSMASQ_DNS_PORT, iface, protocol, DNSMASQ_DNS_PORT),
+                    )
+
 def sync_managed_dns_redirect(port: int, *, enabled: bool) -> None:
     """Set protected LAN DNS REDIRECT rules to the selected local DNS listener."""
     protocol_marks = ", ".join("?" for _ in DNS_PROTOCOLS)
@@ -142,6 +183,7 @@ def sync_dns_filtering_redirect(adguard_running: bool | None = None) -> bool:
     )
     target_port = ADGUARD_HOME_DNS_PORT if active else DNSMASQ_DNS_PORT
     ensure_adguard_lan_input_rules()
+    ensure_dnsmasq_lan_redirect_rules()
     sync_managed_dns_redirect(target_port, enabled=dns_enabled)
 
     for family in ("IPV4", "IPV6"):

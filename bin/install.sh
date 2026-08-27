@@ -150,6 +150,9 @@ main() {
     # Validate and persist the selected LAN interface in iface.db
     "$ROOT_DIR/bin/scripts/install/laniface.sh"
 
+    # Provision the default DNSMasq DNS, DHCP and IPv6 RA configuration for the LAN.
+    "$ROOT_DIR/bin/scripts/install/dnsmasq.sh" "$LAN_IFACE" "$LAN_IPV4_ADDR"
+
     # TODO: apply firewall rules
     "$ROOT_DIR/bin/scripts/install/fwrules.sh"
 
@@ -171,6 +174,9 @@ main() {
 
     # Creates supervisord and systemd service manager files
     "$ROOT_DIR/bin/scripts/install/supervisord.sh"
+
+    # Verifies the DNSMasq service started and makes it the local system resolver.
+    "$ROOT_DIR/bin/scripts/install/dnsmasq.sh" --activate
 
     # Configures requested IPv4 and optional IPv6 interfaces using the platform network backend.
     "$ROOT_DIR/bin/scripts/install/networking.sh" "$LAN_IFACE" "$LAN_IPV4_ADDR" "$WAN_IFACE" "$WAN_IPV4_ADDR" "$LAN_IPV6_ADDR" "$WAN_IPV6_ADDR"

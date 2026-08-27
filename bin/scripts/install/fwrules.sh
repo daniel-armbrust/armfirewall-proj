@@ -280,18 +280,15 @@ enforce_lan_dns() {
     local lan_iface="$1"
     local family binary protocol
 
-    log "Enforcing protected DNS redirection and DNS-over-TLS blocking on ${lan_iface}."
+    log "Registering protected DNS-over-TLS blocking on ${lan_iface}."
 
+    # DNS REDIRECT rules are owned by the DNSMasq configuration state. This
+    # installer deliberately does not create them while DNS is disabled.
     for family in ipv4 ipv6; do
-        record_dns_redirect_rule "$family" tcp "$lan_iface"
-        record_dns_redirect_rule "$family" udp "$lan_iface"
         record_dns_over_tls_block_rule "$family" "$lan_iface"
     done
 
     for binary in iptables ip6tables; do
-        for protocol in tcp udp; do
-            apply_dns_redirect_rule "$binary" "$protocol" "$lan_iface"
-        done
         apply_dns_over_tls_block_rule "$binary" "$lan_iface"
     done
 }
@@ -754,7 +751,6 @@ main() {
     record_default_filter_policies
     set_default_filter_policies
     record_install_filter_apply_work_requests
-    record_install_dns_nat_apply_work_requests
 }
 
 main "$@"

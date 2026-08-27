@@ -23,7 +23,7 @@ def default_config() -> dict[str, Any]:
         "dhcp_enabled": False,
         "listen_interfaces": [],
         "local_domain": "armfirewall.local",
-        "upstream_dns_servers": ["1.1.1.1", "8.8.8.8"],
+        "upstream_dns_servers": ["8.8.8.8", "1.1.1.1"],
         "domain_upstreams": [],
         "interface_configs": [],
         "adguardhome_upstream_enabled": False,
@@ -49,7 +49,7 @@ def default_interface_config(iface_name: str) -> dict[str, Any]:
         "iface": iface_name,
         "dns_enabled": False,
         "local_domain": "armfirewall.local",
-        "upstream_dns_servers": ["1.1.1.1", "8.8.8.8"],
+        "upstream_dns_servers": ["8.8.8.8", "1.1.1.1"],
         "domain_upstreams": [],
         "adguardhome_upstream_enabled": False,
         "cache_size": 1000,
@@ -286,6 +286,15 @@ def render_config(config: dict[str, Any]) -> str:
                 lines.append(f"# DHCP scope for {item['iface']}")
                 lines.append(range_line)
                 rendered_ranges.add(range_line)
+            dns_servers = item.get("upstream_dns_servers") or config["upstream_dns_servers"]
+            if dns_servers:
+                dns_option = (
+                    f"dhcp-option=tag:{item['iface']},option:dns-server,"
+                    f"{','.join(dns_servers)}"
+                )
+                if dns_option not in rendered_directives:
+                    lines.append(dns_option)
+                    rendered_directives.add(dns_option)
             if item["dhcp_authoritative"] and "dhcp-authoritative" not in rendered_directives:
                 lines.append("dhcp-authoritative")
                 rendered_directives.add("dhcp-authoritative")
