@@ -172,9 +172,10 @@ allowinterfaces $WAN_IFACE $LAN_IFACE
 interface $WAN_IFACE
 # The kernel owns Router Advertisements/SLAAC; dhcpcd handles DHCPv6 only.
 noipv6rs
-# Request both the WAN IPv6 address and a prefix to delegate to LAN.
-ia_na 0
-ia_pd 1 $LAN_IFACE/$PD_SUBNET_ID/64/1
+# Request both the WAN IPv6 address and a prefix to delegate to LAN with
+# distinct non-zero IAIDs, as required for independent DHCPv6 associations.
+ia_na 1
+ia_pd 2 $LAN_IFACE/$PD_SUBNET_ID/64/1
 CONF
     cat > "$PD_SERVICE_CONF" <<CONF
 [program:armfirewall-ipv6pd]
