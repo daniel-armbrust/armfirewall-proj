@@ -99,6 +99,66 @@ configure_legacy_networkmanager() {
     log "Disabled NetworkManager IPv6 on persisted Ethernet profiles; dhcpcd owns DHCPv6 prefix delegation."
 }
 
+# Persist one kernel parameter in proc.db. startpre/proc.sh applies all enabled
+# desired values both now and on every boot, keeping /proc as runtime state.
+record_legacy_proc_value() {
+    local name="$1" proc_path="$2" description="$3" default_value="$4" desired_value="$5"
+
+    sqlite_exec "$PROC_DB" "
+        INSERT INTO proc (
+            category, name, proc_path, description, default_value,
+            current_value, desired_value, protected, enabled, collected_at, updated_at
+        ) VALUES (
+            'IPv6',
+            $(sql_quote "$name"),
+            $(sql_quote "$proc_path"),
+            $(sql_quote "$description"),
+            $(sql_quote "$default_value"),
+            $(sql_quote "$desired_value"),
+            $(sql_quote "$desired_value"),
+            0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT(proc_path) DO UPDATE SET
+            current_value = excluded.current_value,
+            desired_value = excluded.desired_value,
+            enabled = 1,
+            collected_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP;
+    "
+}
+
+# A firewall is an IPv6 router, so the kernel normally ignores Router
+# Advertisements when forwarding is enabled. Persist WAN RA processing through
+# proc.db, then let the standard proc.sh path apply it immediately.
+configure_legacy_kernel_ipv6() {
+    [[ -f "$PROC_DB" ]] || fatal "Kernel parameter database was not found: ${PROC_DB}."
+
+    record_legacy_proc_value \
+        "net.ipv6.conf.${WAN_IFACE}.accept_ra" \
+        "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra" \
+        "Accepts Router Advertisements on the WAN while IPv6 forwarding is enabled." \
+        "0" "2"
+    record_legacy_proc_value \
+        "net.ipv6.conf.${WAN_IFACE}.autoconf" \
+        "/proc/sys/net/ipv6/conf/${WAN_IFACE}/autoconf" \
+        "Enables IPv6 SLAAC address configuration on the WAN." \
+        "1" "1"
+    record_legacy_proc_value \
+        "net.ipv6.conf.${WAN_IFACE}.accept_ra_pinfo" \
+        "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra_pinfo" \
+        "Accepts IPv6 prefix information from WAN Router Advertisements." \
+        "1" "1"
+    record_legacy_proc_value \
+        "net.ipv6.conf.${WAN_IFACE}.accept_ra_defrtr" \
+        "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra_defrtr" \
+        "Accepts the IPv6 default router advertised on WAN." \
+        "1" "1"
+
+    "$ROOT_DIR/bin/scripts/startpre/proc.sh" || \
+        fatal "Could not apply persisted IPv6 Router Advertisement settings on ${WAN_IFACE}."
+    log "Persisted and applied WAN Router Advertisement and SLAAC settings for the legacy IPv6 fallback."
+}
+
 install_legacy_pd_service() {
     local dhcpcd_bin pd_length
     has_cmd dhcpcd || fatal "dhcpcd is required for the IPv6 prefix-delegation fallback."
@@ -142,6 +202,7 @@ main() {
         configure_networkmanager_pd
     else
         configure_legacy_networkmanager
+        configure_legacy_kernel_ipv6
         install_legacy_pd_service
     fi
 }
