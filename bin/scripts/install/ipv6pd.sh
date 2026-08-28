@@ -49,6 +49,7 @@ networkmanager_ethernet_connection_uuids() {
 # after their profiles are changed so NetworkManager releases any DHCPv6 socket.
 networkmanager_active_ethernet_interfaces() {
     local iface device_type
+    has_cmd nmcli || return 0
 
     while IFS=: read -r iface device_type; do
         [[ -n "$iface" && "$iface" != "lo" && "$device_type" == "ethernet" ]] || continue
@@ -128,35 +129,69 @@ record_legacy_proc_value() {
 }
 
 # dhcpcd owns Router Advertisements, SLAAC, and DHCPv6 on legacy
-# NetworkManager hosts. Keep kernel RA processing disabled to prevent two
-# independent clients from installing competing WAN addresses and routes.
+# NetworkManager hosts. Keep kernel RA processing disabled on every Ethernet
+# interface so a pre-existing NetworkManager connection cannot install an RA
+# route before dhcpcd takes ownership of the WAN.
 configure_legacy_kernel_ipv6() {
+    local iface
+
     [[ -f "$PROC_DB" ]] || fatal "Kernel parameter database was not found: ${PROC_DB}."
 
-    record_legacy_proc_value \
-        "net.ipv6.conf.${WAN_IFACE}.accept_ra" \
-        "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra" \
-        "Disables kernel Router Advertisements on the WAN; dhcpcd manages them." \
-        "0" "0"
-    record_legacy_proc_value \
-        "net.ipv6.conf.${WAN_IFACE}.autoconf" \
-        "/proc/sys/net/ipv6/conf/${WAN_IFACE}/autoconf" \
-        "Disables kernel IPv6 SLAAC on the WAN; dhcpcd manages it." \
-        "1" "0"
-    record_legacy_proc_value \
-        "net.ipv6.conf.${WAN_IFACE}.accept_ra_pinfo" \
-        "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra_pinfo" \
-        "Disables kernel IPv6 RA prefix processing on the WAN; dhcpcd manages it." \
-        "1" "0"
-    record_legacy_proc_value \
-        "net.ipv6.conf.${WAN_IFACE}.accept_ra_defrtr" \
-        "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra_defrtr" \
-        "Disables kernel IPv6 RA default-router processing on WAN; dhcpcd manages it." \
-        "1" "0"
+    while IFS= read -r iface; do
+        [[ -n "$iface" && -d "/proc/sys/net/ipv6/conf/${iface}" ]] || continue
+        record_legacy_proc_value \
+            "net.ipv6.conf.${iface}.accept_ra" \
+            "/proc/sys/net/ipv6/conf/${iface}/accept_ra" \
+            "Disables kernel Router Advertisements; dhcpcd owns WAN IPv6." \
+            "0" "0"
+        record_legacy_proc_value \
+            "net.ipv6.conf.${iface}.autoconf" \
+            "/proc/sys/net/ipv6/conf/${iface}/autoconf" \
+            "Disables kernel IPv6 SLAAC; dhcpcd owns WAN IPv6." \
+            "1" "0"
+        record_legacy_proc_value \
+            "net.ipv6.conf.${iface}.accept_ra_pinfo" \
+            "/proc/sys/net/ipv6/conf/${iface}/accept_ra_pinfo" \
+            "Disables kernel IPv6 RA prefix processing; dhcpcd owns WAN IPv6." \
+            "1" "0"
+        record_legacy_proc_value \
+            "net.ipv6.conf.${iface}.accept_ra_defrtr" \
+            "/proc/sys/net/ipv6/conf/${iface}/accept_ra_defrtr" \
+            "Disables kernel IPv6 RA default-router processing; dhcpcd owns WAN IPv6." \
+            "1" "0"
+    done < <(
+        {
+            printf '%s\n' "$WAN_IFACE" "$LAN_IFACE"
+            networkmanager_active_ethernet_interfaces
+        } | awk 'NF && !seen[$0]++'
+    )
 
     "$ROOT_DIR/bin/scripts/startpre/proc.sh" || \
-        fatal "Could not apply persisted IPv6 Router Advertisement settings on ${WAN_IFACE}."
-    log "Persisted and applied kernel IPv6 settings that leave WAN RA and SLAAC to dhcpcd."
+        fatal "Could not apply persisted IPv6 Router Advertisement settings."
+    log "Persisted and applied kernel IPv6 settings that reserve Router Advertisements and SLAAC for dhcpcd."
+}
+
+# Connections can be active before the installer reaches this script. Remove
+# only dynamic IPv6 state learned from those early Router Advertisements, after
+# the persistent proc settings are applied and before dhcpcd starts. Static
+# addresses and non-RA routes are intentionally preserved.
+clear_legacy_ra_state() {
+    local iface address
+
+    while IFS= read -r iface; do
+        [[ -n "$iface" ]] || continue
+        ip -6 route flush dev "$iface" proto ra 2>/dev/null || true
+        while IFS= read -r address; do
+            [[ -n "$address" ]] || continue
+            ip -6 address del "$address" dev "$iface" 2>/dev/null || true
+        done < <(ip -6 -o address show dev "$iface" scope global dynamic 2>/dev/null | awk '{print $4}')
+    done < <(
+        {
+            printf '%s\n' "$WAN_IFACE" "$LAN_IFACE"
+            networkmanager_active_ethernet_interfaces
+        } | awk 'NF && !seen[$0]++'
+    )
+    log "Cleared dynamic IPv6 Router Advertisement state before starting dhcpcd."
 }
 
 install_legacy_pd_service() {
@@ -208,6 +243,7 @@ main() {
     else
         configure_legacy_networkmanager
         configure_legacy_kernel_ipv6
+        clear_legacy_ra_state
         install_legacy_pd_service
     fi
 }
