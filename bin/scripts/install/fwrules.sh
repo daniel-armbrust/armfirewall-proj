@@ -113,6 +113,61 @@ apply_conntrack_base_rules() {
     ip6tables -t filter -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 }
 
+# Return success when the WAN is expected to obtain IPv6 dynamically.
+wan_uses_dynamic_ipv6() {
+    [[ "${WAN_IPV6_ADDR:-}" == "auto" || "${WAN_IPV6_ADDR:-}" == "dhcp" ]]
+}
+
+# Persist the DHCPv6 server reply rule required by a stateful WAN client.
+record_wan_dhcpv6_client_rule() {
+    local any_addr="::/0"
+
+    sqlite_exec "$IPV6_FILTER_RULES_DB" "
+        INSERT INTO filter_input_rules (
+            iface_in, rule_order, ct_new, ct_established, ct_related,
+            ct_invalid, src_addr, src_port, dst_addr, dst_port,
+            protocol_name, protocol_type, protocol_code, action,
+            protected, enabled, created_at, updated_at
+        )
+        SELECT
+            $(sql_quote "$WAN_IFACE"),
+            (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
+            1, 0, 0, 0,
+            'fe80::/10', 547, $(sql_quote "$any_addr"), 546,
+            'udp', NULL, NULL, 'ACCEPT',
+            1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM filter_input_rules
+            WHERE iface_in = $(sql_quote "$WAN_IFACE")
+              AND src_addr = 'fe80::/10'
+              AND src_port = 547
+              AND dst_port = 546
+              AND protocol_name = 'udp'
+              AND action = 'ACCEPT'
+              AND enabled = 1
+        );
+    "
+}
+
+# Permit only DHCPv6 replies from the WAN's link-local DHCPv6 server.
+apply_wan_dhcpv6_client_rule() {
+    ip6tables -t filter -C INPUT -i "$WAN_IFACE" -s fe80::/10 -p udp \
+        --sport 547 --dport 546 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null || \
+    ip6tables -t filter -A INPUT -i "$WAN_IFACE" -s fe80::/10 -p udp \
+        --sport 547 --dport 546 -m conntrack --ctstate NEW -j ACCEPT
+}
+
+# Register and apply the inbound DHCPv6 reply rule only when WAN IPv6 is dynamic.
+allow_wan_dhcpv6_client() {
+    wan_uses_dynamic_ipv6 || return 0
+    [[ -n "${WAN_IFACE:-}" ]] || fatal "WAN_IFACE is required for dynamic WAN IPv6."
+
+    log "Registering and applying the DHCPv6 client reply rule on ${WAN_IFACE}."
+    record_wan_dhcpv6_client_rule
+    apply_wan_dhcpv6_client_rule
+}
+
 # Record one protected loopback rule in the selected filter rules database.
 record_loopback_rule() {
     local family="$1"
@@ -725,6 +780,7 @@ main() {
     allow_lan_icmp
     record_conntrack_base_rules
     apply_conntrack_base_rules
+    allow_wan_dhcpv6_client
     record_loopback_rules
     apply_loopback_rules
     enforce_lan_dns "$LAN_IFACE"
