@@ -170,8 +170,8 @@ install_legacy_pd_service() {
 # Managed by ArmFirewall: DHCPv6 prefix delegation for legacy NetworkManager.
 allowinterfaces $WAN_IFACE $LAN_IFACE
 interface $WAN_IFACE
-# Receive Router Advertisements for the WAN SLAAC address and default route.
-ipv6rs
+# The kernel owns Router Advertisements/SLAAC; dhcpcd handles DHCPv6 only.
+noipv6rs
 # Request both the WAN IPv6 address and a prefix to delegate to LAN.
 ia_na 0
 ia_pd 1 $LAN_IFACE/$PD_SUBNET_ID/64/1
