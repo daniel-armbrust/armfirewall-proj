@@ -33,9 +33,9 @@ active_connection_uuid() {
 }
 
 # List every persisted Ethernet profile. In the legacy fallback, dhcpcd must
-# be the sole DHCPv6 client on the host. Limiting this to currently active
-# devices leaves a later NetworkManager auto-connection able to bind UDP 546
-# and prevent prefix delegation on WAN.
+# be the sole IPv6 client on the host. NetworkManager must leave IPv6 to
+# dhcpcd rather than disable it: disabling IPv6 prevents the WAN from
+# receiving global IPv6 configuration from Router Advertisements.
 networkmanager_ethernet_connection_uuids() {
     local uuid connection_type
 
@@ -56,7 +56,7 @@ networkmanager_active_ethernet_interfaces() {
     done < <(nmcli -t -f DEVICE,TYPE device status)
 }
 
-# Reconnect a profile after changing ipv6.method.  NetworkManager cannot
+# Reconnect a profile after changing ipv6.method. NetworkManager cannot
 # reliably remove an already running DHCPv6 client through device reapply.
 reconnect_networkmanager_connection() {
     local iface="$1" connection="$2" state
@@ -64,7 +64,7 @@ reconnect_networkmanager_connection() {
     state="$(nmcli -g GENERAL.STATE device show "$iface" 2>/dev/null | head -n1 || true)"
     [[ "$state" == 100* ]] || return 0
     nmcli connection up uuid "$connection" ifname "$iface" >/dev/null || \
-        fatal "Could not reactivate ${iface} after disabling NetworkManager IPv6."
+        fatal "Could not reactivate ${iface} after leaving IPv6 unmanaged by NetworkManager."
 }
 
 configure_networkmanager_pd() {
@@ -85,9 +85,9 @@ configure_legacy_networkmanager() {
 
     while IFS= read -r connection; do
         nmcli connection modify "$connection" \
-            ipv6.method disabled ipv6.addresses "" ipv6.gateway "" ipv6.dns "" \
+            ipv6.method ignore ipv6.addresses "" ipv6.gateway "" ipv6.dns "" \
             ipv6.never-default yes ipv6.ignore-auto-routes yes ipv6.ignore-auto-dns yes || \
-            fatal "Could not disable NetworkManager IPv6 on connection ${connection}."
+            fatal "Could not leave IPv6 unmanaged by NetworkManager on connection ${connection}."
     done < <(networkmanager_ethernet_connection_uuids)
 
     while IFS= read -r iface; do
@@ -96,7 +96,7 @@ configure_legacy_networkmanager() {
         reconnect_networkmanager_connection "$iface" "$connection"
     done < <(networkmanager_active_ethernet_interfaces)
 
-    log "Disabled NetworkManager IPv6 on persisted Ethernet profiles; dhcpcd owns DHCPv6 prefix delegation."
+    log "Configured NetworkManager to leave IPv6 unmanaged on persisted Ethernet profiles; dhcpcd owns WAN RA/SLAAC and DHCPv6 prefix delegation."
 }
 
 # Persist one kernel parameter in proc.db. startpre/proc.sh applies all enabled
@@ -127,36 +127,36 @@ record_legacy_proc_value() {
     "
 }
 
-# A firewall is an IPv6 router, so the kernel normally ignores Router
-# Advertisements when forwarding is enabled. Persist WAN RA processing through
-# proc.db, then let the standard proc.sh path apply it immediately.
+# dhcpcd owns Router Advertisements, SLAAC, and DHCPv6 on legacy
+# NetworkManager hosts. Keep kernel RA processing disabled to prevent two
+# independent clients from installing competing WAN addresses and routes.
 configure_legacy_kernel_ipv6() {
     [[ -f "$PROC_DB" ]] || fatal "Kernel parameter database was not found: ${PROC_DB}."
 
     record_legacy_proc_value \
         "net.ipv6.conf.${WAN_IFACE}.accept_ra" \
         "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra" \
-        "Accepts Router Advertisements on the WAN while IPv6 forwarding is enabled." \
-        "0" "2"
+        "Disables kernel Router Advertisements on the WAN; dhcpcd manages them." \
+        "0" "0"
     record_legacy_proc_value \
         "net.ipv6.conf.${WAN_IFACE}.autoconf" \
         "/proc/sys/net/ipv6/conf/${WAN_IFACE}/autoconf" \
-        "Enables IPv6 SLAAC address configuration on the WAN." \
-        "1" "1"
+        "Disables kernel IPv6 SLAAC on the WAN; dhcpcd manages it." \
+        "1" "0"
     record_legacy_proc_value \
         "net.ipv6.conf.${WAN_IFACE}.accept_ra_pinfo" \
         "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra_pinfo" \
-        "Accepts IPv6 prefix information from WAN Router Advertisements." \
-        "1" "1"
+        "Disables kernel IPv6 RA prefix processing on the WAN; dhcpcd manages it." \
+        "1" "0"
     record_legacy_proc_value \
         "net.ipv6.conf.${WAN_IFACE}.accept_ra_defrtr" \
         "/proc/sys/net/ipv6/conf/${WAN_IFACE}/accept_ra_defrtr" \
-        "Accepts the IPv6 default router advertised on WAN." \
-        "1" "1"
+        "Disables kernel IPv6 RA default-router processing on WAN; dhcpcd manages it." \
+        "1" "0"
 
     "$ROOT_DIR/bin/scripts/startpre/proc.sh" || \
         fatal "Could not apply persisted IPv6 Router Advertisement settings on ${WAN_IFACE}."
-    log "Persisted and applied WAN Router Advertisement and SLAAC settings for the legacy IPv6 fallback."
+    log "Persisted and applied kernel IPv6 settings that leave WAN RA and SLAAC to dhcpcd."
 }
 
 install_legacy_pd_service() {
@@ -170,12 +170,16 @@ install_legacy_pd_service() {
 # Managed by ArmFirewall: DHCPv6 prefix delegation for legacy NetworkManager.
 allowinterfaces $WAN_IFACE $LAN_IFACE
 interface $WAN_IFACE
-# The kernel owns Router Advertisements/SLAAC; dhcpcd handles DHCPv6 only.
-noipv6rs
+# dhcpcd owns WAN Router Advertisements, SLAAC, and DHCPv6. NetworkManager
+# leaves IPv6 untouched so it does not compete for the DHCPv6 socket.
+ipv6rs
 # Request both the WAN IPv6 address and a prefix to delegate to LAN with
 # distinct non-zero IAIDs, as required for independent DHCPv6 associations.
 ia_na 1
 ia_pd 2 $LAN_IFACE/$PD_SUBNET_ID/64/1
+interface $LAN_IFACE
+# LAN is a downstream network. Do not solicit Router Advertisements there.
+noipv6rs
 CONF
     cat > "$PD_SERVICE_CONF" <<CONF
 [program:armfirewall-ipv6pd]
