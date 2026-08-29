@@ -23,11 +23,16 @@ uses_ipv6_auto() {
     [[ "${1:-}" == "auto" ]]
 }
 
+# Return success when IPv6 prefix delegation is requested for router mode.
+ipv6_prefix_delegation_requested() {
+    [[ "${ROUTER_MODE:-0}" == "1" ]] || return 1
+    uses_dhcp "${WAN_IPV6_ADDR:-}" && uses_dhcp "${LAN_IPV6_ADDR:-}"
+}
+
 # With no NetworkManager, dhcpcd owns DHCPv6/RA processing for dynamic PD.
 # Do not generate ifupdown IPv6 stanzas for its WAN and delegated LAN.
 legacy_ipv6_pd_requested() {
-    [[ "${ROUTER_MODE:-0}" == "1" ]] || return 1
-    uses_dhcp "${WAN_IPV6_ADDR:-}" && uses_dhcp "${LAN_IPV6_ADDR:-}"
+    ipv6_prefix_delegation_requested
 }
 
 # Validate an IPv4 address with a CIDR prefix, such as 192.0.2.10/24.
@@ -305,18 +310,28 @@ configure_networkmanager_interfaces() {
         fi
     done
 
-    # Keep every additional Ethernet interface ready for DHCP, without letting
-    # an incidental DHCP/RA gateway replace the WAN's default route or DNS.
+    # Keep every additional Ethernet interface on IPv4 DHCP, without letting
+    # an incidental gateway replace the WAN's default route or DNS. When WAN
+    # prefix delegation is active, only the explicit WAN may receive IPv6.
     while IFS= read -r iface; do
-        [[ "$iface" != "$WAN_IFACE" ]] || continue
+        [[ "$iface" != "$WAN_IFACE" && "$iface" != "$LAN_IFACE" ]] || continue
 
         connection="$(networkmanager_connection_for_interface "$iface")"
         nmcli connection modify "$connection" connection.interface-name "$iface" connection.autoconnect yes || \
             fatal "Could not prepare the NetworkManager connection for ${iface}."
+        configure_networkmanager_ipv4 "$connection" "dhcp" ""
         configure_networkmanager_default_route_policy "$connection" no
 
+        if ipv6_prefix_delegation_requested; then
+            nmcli connection modify "$connection" \
+                ipv6.method ignore ipv6.addresses "" ipv6.gateway "" ipv6.dns "" \
+                ipv6.never-default yes ipv6.ignore-auto-routes yes ipv6.ignore-auto-dns yes || \
+                fatal "Could not reserve IPv6 prefix delegation for the WAN on ${iface}."
+        fi
+
         if network_interface_has_carrier "$iface"; then
-            nmcli device reapply "$iface" >/dev/null 2>&1 || true
+            nmcli connection up "$connection" ifname "$iface" >/dev/null || \
+                fatal "Could not activate the NetworkManager connection on ${iface}."
         fi
     done < <(networkmanager_ethernet_interfaces)
 

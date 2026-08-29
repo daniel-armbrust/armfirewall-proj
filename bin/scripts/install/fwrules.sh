@@ -132,15 +132,15 @@ record_wan_dhcpv6_client_rule() {
         SELECT
             $(sql_quote "$WAN_IFACE"),
             (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
-            1, 0, 0, 0,
-            'fe80::/10', 547, $(sql_quote "$any_addr"), 546,
+            0, 0, 0, 0,
+            '::/0', 547, $(sql_quote "$any_addr"), 546,
             'udp', NULL, NULL, 'ACCEPT',
             1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         WHERE NOT EXISTS (
             SELECT 1
             FROM filter_input_rules
             WHERE iface_in = $(sql_quote "$WAN_IFACE")
-              AND src_addr = 'fe80::/10'
+              AND src_addr = '::/0'
               AND src_port = 547
               AND dst_port = 546
               AND protocol_name = 'udp'
@@ -150,12 +150,13 @@ record_wan_dhcpv6_client_rule() {
     "
 }
 
-# Permit only DHCPv6 replies from the WAN's link-local DHCPv6 server.
+# Permit DHCPv6 replies from the WAN. DHCPv6 servers may reply from a global
+# address, even when the client uses a link-local source for SOLICIT.
 apply_wan_dhcpv6_client_rule() {
-    ip6tables -t filter -C INPUT -i "$WAN_IFACE" -s fe80::/10 -p udp \
-        --sport 547 --dport 546 -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null || \
-    ip6tables -t filter -A INPUT -i "$WAN_IFACE" -s fe80::/10 -p udp \
-        --sport 547 --dport 546 -m conntrack --ctstate NEW -j ACCEPT
+    ip6tables -t filter -C INPUT -i "$WAN_IFACE" -p udp \
+        --sport 547 --dport 546 -j ACCEPT 2>/dev/null || \
+    ip6tables -t filter -A INPUT -i "$WAN_IFACE" -p udp \
+        --sport 547 --dport 546 -j ACCEPT
 }
 
 # Register and apply the inbound DHCPv6 reply rule only when WAN IPv6 is dynamic.
@@ -449,6 +450,27 @@ record_icmpv6_input_rule() {
     local src_addr="$1"
     local icmp_type="$2"
     local icmp_code="$3"
+    local ct_new=1
+
+    # Router Discovery and Neighbor Discovery are link-local control traffic.
+    # Conntrack does not reliably classify them as NEW; requiring that state
+    # prevents the firewall from resolving IPv6 neighbours on the LAN.
+    case "$icmp_type" in
+        133|134|135|136) ct_new=0 ;;
+    esac
+
+    # A solicited Neighbor Advertisement uses the target address as its
+    # source, which is commonly a global address on the delegated LAN prefix.
+    # Migrate the former link-local-only NDP rules on existing installations.
+    if [[ "$icmp_type" == "135" || "$icmp_type" == "136" ]]; then
+        sqlite_exec "$IPV6_FILTER_RULES_DB" "
+            UPDATE filter_input_rules
+               SET src_addr = '::/0', updated_at = CURRENT_TIMESTAMP
+             WHERE iface_in = 'ANY' AND src_addr = 'fe80::/10'
+               AND protocol_name = 'icmpv6' AND protocol_type = ${icmp_type}
+               AND protocol_code = ${icmp_code} AND action = 'ACCEPT'
+               AND enabled = 1;"
+    fi
 
     sqlite_exec "$IPV6_FILTER_RULES_DB" "
         INSERT INTO filter_input_rules (
@@ -458,7 +480,7 @@ record_icmpv6_input_rule() {
             protected, enabled, created_at, updated_at)
                 SELECT
                     'ANY', (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM filter_input_rules),
-                    1, 0, 0, 0, $(sql_quote "$src_addr"), NULL,
+                    ${ct_new}, 0, 0, 0, $(sql_quote "$src_addr"), NULL,
                     '::/0', NULL,
                     'icmpv6', ${icmp_type}, ${icmp_code},
                     'ACCEPT', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -472,6 +494,19 @@ record_icmpv6_input_rule() {
                             AND action = 'ACCEPT'
                             AND enabled = 1
                 );"
+
+    # Existing installations already have these rules. Update their
+    # conntrack flag so persistence matches the runtime rule after upgrade.
+    sqlite_exec "$IPV6_FILTER_RULES_DB" "
+        UPDATE filter_input_rules
+           SET ct_new = ${ct_new}, ct_established = 0, ct_related = 0,
+               ct_invalid = 0, updated_at = CURRENT_TIMESTAMP
+         WHERE iface_in = 'ANY'
+           AND src_addr = $(sql_quote "$src_addr")
+           AND protocol_name = 'icmpv6'
+           AND protocol_type = ${icmp_type}
+           AND protocol_code = ${icmp_code}
+           AND action = 'ACCEPT' AND enabled = 1;"
 }
 
 # Record one ICMPv6 FORWARD rule in SQLite.
@@ -508,6 +543,12 @@ allow_icmpv6_input_rule() {
     local src_addr="$1"
     local icmp_type="$2"
     local icmp_code="$3"
+
+    # NS may have a link-local/unspecified source, but a corresponding NA
+    # normally uses the client's global target address as its source.
+    case "$icmp_type" in
+        135|136) src_addr="::/0" ;;
+    esac
 
     record_icmpv6_input_rule "$src_addr" "$icmp_type" "$icmp_code"
     apply_icmpv6_input_rule "$src_addr" "$icmp_type" "$icmp_code"

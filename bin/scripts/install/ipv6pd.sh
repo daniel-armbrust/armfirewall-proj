@@ -133,9 +133,35 @@ record_legacy_proc_value() {
 # interface so a pre-existing NetworkManager connection cannot install an RA
 # route before dhcpcd takes ownership of the WAN.
 configure_legacy_kernel_ipv6() {
-    local iface
+    local iface scope
 
     [[ -f "$PROC_DB" ]] || fatal "Kernel parameter database was not found: ${PROC_DB}."
+
+    # conf/all and conf/default must also be disabled. Otherwise a Router
+    # Advertisement received during startup can recreate a stale route on an
+    # interface that is not the primary WAN.
+    for scope in all default; do
+        record_legacy_proc_value \
+            "net.ipv6.conf.${scope}.accept_ra" \
+            "/proc/sys/net/ipv6/conf/${scope}/accept_ra" \
+            "Disables global kernel Router Advertisements; dhcpcd owns WAN IPv6." \
+            "1" "0"
+        record_legacy_proc_value \
+            "net.ipv6.conf.${scope}.autoconf" \
+            "/proc/sys/net/ipv6/conf/${scope}/autoconf" \
+            "Disables global kernel IPv6 SLAAC; dhcpcd owns WAN IPv6." \
+            "1" "0"
+        record_legacy_proc_value \
+            "net.ipv6.conf.${scope}.accept_ra_pinfo" \
+            "/proc/sys/net/ipv6/conf/${scope}/accept_ra_pinfo" \
+            "Disables global IPv6 RA prefix processing; dhcpcd owns WAN IPv6." \
+            "1" "0"
+        record_legacy_proc_value \
+            "net.ipv6.conf.${scope}.accept_ra_defrtr" \
+            "/proc/sys/net/ipv6/conf/${scope}/accept_ra_defrtr" \
+            "Disables global IPv6 RA default-router processing; dhcpcd owns WAN IPv6." \
+            "1" "0"
+    done
 
     while IFS= read -r iface; do
         [[ -n "$iface" && -d "/proc/sys/net/ipv6/conf/${iface}" ]] || continue
@@ -208,9 +234,8 @@ interface $WAN_IFACE
 # dhcpcd owns WAN Router Advertisements, SLAAC, and DHCPv6. NetworkManager
 # leaves IPv6 untouched so it does not compete for the DHCPv6 socket.
 ipv6rs
-# Request both the WAN IPv6 address and a prefix to delegate to LAN with
-# distinct non-zero IAIDs, as required for independent DHCPv6 associations.
-ia_na 1
+# The WAN address is configured from Router Advertisements. Some providers,
+# including Starlink, delegate a prefix but do not offer a DHCPv6 IA_NA.
 ia_pd 2 $LAN_IFACE/$PD_SUBNET_ID/64/1
 interface $LAN_IFACE
 # LAN is a downstream network. Do not solicit Router Advertisements there.
@@ -219,7 +244,7 @@ CONF
     cat > "$PD_SERVICE_CONF" <<CONF
 [program:armfirewall-ipv6pd]
 directory=$ROOT_DIR
-command=$dhcpcd_bin -6 -B -f $PD_DHCPCD_CONF $WAN_IFACE $LAN_IFACE
+command=$ROOT_DIR/bin/scripts/startpre/ipv6pd.sh $dhcpcd_bin $PD_DHCPCD_CONF $WAN_IFACE $LAN_IFACE
 autostart=true
 autorestart=true
 startsecs=3
