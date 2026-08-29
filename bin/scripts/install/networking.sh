@@ -243,11 +243,29 @@ configure_networkmanager_default_route_policy() {
 }
 
 # Return NetworkManager Ethernet devices, excluding loopback and virtual devices.
+# A DSA conduit is an internal CPU-facing Ethernet interface. Its child ports
+# are the usable network interfaces and report "dsa conduit <interface>" in
+# their detailed link metadata. Do not configure the conduit itself as DHCP.
+networkmanager_is_dsa_conduit() {
+    local iface="$1" candidate candidate_path
+
+    for candidate_path in /sys/class/net/*; do
+        [[ -d "$candidate_path" ]] || continue
+        candidate="${candidate_path##*/}"
+        [[ "$candidate" != "$iface" ]] || continue
+
+        ip -d link show dev "$candidate" 2>/dev/null | grep -Fq "dsa conduit ${iface}" && return 0
+    done
+
+    return 1
+}
+
 networkmanager_ethernet_interfaces() {
     local iface device_type
 
     while IFS=: read -r iface device_type; do
         [[ -n "$iface" && "$iface" != "lo" && "$device_type" == "ethernet" ]] || continue
+        networkmanager_is_dsa_conduit "$iface" && continue
         printf '%s\n' "$iface"
     done < <(nmcli -t -f DEVICE,TYPE device status)
 }
@@ -258,6 +276,24 @@ network_interface_has_carrier() {
 
     [[ -r "/sys/class/net/${iface}/carrier" ]] || return 1
     [[ "$(<"/sys/class/net/${iface}/carrier")" == "1" ]]
+}
+
+# Activate a NetworkManager connection. Dynamic DHCP/RA acquisition can time
+# out while the upstream link is starting; retain its autoconnect profile so
+# NetworkManager retries rather than aborting the remainder of installation.
+activate_networkmanager_connection() {
+    local iface="$1" connection="$2" ipv4_address_spec="$3" ipv6_address_spec="$4"
+
+    if nmcli connection up "$connection" ifname "$iface" >/dev/null; then
+        return 0
+    fi
+
+    if uses_dhcp "$ipv4_address_spec" || uses_dhcp "$ipv6_address_spec"; then
+        log "NetworkManager could not obtain dynamic IP configuration on ${iface}; the saved autoconnect profile will retry."
+        return 0
+    fi
+
+    fatal "Could not activate the NetworkManager connection on ${iface}."
 }
 
 # Configure requested interfaces through the operating system's NetworkManager backend.
@@ -303,8 +339,7 @@ configure_networkmanager_interfaces() {
 
         if network_interface_has_carrier "$iface"; then
             log "Applying NetworkManager configuration on ${iface}."
-            nmcli connection up "$connection" ifname "$iface" >/dev/null || \
-                fatal "Could not activate the NetworkManager connection on ${iface}."
+            activate_networkmanager_connection "$iface" "$connection" "$ipv4_address_spec" "$ipv6_address_spec"
         else
             log "Saved NetworkManager configuration for ${iface}; activation will occur when a physical link is detected."
         fi
@@ -330,8 +365,7 @@ configure_networkmanager_interfaces() {
         fi
 
         if network_interface_has_carrier "$iface"; then
-            nmcli connection up "$connection" ifname "$iface" >/dev/null || \
-                fatal "Could not activate the NetworkManager connection on ${iface}."
+            activate_networkmanager_connection "$iface" "$connection" "dhcp" ""
         fi
     done < <(networkmanager_ethernet_interfaces)
 
