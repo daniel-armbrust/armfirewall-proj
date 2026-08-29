@@ -185,6 +185,7 @@ environment=PYTHONUNBUFFERED="1"
 [program:armfirewall-monitord]
 directory=$ROOT_DIR
 command=$ROOT_DIR/.venv/bin/python -m daemons.monitord
+user=armfw
 autostart=true
 autorestart=true
 startsecs=3
