@@ -184,7 +184,7 @@ environment=PYTHONUNBUFFERED="1"
 
 [program:armfirewall-monitord]
 directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/python -m daemons.monitord
+command=/usr/bin/nice -n 10 $ROOT_DIR/.venv/bin/python -m daemons.monitord
 user=armfw
 autostart=true
 autorestart=true
@@ -203,7 +203,7 @@ environment=PYTHONUNBUFFERED="1"
 
 [program:armfirewall-collectord]
 directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/python -m daemons.collectord
+command=/usr/bin/nice -n 10 $ROOT_DIR/.venv/bin/python -m daemons.collectord
 autostart=true
 autorestart=true
 startsecs=3
@@ -220,7 +220,7 @@ environment=PYTHONUNBUFFERED="1"
 
 [program:armfirewall-workreqd]
 directory=$ROOT_DIR
-command=$ROOT_DIR/.venv/bin/python -m daemons.workreqd.workreqd
+command=/usr/bin/nice -n -5 $ROOT_DIR/.venv/bin/python -m daemons.workreqd.workreqd
 autostart=true
 autorestart=true
 startsecs=3
