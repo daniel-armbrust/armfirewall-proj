@@ -13,7 +13,7 @@ STATIC_DIR = WEB_DIR / "static"
 
 SERVICES_STATUS_ACTIONS = {"enable", "disable", "start", "stop", "restart"}
 SESSION_COOKIE = "armfw_session"
-SESSION_TTL = timedelta(hours=8)
+SESSION_TTL = timedelta(minutes=10)
 LOGIN_PATH = "/login"
 CHANGE_PASSWORD_PATH = "/login/change-password"
 LOGOUT_PATH = "/logout"
